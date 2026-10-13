@@ -1,0 +1,262 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { useNovelStore } from '@/stores/useNovelStore';
+import {
+  Bold,
+  Italic,
+  Heading1,
+  Heading2,
+  Quote,
+  Minus,
+  Undo,
+  Redo,
+  Save,
+  Maximize2,
+  Minimize2,
+  Sparkles,
+} from 'lucide-react';
+
+export const NovelEditor: React.FC = () => {
+  const {
+    activeNovel,
+    activeChapter,
+    editorContent,
+    updateEditorContent,
+    saveCurrentChapter,
+    saveStatus,
+    streamText,
+    isGenerating,
+  } = useNovelStore();
+
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+    ],
+    content: editorContent || '',
+    editorProps: {
+      attributes: {
+        class: 'prose prose-invert max-w-none focus:outline-none min-h-[500px] text-slate-200 text-lg leading-relaxed',
+      },
+    },
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      updateEditorContent(html);
+
+      // Debounce auto-save (800ms)
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        saveCurrentChapter(false, 'USER_EDIT');
+      }, 800);
+    },
+  });
+
+  // Sync editor content when chapter changes
+  useEffect(() => {
+    if (editor && editorContent !== editor.getHTML()) {
+      editor.commands.setContent(editorContent || '', { emitUpdate: false });
+    }
+  }, [activeChapter?.id]);
+
+  // Handle Ctrl+S keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveCurrentChapter(true, 'USER_MANUAL_SAVE');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [saveCurrentChapter]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
+
+  if (!activeNovel) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-slate-500 select-none p-6">
+        <Sparkles className="w-12 h-12 text-slate-700 mb-3" />
+        <h3 className="text-base font-semibold text-slate-400 mb-1">欢迎使用 NovelForge AI</h3>
+        <p className="text-xs text-slate-500 mb-4 text-center max-w-md">
+          请在左侧栏选择或创建小说项目，开启本地优先、长期记忆驱动的专业长篇连载创作。
+        </p>
+      </div>
+    );
+  }
+
+  if (!activeChapter) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-slate-500 select-none p-6">
+        <div className="w-12 h-12 rounded-full bg-slate-800/80 flex items-center justify-center mb-3">
+          <Quote className="w-6 h-6 text-slate-400" />
+        </div>
+        <h3 className="text-sm font-semibold text-slate-300 mb-1">未选中章节</h3>
+        <p className="text-xs text-slate-500 mb-3">请从左侧目录选择一个章节，或点击新建章节开始写作。</p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`flex-1 flex flex-col bg-slate-900/40 min-w-0 h-[calc(100vh-3.5rem)] ${
+        isFullScreen ? 'fixed inset-0 z-50 bg-slate-950 p-6' : ''
+      }`}
+    >
+      {/* Editor Formatting Toolbar */}
+      <div className="h-11 border-b border-slate-800/80 px-4 flex items-center justify-between bg-slate-950/40 select-none shrink-0">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => editor?.chain().focus().undo().run()}
+            disabled={!editor?.can().undo()}
+            className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent"
+            title="撤销 (Ctrl+Z)"
+          >
+            <Undo className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => editor?.chain().focus().redo().run()}
+            disabled={!editor?.can().redo()}
+            className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent"
+            title="重做 (Ctrl+Y)"
+          >
+            <Redo className="w-3.5 h-3.5" />
+          </button>
+
+          <div className="w-px h-4 bg-slate-800 mx-1" />
+
+          <button
+            onClick={() => editor?.chain().focus().toggleBold().run()}
+            className={`p-1.5 rounded hover:bg-slate-800 transition ${
+              editor?.isActive('bold') ? 'bg-indigo-600/30 text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="加粗"
+          >
+            <Bold className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => editor?.chain().focus().toggleItalic().run()}
+            className={`p-1.5 rounded hover:bg-slate-800 transition ${
+              editor?.isActive('italic') ? 'bg-indigo-600/30 text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="斜体"
+          >
+            <Italic className="w-3.5 h-3.5" />
+          </button>
+
+          <div className="w-px h-4 bg-slate-800 mx-1" />
+
+          <button
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+            className={`p-1.5 rounded hover:bg-slate-800 transition ${
+              editor?.isActive('heading', { level: 1 })
+                ? 'bg-indigo-600/30 text-indigo-400'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="一级标题"
+          >
+            <Heading1 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+            className={`p-1.5 rounded hover:bg-slate-800 transition ${
+              editor?.isActive('heading', { level: 2 })
+                ? 'bg-indigo-600/30 text-indigo-400'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="二级标题"
+          >
+            <Heading2 className="w-3.5 h-3.5" />
+          </button>
+
+          <div className="w-px h-4 bg-slate-800 mx-1" />
+
+          <button
+            onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+            className={`p-1.5 rounded hover:bg-slate-800 transition ${
+              editor?.isActive('blockquote')
+                ? 'bg-indigo-600/30 text-indigo-400'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="引述"
+          >
+            <Quote className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => editor?.chain().focus().setHorizontalRule().run()}
+            className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+            title="分割线"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => saveCurrentChapter(true, 'USER_MANUAL_SAVE')}
+            disabled={saveStatus === 'SAVING'}
+            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition border border-slate-700"
+            title="保存当前快照 (Ctrl+S)"
+          >
+            <Save className="w-3.5 h-3.5" />
+            保存快照
+          </button>
+
+          <button
+            onClick={() => setIsFullScreen(!isFullScreen)}
+            className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+            title={isFullScreen ? '退出全屏专注模式' : '全屏专注模式'}
+          >
+            {isFullScreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Editor Content Area */}
+      <div className="flex-1 overflow-y-auto px-8 md:px-16 py-8">
+        <div className="max-w-3xl mx-auto">
+          {/* Chapter Title Banner */}
+          <div className="mb-6 pb-4 border-b border-slate-800/60">
+            <div className="text-xs font-semibold text-indigo-400 tracking-wider mb-1">
+              第 {activeChapter.chapter_number} 章
+            </div>
+            <h1 className="text-2xl font-bold text-slate-100 tracking-tight">
+              {activeChapter.title}
+            </h1>
+          </div>
+
+          {/* Tiptap Editor Surface */}
+          <div className="min-h-[500px]">
+            <EditorContent editor={editor} />
+          </div>
+
+          {/* Stream preview box if actively generating */}
+          {isGenerating && streamText && (
+            <div className="mt-6 p-4 rounded-xl border border-indigo-500/30 bg-indigo-950/20 backdrop-blur">
+              <div className="flex items-center gap-2 text-xs text-indigo-400 font-medium mb-2">
+                <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                <span>正文作家 Agent 实时流式生成中...</span>
+              </div>
+              <p className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">
+                {streamText}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

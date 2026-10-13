@@ -1,0 +1,6 @@
+[build]
+target = "x86_64-pc-windows-gnu"
+target-dir = "E:/tools/novelforge_target"
+
+[target.x86_64-pc-windows-gnu]
+linker = "gcc"
