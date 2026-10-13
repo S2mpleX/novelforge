@@ -15,9 +15,53 @@ import {
   Maximize2,
   Minimize2,
   Sparkles,
+  AlignLeft,
+  Lightbulb,
+  Clock,
+  Target,
+  Check,
+  X,
 } from 'lucide-react';
 import { CreateNovelModal } from '@/components/modals/CreateNovelModal';
 import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
+
+type PaperTheme = 'xuan' | 'bamboo' | 'kraft' | 'midnight';
+type FontSize = '16' | '18' | '20';
+
+const PAPER_STYLES: Record<PaperTheme, { bg: string; paper: string; border: string; text: string; shadow: string; label: string }> = {
+  xuan: {
+    label: '温润宣纸',
+    bg: 'bg-[#f4efe6]',
+    paper: 'bg-[#fdfbf7]',
+    border: 'border-[#ded5c4]',
+    text: 'text-[#2b2621]',
+    shadow: 'shadow-[0_4px_25px_-5px_rgba(120,90,50,0.08),0_0_0_1px_rgba(215,200,180,0.5)]',
+  },
+  bamboo: {
+    label: '澄心竹纸',
+    bg: 'bg-[#f2f4f0]',
+    paper: 'bg-[#ffffff]',
+    border: 'border-[#dce1d9]',
+    text: 'text-[#1c221a]',
+    shadow: 'shadow-[0_4px_25px_-5px_rgba(50,80,60,0.06),0_0_0_1px_rgba(200,210,195,0.5)]',
+  },
+  kraft: {
+    label: '复古牛皮',
+    bg: 'bg-[#ebe0cb]',
+    paper: 'bg-[#f4ebdc]',
+    border: 'border-[#cfbf9e]',
+    text: 'text-[#261f16]',
+    shadow: 'shadow-[0_4px_25px_-5px_rgba(100,70,30,0.12),0_0_0_1px_rgba(190,170,140,0.6)]',
+  },
+  midnight: {
+    label: '水墨夜读',
+    bg: 'bg-[#18181b]',
+    paper: 'bg-[#222226]',
+    border: 'border-[#3f3f46]',
+    text: 'text-[#e4e4e7]',
+    shadow: 'shadow-[0_4px_25px_-5px_rgba(0,0,0,0.5),0_0_0_1px_rgba(60,60,65,0.8)]',
+  },
+};
 
 export const NovelEditor: React.FC = () => {
   const {
@@ -29,9 +73,32 @@ export const NovelEditor: React.FC = () => {
     saveStatus,
     streamText,
     isGenerating,
+    zenMode,
   } = useNovelStore();
 
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [showScratchpad, setShowScratchpad] = useState(false);
+  const [paperTheme, setPaperTheme] = useState<PaperTheme>(() => {
+    return (localStorage.getItem('novelforge_paper_theme') as PaperTheme) || 'xuan';
+  });
+  const [fontSize, setFontSize] = useState<FontSize>(() => {
+    return (localStorage.getItem('novelforge_font_size') as FontSize) || '18';
+  });
+  const [scratchNotes, setScratchNotes] = useState(() => {
+    return localStorage.getItem(`novelforge_notes_${activeNovel?.id || 'default'}`) || '';
+  });
+  const [formatSuccess, setFormatSuccess] = useState(false);
+
+  const handleSetPaperTheme = (theme: PaperTheme) => {
+    setPaperTheme(theme);
+    localStorage.setItem('novelforge_paper_theme', theme);
+  };
+
+  const handleSetFontSize = (size: FontSize) => {
+    setFontSize(size);
+    localStorage.setItem('novelforge_font_size', size);
+  };
+
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const editor = useEditor({
@@ -45,7 +112,7 @@ export const NovelEditor: React.FC = () => {
     content: editorContent || '',
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none min-h-[500px] text-slate-200 text-lg leading-relaxed',
+        class: 'prose max-w-none focus:outline-none min-h-[500px] leading-relaxed',
       },
     },
     onUpdate: ({ editor }) => {
@@ -69,6 +136,20 @@ export const NovelEditor: React.FC = () => {
     }
   }, [activeChapter?.id]);
 
+  // Sync scratch notes when active novel changes
+  useEffect(() => {
+    if (activeNovel?.id) {
+      setScratchNotes(localStorage.getItem(`novelforge_notes_${activeNovel.id}`) || '');
+    }
+  }, [activeNovel?.id]);
+
+  const handleNotesChange = (val: string) => {
+    setScratchNotes(val);
+    if (activeNovel?.id) {
+      localStorage.setItem(`novelforge_notes_${activeNovel.id}`, val);
+    }
+  };
+
   // Handle Ctrl+S keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -91,6 +172,44 @@ export const NovelEditor: React.FC = () => {
   const [showCreateNovel, setShowCreateNovel] = useState(false);
   const [showCreateChapter, setShowCreateChapter] = useState(false);
   const { loadNovels } = useNovelStore();
+
+  // One-click Literature Format: clean extra blank paragraphs and fix punctuation
+  const handleAutoFormat = () => {
+    if (!editor) return;
+    const currentHtml = editor.getHTML();
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = currentHtml;
+
+    const paragraphs = tempDiv.querySelectorAll('p');
+    paragraphs.forEach((p) => {
+      let text = p.innerText.trim();
+      if (!text) {
+        p.remove();
+        return;
+      }
+      // Replace English punctuations with Chinese standard
+      text = text
+        .replace(/,/g, '，')
+        .replace(/\?/g, '？')
+        .replace(/!/g, '！')
+        .replace(/:/g, '：')
+        .replace(/;/g, '；');
+      p.innerText = text;
+    });
+
+    const cleanedHtml = tempDiv.innerHTML;
+    editor.commands.setContent(cleanedHtml);
+    updateEditorContent(cleanedHtml);
+    saveCurrentChapter(true, 'AUTO_FORMAT');
+    setFormatSuccess(true);
+    setTimeout(() => setFormatSuccess(false), 2000);
+  };
+
+  // Character stats & calculations
+  const charCount = editorContent.replace(/\s+/g, '').length;
+  const targetWords = activeNovel?.chapter_target_length || 3000;
+  const targetPercent = Math.min(150, Math.round((charCount / Math.max(1, targetWords)) * 100));
+  const estimatedReadMinutes = (charCount / 400).toFixed(1);
 
   if (!activeNovel) {
     return (
@@ -193,13 +312,19 @@ export const NovelEditor: React.FC = () => {
 
   return (
     <div
-      className={`flex-1 flex flex-col bg-[#f4efe6] min-w-0 h-[calc(100vh-3.5rem)] transition-all ${
+      className={`flex-1 flex flex-col min-w-0 h-[calc(100vh-3.5rem)] transition-all ${
         isFullScreen ? 'fixed inset-0 z-50 bg-[#f4efe6] p-6' : ''
       }`}
     >
       {/* Editor Formatting Floating Toolbar */}
-      <div className="h-12 border-b border-[#ded5c4] px-6 flex items-center justify-between bg-[#efe9dc]/95 backdrop-blur-xl select-none shrink-0 z-10 shadow-sm">
-        <div className="flex items-center gap-1">
+      <div className="h-12 border-b border-[#ded5c4] px-4 md:px-6 flex items-center justify-between bg-[#efe9dc]/95 backdrop-blur-xl select-none shrink-0 z-10 shadow-sm gap-2">
+        {/* Left: Text Formatting Controls & Zen Mode Indicator */}
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {zenMode && (
+            <span className="mr-2 px-2 py-0.5 rounded bg-amber-800/10 text-amber-800 border border-amber-800/20 text-[10px] font-serif font-bold">
+              禅意专注 (Esc退出)
+            </span>
+          )}
           <button
             onClick={() => editor?.chain().focus().undo().run()}
             disabled={!editor?.can().undo()}
@@ -217,7 +342,7 @@ export const NovelEditor: React.FC = () => {
             <Redo className="w-3.5 h-3.5" />
           </button>
 
-          <div className="w-px h-4 bg-[#ded5c4] mx-1.5" />
+          <div className="w-px h-4 bg-[#ded5c4] mx-1" />
 
           <button
             onClick={() => editor?.chain().focus().toggleBold().run()}
@@ -242,8 +367,6 @@ export const NovelEditor: React.FC = () => {
             <Italic className="w-3.5 h-3.5" />
           </button>
 
-          <div className="w-px h-4 bg-[#ded5c4] mx-1.5" />
-
           <button
             onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
             className={`p-1.5 rounded-md transition ${
@@ -267,8 +390,6 @@ export const NovelEditor: React.FC = () => {
             <Heading2 className="w-3.5 h-3.5" />
           </button>
 
-          <div className="w-px h-4 bg-[#ded5c4] mx-1.5" />
-
           <button
             onClick={() => editor?.chain().focus().toggleBlockquote().run()}
             className={`p-1.5 rounded-md transition ${
@@ -287,17 +408,110 @@ export const NovelEditor: React.FC = () => {
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
+
+          <div className="w-px h-4 bg-[#ded5c4] mx-1" />
+
+          {/* One-click Formatting */}
+          <button
+            onClick={handleAutoFormat}
+            className="px-2 py-1 rounded-md bg-[#efe9dc] hover:bg-[#e4dcce] text-[#854d0e] border border-[#ded5c4] text-xs font-serif flex items-center gap-1 transition shadow-2xs"
+            title="一键文学规范排版：清理空行、全角标点规范化"
+          >
+            {formatSuccess ? <Check className="w-3.5 h-3.5 text-[#047857]" /> : <AlignLeft className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{formatSuccess ? '排版完成' : '规范排版'}</span>
+          </button>
+
+          <div className="w-px h-4 bg-[#ded5c4] mx-1" />
+
+          {/* Paper Theme Selector */}
+          <div className="flex items-center gap-0.5 bg-[#e8e0d0] p-0.5 rounded-md border border-[#d5cbb8]">
+            {(['xuan', 'bamboo', 'kraft', 'midnight'] as PaperTheme[]).map((theme) => (
+              <button
+                key={theme}
+                onClick={() => handleSetPaperTheme(theme)}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-serif transition ${
+                  paperTheme === theme
+                    ? 'bg-[#854d0e] text-white font-bold shadow-xs'
+                    : 'text-[#6b6255] hover:text-[#231f1a]'
+                }`}
+                title={`切换纸张主题：${PAPER_STYLES[theme].label}`}
+              >
+                {theme === 'xuan' ? '宣纸' : theme === 'bamboo' ? '竹纸' : theme === 'kraft' ? '牛皮' : '夜读'}
+              </button>
+            ))}
+          </div>
+
+          {/* Font Size Toggle */}
+          <div className="flex items-center gap-0.5 bg-[#e8e0d0] p-0.5 rounded-md border border-[#d5cbb8]">
+            <button
+              onClick={() => handleSetFontSize(fontSize === '20' ? '18' : '16')}
+              className="px-1 py-0.5 rounded text-[10px] font-mono text-[#6b6255] hover:text-[#231f1a]"
+              title="减小字号"
+            >
+              A-
+            </button>
+            <span className="text-[10px] px-1 font-mono text-[#854d0e] font-bold">
+              {fontSize}px
+            </span>
+            <button
+              onClick={() => handleSetFontSize(fontSize === '16' ? '18' : '20')}
+              className="px-1 py-0.5 rounded text-[10px] font-mono text-[#6b6255] hover:text-[#231f1a]"
+              title="放大字号"
+            >
+              A+
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Center/Right: Target Word Count & Reading Time Tracker */}
+        <div className="hidden lg:flex items-center gap-3 text-xs font-serif text-[#685f54] bg-[#f7f2e7] px-3 py-1 rounded-lg border border-[#ded5c4]">
+          <div className="flex items-center gap-1.5">
+            <Target className="w-3.5 h-3.5 text-[#854d0e]" />
+            <span>目标:</span>
+            <span className="font-bold text-[#2b2621]">
+              {charCount} / {targetWords} 字
+            </span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
+              targetPercent >= 100
+                ? 'bg-[#047857]/10 text-[#047857] border border-[#047857]/20'
+                : 'bg-[#854d0e]/10 text-[#854d0e] border border-[#854d0e]/20'
+            }`}>
+              {targetPercent}%
+            </span>
+          </div>
+
+          <div className="w-px h-3 bg-[#ded5c4]" />
+
+          <div className="flex items-center gap-1 text-[#786f65]">
+            <Clock className="w-3.5 h-3.5 text-[#854d0e]" />
+            <span>~{estimatedReadMinutes} 分钟</span>
+          </div>
+        </div>
+
+        {/* Right: Actions (Scratchpad, Save, Fullscreen) */}
+        <div className="flex items-center gap-2">
+          {/* Scratchpad Toggle */}
+          <button
+            onClick={() => setShowScratchpad(!showScratchpad)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-serif font-medium flex items-center gap-1.5 transition border ${
+              showScratchpad
+                ? 'bg-[#854d0e] text-[#fdfbf7] border-[#854d0e] shadow-xs'
+                : 'bg-[#efe9dc] hover:bg-[#e4dcce] text-[#2b2621] border-[#ded5c4]'
+            }`}
+            title="展开/折叠灵感随手记便签"
+          >
+            <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+            <span className="hidden sm:inline">灵感便签</span>
+          </button>
+
           <button
             onClick={() => saveCurrentChapter(true, 'USER_MANUAL_SAVE')}
             disabled={saveStatus === 'SAVING'}
-            className="px-3 py-1 rounded-lg bg-[#e8dfcf] hover:bg-[#dfd4c0] text-[#2b2621] text-xs font-medium flex items-center gap-1.5 transition border border-[#d5c9b4] shadow-xs active:scale-95"
+            className="px-3 py-1 rounded-lg bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] text-xs font-serif font-medium flex items-center gap-1.5 transition shadow-xs active:scale-95 disabled:opacity-40"
             title="保存当前快照 (Ctrl+S)"
           >
-            <Save className="w-3.5 h-3.5 text-amber-800" />
-            保存快照
+            <Save className="w-3.5 h-3.5" />
+            <span>保存快照</span>
           </button>
 
           <button
@@ -310,38 +524,70 @@ export const NovelEditor: React.FC = () => {
         </div>
       </div>
 
-      {/* Editor Content Area (Physical Paper Sheet Layout) */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-12 lg:px-20 py-8">
-        <div className="max-w-3xl mx-auto bg-[#fdfbf7] p-8 md:p-14 rounded-2xl border border-[#ded5c4] shadow-[0_4px_25px_-5px_rgba(120,90,50,0.08),0_0_0_1px_rgba(215,200,180,0.5)]">
-          {/* Chapter Title Banner */}
-          <div className="mb-8 pb-5 border-b border-[#ded5c4]">
-            <div className="text-xs font-bold text-amber-800 tracking-wider uppercase mb-2 flex items-center gap-2 font-mono">
-              <span className="w-2 h-2 rounded-full bg-amber-700" />
-              第 {activeChapter.chapter_number} 章
-            </div>
-            <h1 className="text-2xl md:text-3xl font-bold text-[#1f1d1a] tracking-tight leading-snug font-serif">
-              {activeChapter.title}
-            </h1>
-          </div>
-
-          {/* Tiptap Editor Surface */}
-          <div className="min-h-[540px]">
-            <EditorContent editor={editor} />
-          </div>
-
-          {/* Stream preview box if actively generating */}
-          {isGenerating && streamText && (
-            <div className="mt-8 p-6 rounded-xl border border-amber-800/30 bg-[#f9f4ea] shadow-md">
-              <div className="flex items-center gap-2.5 text-xs text-amber-800 font-semibold mb-3">
-                <Sparkles className="w-4 h-4 animate-spin text-amber-700" />
-                <span>正文作家 Agent 正在实时流式创作中...</span>
+      {/* Main Workspace (Editor Canvas + Optional Scratchpad Drawer) */}
+      <div className={`flex-1 flex overflow-hidden transition-colors duration-200 ${PAPER_STYLES[paperTheme].bg}`}>
+        {/* Editor Content Area (Physical Paper Sheet Layout) */}
+        <div className="flex-1 overflow-y-auto px-4 md:px-12 lg:px-20 py-8">
+          <div className={`max-w-3xl mx-auto p-8 md:p-14 rounded-2xl border transition-colors duration-200 ${PAPER_STYLES[paperTheme].paper} ${PAPER_STYLES[paperTheme].border} ${PAPER_STYLES[paperTheme].text} ${PAPER_STYLES[paperTheme].shadow}`}>
+            {/* Chapter Title Banner */}
+            <div className={`mb-8 pb-5 border-b ${PAPER_STYLES[paperTheme].border}`}>
+              <div className="text-xs font-bold text-amber-800 tracking-wider uppercase mb-2 flex items-center gap-2 font-mono">
+                <span className="w-2 h-2 rounded-full bg-amber-700" />
+                第 {activeChapter.chapter_number} 章
               </div>
-              <p className="text-[#2b2621] text-base whitespace-pre-wrap leading-relaxed font-serif">
-                {streamText}
-              </p>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight leading-snug font-serif">
+                {activeChapter.title}
+              </h1>
             </div>
-          )}
+
+            {/* Tiptap Editor Surface */}
+            <div className={`min-h-[540px] ${fontSize === '16' ? 'text-base leading-relaxed' : fontSize === '20' ? 'text-xl leading-loose' : 'text-lg leading-relaxed'}`}>
+              <EditorContent editor={editor} />
+            </div>
+
+            {/* Stream preview box if actively generating */}
+            {isGenerating && streamText && (
+              <div className="mt-8 p-6 rounded-xl border border-amber-800/30 bg-[#f9f4ea] shadow-md">
+                <div className="flex items-center gap-2.5 text-xs text-amber-800 font-semibold mb-3">
+                  <Sparkles className="w-4 h-4 animate-spin text-amber-700" />
+                  <span>正文作家 Agent 正在实时流式创作中...</span>
+                </div>
+                <p className="text-[#2b2621] text-base whitespace-pre-wrap leading-relaxed font-serif">
+                  {streamText}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Scratchpad Slide-in Board */}
+        {showScratchpad && (
+          <aside className="w-72 md:w-80 border-l border-[#ded5c4] bg-[#f7f2e7] flex flex-col shrink-0 animate-in slide-in-from-right duration-200">
+            <div className="p-3.5 border-b border-[#ded5c4] flex items-center justify-between bg-[#efe9dc]">
+              <div className="flex items-center gap-2 text-xs font-serif font-bold text-[#854d0e]">
+                <Lightbulb className="w-4 h-4 text-amber-600" />
+                <span>灵感与伏笔备忘便签</span>
+              </div>
+              <button
+                onClick={() => setShowScratchpad(false)}
+                className="p-1 rounded text-[#786f65] hover:text-[#2b2621]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="p-3 flex-1 flex flex-col">
+              <span className="text-[11px] text-[#786f65] font-serif mb-2">
+                随手记下剧情火花、伏笔备忘或读者心绪，自动持久化存储：
+              </span>
+              <textarea
+                value={scratchNotes}
+                onChange={(e) => handleNotesChange(e.target.value)}
+                placeholder="例如：\n- 下一章让反派在重力井提前埋伏\n- 李观棋的曲率钥匙还有第二重隐藏密码\n- 突出深空环境的压迫感与金属冷感..."
+                className="flex-1 w-full bg-[#fdfbf7] border border-[#ded5c4] rounded-xl p-3 text-xs text-[#2b2621] placeholder-[#a89f91] focus:outline-hidden focus:border-[#854d0e] resize-none font-serif leading-relaxed shadow-2xs"
+              />
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

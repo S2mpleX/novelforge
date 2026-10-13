@@ -11,7 +11,7 @@ import { isTauri } from '@/utils/tauriBridge';
 import { Info, X } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const { loadNovels, loadProviders, activeTab } = useNovelStore();
+  const { loadNovels, loadProviders, activeTab, zenMode } = useNovelStore();
   const [showWebNotice, setShowWebNotice] = useState(!isTauri());
 
   useEffect(() => {
@@ -41,12 +41,12 @@ export const App: React.FC = () => {
       )}
       <Header />
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar />
+        {!zenMode && <Sidebar />}
         <main className="flex-1 flex overflow-hidden">
           {activeTab === 'EDITOR' && (
             <>
               <NovelEditor />
-              <AiAssistantPanel />
+              {!zenMode && <AiAssistantPanel />}
             </>
           )}
           {activeTab === 'DASHBOARD' && <DashboardView />}

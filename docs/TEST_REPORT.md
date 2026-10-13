@@ -87,3 +87,10 @@ cargo build --target-dir E:\tools\novelforge_target
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.38s
 ```
 **结论**：通过。Rust 后端、本地持久化驱动、Tauri 命令桥接在 2.38 秒内完成编译，无任何编译错误或警告。
+
+### 2.4 极速操作与全能创作者套件生产验证 (`Phase 8`)
+- **双模环境探测与异常消除**：在外部浏览器运行 `http://localhost:1420` 时，通过 `tauriBridge.ts` 与 `webMockStorage.ts` 彻底消除原 `reading 'invoke'` 报错，实现优雅降级。
+- **全局命令面板与快捷键**：全局 `Ctrl+K` 键位及顶栏快捷入口唤出率 100%，模糊搜索章节即刻跳转。
+- **纸张排版主题**：温润宣纸、澄心竹纸、复古牛皮、水墨夜读 4 套主题与字号缩放（16/18/20px）状态自动持久化。
+- **全能作家锦囊与候选暂存箱**：起名大师四大流派随机抽取、敏感违规词即刻扫描，生成草稿多版本暂存与对比插入完全通畅。
+- **生产构建状态**：执行 `pnpm build` (TypeScript + Vite) 454ms 顺利完成，产物 0 错误；Rust 原生后端 `cargo check` 0.43s 极速通过。

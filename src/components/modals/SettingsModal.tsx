@@ -144,6 +144,47 @@ export const SettingsModal: React.FC<Props> = ({ onClose }) => {
             </div>
           </div>
 
+          {/* Provider Quick Presets */}
+          <div className="space-y-2">
+            <label className="text-xs font-serif font-bold text-[#854d0e] flex items-center justify-between">
+              <span>⚡ 一键快速预设 (点击自动填入端点与模型)</span>
+              <span className="text-[11px] text-[#786f65] font-normal">支持本地网关、官方及第三方端点</span>
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[
+                { name: '本地 CPA / 代理', url: 'http://127.0.0.1:8317/v1', model: 'gemini-3.8-flash-high', badge: '免 Key' },
+                { name: 'DeepSeek 官方', url: 'https://api.deepseek.com/v1', model: 'deepseek-chat', badge: '深度思考' },
+                { name: 'OpenAI 官方', url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', badge: '稳定' },
+                { name: 'Ollama 本地模型', url: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:7b', badge: '纯离线' },
+                { name: '硅基流动 (SiliconFlow)', url: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3', badge: '国产高速' },
+                { name: '月之暗面 Kimi', url: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', badge: '长上下文' },
+              ].map((preset) => (
+                <button
+                  key={preset.name}
+                  type="button"
+                  onClick={() => {
+                    setProviderName(preset.name);
+                    setBaseUrl(preset.url);
+                    setModelName(preset.model);
+                  }}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                    baseUrl === preset.url
+                      ? 'bg-[#efe9dc] border-[#854d0e] text-[#854d0e] shadow-2xs'
+                      : 'bg-[#f7f2e7] border-[#ded5c4] text-[#4a4237] hover:bg-[#efe9dc] hover:border-[#854d0e]/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-serif font-bold truncate">{preset.name}</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#fdfbf7] text-[#854d0e] border border-[#ded5c4]">
+                      {preset.badge}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[#786f65] font-mono truncate">{preset.model}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <form onSubmit={handleSave} className="space-y-4">
             <div>
               <label className="text-xs font-serif font-semibold text-[#2b2621] block mb-1.5">

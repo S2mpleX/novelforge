@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Search,
   BookOpen,
+  Copy,
 } from 'lucide-react';
 import { CreateNovelModal } from '@/components/modals/CreateNovelModal';
 import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
@@ -99,8 +100,8 @@ export const Sidebar: React.FC = () => {
           </button>
         </div>
 
-        {/* Search Bar */}
-        <div className="px-3 py-2">
+        {/* Search Bar & Novel Stats Overview */}
+        <div className="px-3 py-2 space-y-1.5">
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#8e8476]" />
             <input
@@ -110,6 +111,13 @@ export const Sidebar: React.FC = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-[#2b2621] placeholder-[#8e8476] focus:outline-none focus:border-amber-700 shadow-inner"
             />
+          </div>
+
+          <div className="flex items-center justify-between px-1 text-[10px] text-[#786f65]">
+            <span>全书累计:</span>
+            <span className="font-mono font-medium text-[#2b2621]">
+              <strong>{chapters.length}</strong> 章节 · <strong>{chapters.reduce((sum, c) => sum + (c.word_count || 0), 0).toLocaleString()}</strong> 字
+            </span>
           </div>
         </div>
 
@@ -151,10 +159,28 @@ export const Sidebar: React.FC = () => {
                     <span className="truncate text-[#2b2621]">{ch.title}</span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     <span className="text-[10px] text-[#786f65] font-mono px-1 py-0.5 rounded bg-[#e8e0d0] border border-[#dcd1be]">
                       {ch.word_count || 0}字
                     </span>
+
+                    {/* Quick Copy Plaintext */}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          const plainText = (ch.content || '').replace(/<[^>]+>/g, '\n').replace(/\n\s*\n/g, '\n\n').trim();
+                          await navigator.clipboard.writeText(plainText || ch.title);
+                          alert(`已复制第 ${ch.chapter_number} 章内容到剪贴板！`);
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }}
+                      className="p-1 rounded text-[#786f65] hover:text-[#231f1a] hover:bg-[#ded4c3] transition opacity-0 group-hover:opacity-100"
+                      title="快速复制本章纯文本"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
 
                     {isActive && (
                       <button

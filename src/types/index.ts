@@ -10,6 +10,7 @@ export interface Novel {
   updated_at: number;
   chapter_count?: number;
   total_word_count?: number;
+  chapter_target_length?: number;
 }
 
 export interface Volume {

@@ -25,11 +25,14 @@ interface NovelState {
   versions: ChapterVersion[];
   sidebarCollapsed: boolean;
   rightPanelOpen: boolean;
+  zenMode: boolean;
 
   // Actions
   setActiveTab: (tab: ActiveTab) => void;
   toggleSidebar: () => void;
   toggleRightPanel: () => void;
+  toggleZenMode: () => void;
+  setZenMode: (zenMode: boolean) => void;
   loadNovels: () => Promise<void>;
   selectNovel: (novel: Novel) => Promise<void>;
   createNovel: (input: {
@@ -70,10 +73,13 @@ export const useNovelStore = create<NovelState>((set, get) => ({
   versions: [],
   sidebarCollapsed: false,
   rightPanelOpen: true,
+  zenMode: false,
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   toggleRightPanel: () => set((s) => ({ rightPanelOpen: !s.rightPanelOpen })),
+  toggleZenMode: () => set((s) => ({ zenMode: !s.zenMode })),
+  setZenMode: (zenMode) => set({ zenMode }),
 
   loadNovels: async () => {
     try {

@@ -51,3 +51,19 @@
   1. 引入强类型状态机 `SerializationJob`（`PENDING` -> `RUNNING` -> `WAITING_REVIEW` -> `COMPLETED` / `PAUSED` / `CANCELLED`）。
   2. 实施 **Auto-Approve Guard**：默认情况下 `auto_approve` 为 `false`，每章自动执行【大纲细化 -> 正文草稿 -> 逻辑审稿 -> 记忆沉淀】后自动挂起为 `WAITING_REVIEW`，等待用户人工核准后方可推进下一章；仅当创作者明确授权全自动定稿推进时才开启闭环连载。
   3. 任何自动生成草稿均作为全新章节与新版本快照入库，支持随时暂停、取消与安全回退。
+
+## ADR-010: IPC 桥接双模自适应与 Web 兼容层 (Phase 8)
+- **状态**：已采纳
+- **上下文**：在多环境开发或用户在普通浏览器（如 `localhost:1420`）调试时，由于缺少 Tauri 内部注入的 `__TAURI_INTERNALS__`，会导致直接抛出 `Cannot read properties of undefined (reading 'invoke')` 致命未捕获异常。
+- **决策**：
+  1. 引入双模桥接层 `src/utils/tauriBridge.ts`，自动探测 `isTauri()` 环境。
+  2. 桌面端执行原生 Rust IPC 命令；浏览器环境自动无缝降级走 `webMockStorage.ts`（基于 LocalStorage 持久化存储与真实网络 `fetch` 探测），彻底消除红字报错与白屏崩溃。
+
+## ADR-011: 极简创作路径与全能工具箱架构 (Phase 8)
+- **状态**：已采纳
+- **上下文**：创作者在日常码字中痛恨频繁在多级菜单中查找功能、频繁手动复制粘贴提示词、多次生成候选无法对比暂存、以及夜间暗光环境与白天强光下的视觉疲劳。
+- **决策**：
+  1. **全局命令面板 (Ctrl+K)**：提供键盘流命令面板，秒级模糊检索章节、一键规范排版、保存快照与导航。
+  2. **草稿候选暂存箱 (Draft Stash)**：AI 每次流式生成的文本支持一键放入草稿箱，支持多版本横向对比与差异化应用。
+  3. **纸张与排版工作室 (Paper & Typography Studio)**：提供 4 款定制纸张（温润宣纸、澄心竹纸、复古牛皮、水墨夜读）与字号快速缩放（16/18/20px），沉浸式 Zen 模式（按 Esc 退出）。
+  4. **作家锦囊 (Toolbox)**：内置四大风格起名大师（人名、宗门、神兵、功法）与网文敏感违规词合规自查。
