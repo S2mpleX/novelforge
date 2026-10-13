@@ -87,10 +87,117 @@ impl DbManager {
             );
         }
 
+        // Seed default sample novel if no novel exists
+        let novel_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM novels",
+            [],
+            |r| r.get(0),
+        ).unwrap_or(0);
+
+        if novel_count == 0 {
+            let _ = Self::seed_sample_novel(&conn);
+        }
+
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
             db_path,
         })
+    }
+
+    fn seed_sample_novel(conn: &Connection) -> Result<()> {
+        let now = chrono::Utc::now().timestamp_millis();
+        let novel_id = Uuid::new_v4().to_string();
+
+        conn.execute(
+            "INSERT INTO novels (id, title, description, genre_profile, language, writing_style, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'ACTIVE', ?7, ?8)",
+            params![
+                &novel_id,
+                "《星穹之门：终极纪元》",
+                "人类深空先驱舰队跨越柯伊伯带，在太阳风暴余波与未知暗区中追寻古代超维文明遗留的星穹之门。",
+                "硬科幻/太空歌剧",
+                "zh-CN",
+                "沉郁硬朗、富有宏大宇宙诗意、注重微动作与环境压迫感",
+                now,
+                now
+            ],
+        )?;
+
+        conn.execute(
+            "INSERT INTO novel_settings (novel_id, chapter_target_length) VALUES (?1, 3000)",
+            params![&novel_id],
+        )?;
+
+        let volume_id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO volumes (id, novel_id, title, order_index, summary, status, created_at)
+             VALUES (?1, ?2, '第一卷：深空破晓', 1, '跨越柯伊伯带与未知脉冲接战', 'PLANNING', ?3)",
+            params![&volume_id, &novel_id, now],
+        )?;
+
+        let chapter_id = Uuid::new_v4().to_string();
+        let sample_content = "<p>冰冷的冷凝水顺着重巡洋舰“先驱者号”舰桥厚重的铅灰色合金装甲壁缓缓淌下，在低重力环境下凝结成一串悬垂的深蓝色水珠。</p><p>林远站在舷窗前，舷窗外是浩瀚无垠的柯伊伯带暗区，远处太阳的光芒已被削弱成一颗冰冷的苍白星芒。他的右手食指无意识地摩挲着舰长指引徽章边缘的缺口，那是三年前土星轨道战役中留下的弹片擦痕。</p><p>“曲率核心自检完成，工质流速稳定在百分之九十七。”首席科学官安雅的声音从战术投影台后方传来，沉稳中透着一丝不易察觉的紧绷，“但引力波雷达刚刚捕捉到底噪层有极其微弱的周期性脉冲。周期是十三点七秒，不是自然天体辐射。”</p><p>林远缓缓转过身，目光落在三维全息星图上闪烁的暗红光点上。“通报全舰，取消常规巡航状态，进入二级战备。还有三十分钟进入预定跃迁盲区，把所有无源传感器功率推到峰值。”</p><p>“明白。”安雅迅速敲击操作台，战术控制台上泛起层层淡青色的光晕，“如果那道信号是冲着我们的曲率核心来的，一旦跃迁启动，我们可能就无法回头了。”</p><p>林远凝视着虚空中沉默的星河，深吸了一口气。“这片星空从来不允许回头的人活下来。通知轮机舱，按计划注入反物质催化剂。”</p>";
+        
+        conn.execute(
+            "INSERT INTO chapters (id, novel_id, volume_id, chapter_number, title, content, word_count, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, 1, '跃迁前夕', ?4, 512, 'DRAFT', ?5, ?6)",
+            params![&chapter_id, &novel_id, &volume_id, sample_content, now, now],
+        )?;
+
+        // Initial snapshot
+        let version_id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO chapter_versions (id, chapter_id, version_number, content, word_count, change_summary, source_agent, created_at)
+             VALUES (?1, ?2, 1, ?3, 512, '初始示范草稿', 'DEMO_SEED', ?4)",
+            params![&version_id, &chapter_id, sample_content, now],
+        )?;
+
+        // Seed Characters
+        let char1_id = Uuid::new_v4().to_string();
+        let char2_id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO characters (id, novel_id, name, role_type, identity, personality, motivation, secret, current_status, arc_stage, tags, created_at, updated_at)
+             VALUES (?1, ?2, '林远', 'PROTAGONIST', '先驱者号远征舰队旗舰舰长', '冷峻沉着、极度理智、内心负有创伤', '探寻失落先驱者文明遗迹真相', '三年前土星轨道撤退战中有未解指令', '担任先驱者号最高决策人', '觉醒破局期', '硬汉,舰长,深空探索', ?3, ?4)",
+            params![&char1_id, &novel_id, now, now],
+        )?;
+        conn.execute(
+            "INSERT INTO characters (id, novel_id, name, role_type, identity, personality, motivation, secret, current_status, arc_stage, tags, created_at, updated_at)
+             VALUES (?1, ?2, '安雅', 'MAJOR', '首席科学官兼战术参谋', '敏锐执着、思维缜密、对未解物理现象高度着迷', '解密原初暗物质脉冲物理公式', '曾接触过第一代暗区禁忌标本', '正解析13.7秒微弱脉冲', '初识探知期', '天才科学家,参谋,冷静', ?3, ?4)",
+            params![&char2_id, &novel_id, now, now],
+        )?;
+
+        // Seed Relationship
+        let rel_id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO character_relationships (id, novel_id, source_character_id, target_character_id, relation_type, description, trust_level, tension_level, updated_at)
+             VALUES (?1, ?2, ?3, ?4, '生死战友', '在多次深空危机中建立起绝对背靠背信任', 95, 10, ?5)",
+            params![&rel_id, &novel_id, &char1_id, &char2_id, now],
+        )?;
+
+        // Seed World Rule
+        let rule_id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO world_rules (id, novel_id, category, name, rule_content, authority_level, is_active, created_at, updated_at)
+             VALUES (?1, ?2, 'PHYSICS', '曲率泡稳定法则', '在未校准引力扰动区启动曲率泡，必须维持工质流速>=95%，否则将引发时空剪切坍缩。', 'CANON', 1, ?3, ?4)",
+            params![&rule_id, &novel_id, now, now],
+        )?;
+
+        // Seed Story Phase & Arc
+        let phase_id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO story_phases (id, novel_id, phase_number, title, goal, status, created_at)
+             VALUES (?1, ?2, 1, '第一阶段：破晓远征', '突围柯伊伯带封锁区，安全抵达跳跃折叠坐标', 'ACTIVE', ?3)",
+            params![&phase_id, &novel_id, now],
+        )?;
+
+        let arc_id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO story_arcs (id, phase_id, arc_name, arc_type, main_conflict, status, created_at)
+             VALUES (?1, ?2, '柯伊伯带突围弧', 'MAIN', '在未知暗区脉冲干扰下完成先驱者号首次超维曲率跃迁', 'IN_PROGRESS', ?3)",
+            params![&arc_id, &phase_id, now],
+        )?;
+
+        Ok(())
     }
 
     pub fn get_db_path(&self) -> String {
