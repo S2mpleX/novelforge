@@ -13,9 +13,14 @@
 - [x] **包管理器**：pnpm 9.15.4 / npm 11.12.0
 - [x] **Rust**：1.95.0 (`x86_64-pc-windows-gnu`)
 - [x] **C/C++ 链接工具链**：WinLibs MinGW-w64 (MSVCRT runtime + GCC 16.2.0 + GNU Binutils)，部署于 `E:\tools\winlibs_msvcrt`，免管理员权限，节省 C 盘空间
-- [x] **桌面运行时**：Tauri 2 + WebView2 原生后端
+- [x] **桌面运行时**：Tauri 2 + WebView2 原生后端，已在 `Cargo.toml` 中配置 `default-run = "novelforge-ai"`，支持双二进制（主程序与 `db_test` 独立运行）
 - [x] **本地数据库**：SQLite 嵌入式存储，已开启 WAL 模式、外键级联检查与 FTS5 全文搜索支持（虚拟表 `canon_facts_fts`, `chapters_fts`）
 - [x] **前端生态**：React 19 + TypeScript + Vite 8 + Tailwind CSS v4 + Tiptap 编辑器 + Zustand + Lucide 图标库 + **@xyflow/react (React Flow 拓扑图谱)**
+- [x] **开发启动方式**：
+  ```powershell
+  $env:PATH = "E:\tools\winlibs_msvcrt\mingw64\bin;" + $env:PATH
+  pnpm tauri dev
+  ```
 
 ---
 
