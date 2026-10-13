@@ -101,8 +101,20 @@
 - **数据库诊断与优化 (`optimize_database`)**：执行 `PRAGMA integrity_check`、`PRAGMA wal_checkpoint(TRUNCATE)` 与 `PRAGMA optimize`，输出文件体积、健康度与全表行数统计。
 - **发布与运维控制台 (`PublishingModal.tsx`)**：可视化管理导出、导入、热备份与碎片整理。
 
+### 3.10 全站纸张质感与温润书卷美学系统 (Warm Parchment / Paper Studio)
+- **纸张色调与材质**：彻底替换暗黑极客风，全面采用宣纸/米纸/羊皮纸质感背景（`#f4efe6` ~ `#fdfbf7`），正文区呈现一张米白象牙色物理稿纸（带柔和立体双层阴影与书页边框），正文中文大号衬线字体（“Source Han Serif SC”, “Noto Serif CJK SC” 等），首行缩进 2em，徽墨松烟字色 `#231f1a`。
+- **印章与书卷点缀**：采用典雅朱砂红、沉香茶金（`#854d0e` / `#c2410c`）与竹青墨绿（`#047857`），形成统一的文人书房格调。
+- **全站组件覆盖 (17 个模块)**：
+  - 根视口与全局样式表：`src/App.css`, `src/App.tsx`
+  - 布局体系：`Header.tsx`, `Sidebar.tsx`
+  - 核心编辑与 AI 面板：`NovelEditor.tsx`, `AiAssistantPanel.tsx`
+  - 视图模块：`DashboardView.tsx`, `StoryBibleView.tsx`, `CharacterFlowView.tsx`, `PlotArcsView.tsx`, `MemoryEngineView.tsx`
+  - 弹窗与历史抽屉：`CreateNovelModal.tsx`, `CreateChapterModal.tsx`, `SettingsModal.tsx`, `SerializationModal.tsx`, `PublishingModal.tsx`, `VersionDrawer.tsx`
+- **示范作品自动播种**：内置硬科幻小说《星穹之门：终极纪元》（含完整正文、人物拓扑关系、世界观真理与剧情弧），新用户打开立即可体验整套纸张文学写作环境。
+
 ---
 
 ## 4. 总结与后续演进建议
-NovelForge AI V2.0 全部核心架构与业务系统已圆满落地，通过 23 项端到端业务单元测试，实现“本地优先、真实可运行、长期记忆驱动、多 Agent 协作连载、安全可控、优雅发布”的产品承诺。
+NovelForge AI V2.0 全部核心架构与业务系统已圆满落地，通过 23 项端到端业务单元测试，实现“本地优先、真实可运行、长期记忆驱动、多 Agent 协作连载、安全可控、优雅发布”的产品承诺。全站界面已完成“温润纸张/书卷美学”深度换装，具备极佳的长时间阅读与写作体验。
 后续可在桌面端增加系统托盘图标、全局快捷键与高级自定义 CSS 皮肤扩展。
+
