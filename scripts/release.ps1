@@ -183,14 +183,86 @@ if ($exeName) {
     Write-Host "  → 把 .exe 文件发给对方即可安装" -ForegroundColor Cyan
     Write-Host ""
 
-    # 询问是否推送到 GitHub
-    $pushGit = Read-Host "  是否提交到 Git 并推送标签触发 GitHub 发布？(y/N)"
-    if ($pushGit -eq 'y' -or $pushGit -eq 'Y') {
+    # 询问是否发布到 GitHub
+    $pushGit = Read-Host "  是否一键发布到 GitHub Releases 并推送代码？(Y/n)"
+    if ($pushGit -ne 'n' -and $pushGit -ne 'N') {
+        Write-Host ""
+        Write-Host "[10/10] 正在推送 Git 代码与标签 ..." -ForegroundColor Yellow
         git add -A
         git commit -m "release: v$newVersion"
-        git tag "v$newVersion"
-        git push origin main --tags
-        Write-Host "  ✅ 已推送 v$newVersion 标签，GitHub Actions 将自动构建并创建草稿 Release" -ForegroundColor Green
+        git tag -a "v$newVersion" -m "Release v$newVersion" -f
+        git push origin main --tags --force
+        Write-Host "     ✅ Git 代码与标签已同步至 GitHub" -ForegroundColor Green
+
+        Write-Host "     正在直接发布到 GitHub Releases ..." -ForegroundColor Yellow
+        try {
+            $cred = "url=https://github.com" | git credential fill
+            $token = ($cred | Select-String "password=").ToString().Replace("password=", "").Trim()
+            $headers = @{
+                "Authorization" = "token $token"
+                "User-Agent" = "NovelForge-Deploy"
+                "Accept" = "application/vnd.github.v3+json"
+            }
+
+            # 提取签名内容
+            $sigContent = (Get-Content "$($exeName.FullName).sig" -Raw).Trim()
+
+            # 生成 latest.json
+            $latestMeta = @{
+                version = $newVersion
+                notes = "## NovelForge AI v$newVersion`n`n详细变更请参阅 CHANGELOG.md。"
+                pub_date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+                platforms = @{
+                    "windows-x86_64" = @{
+                        signature = $sigContent
+                        url = "https://github.com/S2mpleX/novelforge/releases/download/v$newVersion/NovelForge.AI_${newVersion}_x64-setup.exe"
+                    }
+                }
+            } | ConvertTo-Json -Depth 4
+            $latestJsonPath = "$destDir\latest.json"
+            [System.IO.File]::WriteAllText($latestJsonPath, $latestMeta, [System.Text.Encoding]::UTF8)
+
+            # 创建 GitHub Release
+            $relPayload = @{
+                tag_name = "v$newVersion"
+                target_commitish = "main"
+                name = "NovelForge AI v$newVersion"
+                body = "## NovelForge AI v$newVersion 正式发布`n`n请通过应用内自动更新或下载随附安装包升级。"
+                draft = $false
+                prerelease = $false
+            } | ConvertTo-Json
+            
+            $relResp = Invoke-RestMethod -Uri "https://api.github.com/repos/S2mpleX/novelforge/releases" -Method Post -Headers $headers -Body ([System.Text.Encoding]::UTF8.GetBytes($relPayload))
+            $uploadBase = "https://uploads.github.com/repos/S2mpleX/novelforge/releases/$($relResp.id)/assets"
+
+            # 上传最新清单
+            $jsonBytes = [System.IO.File]::ReadAllBytes($latestJsonPath)
+            $uUri = "${uploadBase}?name=latest.json"
+            $headers["Content-Type"] = "application/json"
+            Invoke-RestMethod -Uri $uUri -Method Post -Headers $headers -Body $jsonBytes | Out-Null
+            Write-Host "     ✅ 已上传 latest.json 更新清单" -ForegroundColor Green
+
+            # 上传签名
+            $sigBytes = [System.IO.File]::ReadAllBytes("$($exeName.FullName).sig")
+            $uUri = "${uploadBase}?name=NovelForge.AI_${newVersion}_x64-setup.exe.sig"
+            $headers["Content-Type"] = "text/plain"
+            Invoke-RestMethod -Uri $uUri -Method Post -Headers $headers -Body $sigBytes | Out-Null
+            Write-Host "     ✅ 已上传更新包签名" -ForegroundColor Green
+
+            # 上传安装包
+            $exeBytes = [System.IO.File]::ReadAllBytes($exeName.FullName)
+            $uUri = "${uploadBase}?name=NovelForge.AI_${newVersion}_x64-setup.exe"
+            $headers["Content-Type"] = "application/octet-stream"
+            Invoke-RestMethod -Uri $uUri -Method Post -Headers $headers -Body $exeBytes | Out-Null
+            Write-Host "     ✅ 已上传 Windows NSIS 安装包" -ForegroundColor Green
+
+            Write-Host ""
+            Write-Host "🎉 恭喜！v$newVersion 已正式发布到 GitHub！" -ForegroundColor Green
+            Write-Host "所有已安装客户端在打开软件时，将自动检测到该新版本并提示一键升级！" -ForegroundColor Cyan
+        } catch {
+            Write-Host "⚠️ 直接上传 Release 时遇到异常: $_" -ForegroundColor Yellow
+            Write-Host "请检查 GitHub 访问网络或稍后在网页端手动上传桌面产物。" -ForegroundColor Gray
+        }
     }
 } else {
     Write-Host "警告：未在 $bundleDir 找到安装包文件" -ForegroundColor Yellow
