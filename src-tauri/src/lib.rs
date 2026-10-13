@@ -43,6 +43,32 @@ pub fn run() {
             commands::export_chapter_text,
             commands::export_novel_text,
             commands::get_db_stats,
+            // Character Relationships (Phase 2)
+            commands::list_character_relationships,
+            commands::create_character_relationship,
+            commands::delete_character_relationship,
+            // Story Phases & Arcs (Phase 2)
+            commands::list_story_phases,
+            commands::create_story_phase,
+            commands::delete_story_phase,
+            commands::list_story_arcs,
+            commands::create_story_arc,
+            commands::update_story_arc_status,
+            // Scenes & Events (Phase 2)
+            commands::list_scenes,
+            commands::create_scene,
+            commands::update_scene_status,
+            commands::list_story_events,
+            commands::create_story_event,
+            // Review Reports (Phase 3)
+            commands::list_review_reports,
+            commands::get_latest_review_report,
+            commands::update_finding_status,
+            // Multi-Agent Orchestration (Phase 3)
+            commands::run_continuity_audit,
+            commands::run_style_polish,
+            commands::run_scene_planning,
+            commands::run_collaborative_workflow,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovelForge AI application");

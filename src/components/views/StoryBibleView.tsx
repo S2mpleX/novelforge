@@ -9,12 +9,16 @@ import {
   Plus,
   ShieldCheck,
   Sparkles,
+  GitCommit,
+  Layers,
 } from 'lucide-react';
+import { CharacterFlowView } from './CharacterFlowView';
+import { PlotArcsView } from './PlotArcsView';
 
 export const StoryBibleView: React.FC = () => {
   const { activeNovel } = useNovelStore();
 
-  const [activeTab, setActiveTab] = useState<'CHARACTERS' | 'RULES' | 'PLOTS'>('CHARACTERS');
+  const [activeTab, setActiveTab] = useState<'CHARACTERS' | 'RELATIONSHIPS' | 'RULES' | 'PLOT_ARCS' | 'PLOTS'>('CHARACTERS');
   const [characters, setCharacters] = useState<Character[]>([]);
   const [rules, setRules] = useState<WorldRule[]>([]);
   const [threads, setThreads] = useState<PlotThread[]>([]);
@@ -131,6 +135,17 @@ export const StoryBibleView: React.FC = () => {
             人物档案 ({characters.length})
           </button>
           <button
+            onClick={() => setActiveTab('RELATIONSHIPS')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+              activeTab === 'RELATIONSHIPS'
+                ? 'bg-indigo-600 text-white'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            <GitCommit className="w-3.5 h-3.5" />
+            人物关系图谱
+          </button>
+          <button
             onClick={() => setActiveTab('RULES')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
               activeTab === 'RULES'
@@ -140,6 +155,17 @@ export const StoryBibleView: React.FC = () => {
           >
             <Compass className="w-3.5 h-3.5" />
             世界观法则 ({rules.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('PLOT_ARCS')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+              activeTab === 'PLOT_ARCS'
+                ? 'bg-indigo-600 text-white'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            大纲与剧情弧
           </button>
           <button
             onClick={() => setActiveTab('PLOTS')}
@@ -186,14 +212,23 @@ export const StoryBibleView: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-4xl mx-auto">
-          {/* CHARACTERS TAB */}
-          {activeTab === 'CHARACTERS' && (
-            <div>
-              {characters.length === 0 ? (
-                <div className="text-center py-16 border border-dashed border-slate-800 rounded-xl">
-                  <Users className="w-10 h-10 text-slate-600 mx-auto mb-2 opacity-50" />
+      {activeTab === 'RELATIONSHIPS' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <CharacterFlowView novelId={activeNovel.id} />
+        </div>
+      ) : activeTab === 'PLOT_ARCS' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <PlotArcsView novelId={activeNovel.id} />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-4xl mx-auto">
+            {/* CHARACTERS TAB */}
+            {activeTab === 'CHARACTERS' && (
+              <div>
+                {characters.length === 0 ? (
+                  <div className="text-center py-16 border border-dashed border-slate-800 rounded-xl">
+                    <Users className="w-10 h-10 text-slate-600 mx-auto mb-2 opacity-50" />
                   <p className="text-xs text-slate-400 mb-3">暂无角色档案。创建人物后，写作 Agent 将在生成章节时自动遵守人物性格与动机！</p>
                   <button
                     onClick={() => setShowAddChar(true)}
@@ -323,6 +358,7 @@ export const StoryBibleView: React.FC = () => {
           )}
         </div>
       </div>
+      )}
 
       {/* MODAL: ADD CHARACTER */}
       {showAddChar && (

@@ -201,6 +201,90 @@ CREATE TABLE IF NOT EXISTS usage_records (
     created_at INTEGER NOT NULL
 );
 
+-- Story Phases (宏观故事阶段)
+CREATE TABLE IF NOT EXISTS story_phases (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    order_index INTEGER NOT NULL DEFAULT 1,
+    goal TEXT DEFAULT '',
+    status TEXT DEFAULT 'PLANNING',
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
+
+-- Story Arcs (剧情弧 / 支线线索)
+CREATE TABLE IF NOT EXISTS story_arcs (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT NOT NULL,
+    phase_id TEXT,
+    title TEXT NOT NULL,
+    goal TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    status TEXT DEFAULT 'DEVELOPING', -- PLANNING, DEVELOPING, PAUSED, COMPLETED, CANCELLED
+    start_chapter_id TEXT,
+    planned_end TEXT DEFAULT '',
+    priority TEXT DEFAULT 'MAIN', -- MAIN, SUB, CHARACTER, WORLD
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE,
+    FOREIGN KEY(phase_id) REFERENCES story_phases(id) ON DELETE SET NULL
+);
+
+-- Scenes (章节细分场景)
+CREATE TABLE IF NOT EXISTS scenes (
+    id TEXT PRIMARY KEY,
+    chapter_id TEXT NOT NULL,
+    sequence INTEGER NOT NULL,
+    objective TEXT DEFAULT '',
+    outline TEXT DEFAULT '',
+    pov_character_id TEXT,
+    location_id TEXT DEFAULT '',
+    status TEXT DEFAULT 'PLANNED',
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+);
+
+-- Story Events (时间线与因果拓扑)
+CREATE TABLE IF NOT EXISTS story_events (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    story_time TEXT DEFAULT '',
+    source_chapter_id TEXT,
+    cause_event_id TEXT,
+    location_id TEXT DEFAULT '',
+    status TEXT DEFAULT 'OCCURRED',
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE,
+    FOREIGN KEY(source_chapter_id) REFERENCES chapters(id) ON DELETE SET NULL
+);
+
+-- Review Reports & Findings (逻辑审稿与一致性报告)
+CREATE TABLE IF NOT EXISTS review_reports (
+    id TEXT PRIMARY KEY,
+    chapter_id TEXT NOT NULL,
+    version_number INTEGER NOT NULL,
+    score INTEGER DEFAULT 85,
+    summary TEXT DEFAULT '',
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS review_findings (
+    id TEXT PRIMARY KEY,
+    report_id TEXT NOT NULL,
+    severity TEXT NOT NULL, -- CRITICAL, MAJOR, MINOR, SUGGESTION
+    category TEXT NOT NULL, -- CONTINUITY, CHARACTER, WORLD_RULE, TIMELINE, STYLE
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    evidence_quote TEXT DEFAULT '',
+    suggestion TEXT NOT NULL,
+    status TEXT DEFAULT 'OPEN', -- OPEN, RESOLVED, DISMISSED
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(report_id) REFERENCES review_reports(id) ON DELETE CASCADE
+);
+
 -- Create indexes for high performance
 CREATE INDEX IF NOT EXISTS idx_chapters_novel_id ON chapters(novel_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_volume_id ON chapters(volume_id);
@@ -209,6 +293,10 @@ CREATE INDEX IF NOT EXISTS idx_characters_novel_id ON characters(novel_id);
 CREATE INDEX IF NOT EXISTS idx_world_rules_novel_id ON world_rules(novel_id);
 CREATE INDEX IF NOT EXISTS idx_canon_facts_novel_id ON canon_facts(novel_id);
 CREATE INDEX IF NOT EXISTS idx_plot_threads_novel_id ON plot_threads(novel_id);
+CREATE INDEX IF NOT EXISTS idx_story_arcs_novel_id ON story_arcs(novel_id);
+CREATE INDEX IF NOT EXISTS idx_scenes_chapter_id ON scenes(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_story_events_novel_id ON story_events(novel_id);
+CREATE INDEX IF NOT EXISTS idx_review_findings_report_id ON review_findings(report_id);
 "#;
 
 pub const FTS5_SCHEMA: &str = r#"

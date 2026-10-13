@@ -6,12 +6,20 @@ import type {
   Chapter,
   ChapterVersion,
   Character,
+  CharacterRelationship,
+  StoryPhase,
+  StoryArc,
+  Scene,
+  StoryEvent,
   WorldRule,
   PlotThread,
   AiProvider,
   AiModel,
   ConnectionTestResult,
   StreamChunkPayload,
+  ReviewReport,
+  StylePolishResponse,
+  CollaborativeWorkflowResult,
 } from '@/types';
 
 export const api = {
@@ -83,6 +91,88 @@ export const api = {
     introduced_chapter_id?: string;
     expected_resolution?: string;
   }) => invoke<PlotThread>('create_plot_thread', { input }),
+
+  // Phase 2: Relationships, Plot Arcs, Scenes, Events
+  listCharacterRelationships: (novelId: string) =>
+    invoke<CharacterRelationship[]>('list_character_relationships', { novelId }),
+  createCharacterRelationship: (input: {
+    novel_id: string;
+    source_character_id: string;
+    target_character_id: string;
+    relation_type: string;
+    description?: string;
+  }) => invoke<CharacterRelationship>('create_character_relationship', { input }),
+  deleteCharacterRelationship: (id: string) =>
+    invoke<void>('delete_character_relationship', { id }),
+
+  listStoryPhases: (novelId: string) =>
+    invoke<StoryPhase[]>('list_story_phases', { novelId }),
+  createStoryPhase: (input: {
+    novel_id: string;
+    title: string;
+    order_index?: number;
+    goal?: string;
+  }) => invoke<StoryPhase>('create_story_phase', { input }),
+  deleteStoryPhase: (id: string) =>
+    invoke<void>('delete_story_phase', { id }),
+
+  listStoryArcs: (novelId: string) =>
+    invoke<StoryArc[]>('list_story_arcs', { novelId }),
+  createStoryArc: (input: {
+    novel_id: string;
+    phase_id?: string;
+    title: string;
+    goal?: string;
+    description?: string;
+    priority?: string;
+  }) => invoke<StoryArc>('create_story_arc', { input }),
+  updateStoryArcStatus: (id: string, status: string) =>
+    invoke<void>('update_story_arc_status', { id, status }),
+
+  listScenes: (chapterId: string) =>
+    invoke<Scene[]>('list_scenes', { chapterId }),
+  createScene: (input: {
+    chapter_id: string;
+    sequence: number;
+    objective: string;
+    outline: string;
+    pov_character_id?: string;
+    location_id?: string;
+  }) => invoke<Scene>('create_scene', { input }),
+  updateSceneStatus: (id: string, status: string) =>
+    invoke<void>('update_scene_status', { id, status }),
+
+  listStoryEvents: (novelId: string) =>
+    invoke<StoryEvent[]>('list_story_events', { novelId }),
+  createStoryEvent: (input: {
+    novel_id: string;
+    title: string;
+    description?: string;
+    story_time?: string;
+    source_chapter_id?: string;
+  }) => invoke<StoryEvent>('create_story_event', { input }),
+
+  // Phase 3: Review Reports & Multi-Agent Orchestration
+  listReviewReports: (chapterId: string) =>
+    invoke<ReviewReport[]>('list_review_reports', { chapterId }),
+  getLatestReviewReport: (chapterId: string) =>
+    invoke<ReviewReport | null>('get_latest_review_report', { chapterId }),
+  updateFindingStatus: (findingId: string, status: string) =>
+    invoke<void>('update_finding_status', { findingId, status }),
+
+  runContinuityAudit: (chapterId: string) =>
+    invoke<ReviewReport>('run_continuity_audit', { chapterId }),
+  runStylePolish: (novelId: string, selectedText: string) =>
+    invoke<StylePolishResponse>('run_style_polish', { novelId, selectedText }),
+  runScenePlanning: (chapterId: string, goal: string) =>
+    invoke<Scene[]>('run_scene_planning', { chapterId, goal }),
+  runCollaborativeWorkflow: (input: {
+    novel_id: string;
+    chapter_id: string;
+    chapter_goal: string;
+    target_word_count?: number;
+    skip_audit?: boolean;
+  }) => invoke<CollaborativeWorkflowResult>('run_collaborative_workflow', { input }),
 
   // AI Providers & Models
   listProviders: () => invoke<AiProvider[]>('list_providers'),

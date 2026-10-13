@@ -204,3 +204,192 @@ pub struct StreamChunkPayload {
     pub is_done: bool,
     pub error: Option<String>,
 }
+
+// --- PHASE 2: RELATIONSHIPS, PLOT ARCS, SCENES, EVENTS ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterRelationship {
+    pub id: String,
+    pub novel_id: String,
+    pub source_character_id: String,
+    pub target_character_id: String,
+    pub relation_type: String,
+    pub description: String,
+    pub status: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateCharacterRelationshipInput {
+    pub novel_id: String,
+    pub source_character_id: String,
+    pub target_character_id: String,
+    pub relation_type: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoryPhase {
+    pub id: String,
+    pub novel_id: String,
+    pub title: String,
+    pub order_index: i64,
+    pub goal: String,
+    pub status: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateStoryPhaseInput {
+    pub novel_id: String,
+    pub title: String,
+    pub order_index: Option<i64>,
+    pub goal: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoryArc {
+    pub id: String,
+    pub novel_id: String,
+    pub phase_id: Option<String>,
+    pub title: String,
+    pub goal: String,
+    pub description: String,
+    pub status: String,
+    pub start_chapter_id: Option<String>,
+    pub planned_end: String,
+    pub priority: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateStoryArcInput {
+    pub novel_id: String,
+    pub phase_id: Option<String>,
+    pub title: String,
+    pub goal: Option<String>,
+    pub description: Option<String>,
+    pub priority: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Scene {
+    pub id: String,
+    pub chapter_id: String,
+    pub sequence: i64,
+    pub objective: String,
+    pub outline: String,
+    pub pov_character_id: Option<String>,
+    pub location_id: String,
+    pub status: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateSceneInput {
+    pub chapter_id: String,
+    pub sequence: i64,
+    pub objective: String,
+    pub outline: String,
+    pub pov_character_id: Option<String>,
+    pub location_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoryEvent {
+    pub id: String,
+    pub novel_id: String,
+    pub title: String,
+    pub description: String,
+    pub story_time: String,
+    pub source_chapter_id: Option<String>,
+    pub cause_event_id: Option<String>,
+    pub location_id: String,
+    pub status: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateStoryEventInput {
+    pub novel_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub story_time: Option<String>,
+    pub source_chapter_id: Option<String>,
+}
+
+// --- PHASE 3: REVIEW REPORTS & MULTI-AGENT ORCHESTRATION ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewReport {
+    pub id: String,
+    pub chapter_id: String,
+    pub version_number: i64,
+    pub score: i64,
+    pub summary: String,
+    pub created_at: i64,
+    pub findings: Vec<ReviewFinding>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewFinding {
+    pub id: String,
+    pub report_id: String,
+    pub severity: String, // CRITICAL, MAJOR, MINOR, SUGGESTION
+    pub category: String, // CONTINUITY, CHARACTER, WORLD_RULE, TIMELINE, STYLE
+    pub title: String,
+    pub description: String,
+    pub evidence_quote: String,
+    pub suggestion: String,
+    pub status: String, // OPEN, RESOLVED, DISMISSED
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContinuityAuditFinding {
+    pub severity: String,
+    pub category: String,
+    pub title: String,
+    pub description: String,
+    pub evidence_quote: Option<String>,
+    pub suggestion: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContinuityAuditResponse {
+    pub score: i64,
+    pub summary: String,
+    pub findings: Vec<ContinuityAuditFinding>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StyleRevisionItem {
+    pub original_text: String,
+    pub revised_text: String,
+    pub rationale: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StylePolishResponse {
+    pub summary: String,
+    pub revisions: Vec<StyleRevisionItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollaborativeWorkflowInput {
+    pub novel_id: String,
+    pub chapter_id: String,
+    pub chapter_goal: String,
+    pub target_word_count: Option<i64>,
+    pub skip_audit: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollaborativeWorkflowResult {
+    pub chapter_id: String,
+    pub planned_scenes: Vec<Scene>,
+    pub generated_draft: String,
+    pub review_report: Option<ReviewReport>,
+    pub message: String,
+}
+

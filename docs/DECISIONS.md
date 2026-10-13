@@ -5,10 +5,10 @@
 - **上下文**：NovelForge AI 要求本地优先、百万字长篇数据安全、极低内存占用、深层操作系统的 SQLite 和多线程调度支持。
 - **决策**：选用 Tauri 2 + Rust 原生后端，对比 Electron 能减少 80% 内存消耗，且原生 Rust 能高效处理任务队列、流式加密请求与本地数据库。
 
-## ADR-002: 编译工具链适配（WinLibs MinGW-w64 + UCRT）
+## ADR-002: 编译工具链适配（WinLibs MinGW-w64 + MSVCRT runtime）
 - **状态**：已采纳
-- **上下文**：宿主环境 C 盘剩余容量约 9.3 GB，缺乏 Visual Studio C++ 生成工具 (MSVC `link.exe`)，且默认终端无管理员提权。
-- **决策**：引入免管理员权限的 WinLibs (MinGW-w64 + UCRT) 绿色编译工具链至 E 盘，启用 Rust `x86_64-pc-windows-gnu` 目标平台，确保不爆满 C 盘并能平稳完成原生编译。
+- **上下文**：宿主环境 C 盘剩余容量紧张，缺乏 Visual Studio C++ 生成工具 (MSVC `link.exe`)，且默认终端无管理员提权；同时 MinGW ld/windres 对含中文字符的项目路径解析可能产生异常。
+- **决策**：引入免管理员权限的 WinLibs MinGW-w64 绿色编译工具链至纯 ASCII 目录 `E:\tools\winlibs_msvcrt`，配置 `CARGO_TARGET_DIR = E:\tools\novelforge_target`，启用 Rust `x86_64-pc-windows-gnu` 目标平台并使用 `staticlib` 与 `rlib` crate 类型，彻底规避符号超限与中文路径链接问题。
 
 ## ADR-003: 数据库选型与存储策略（SQLite WAL + FTS5）
 - **状态**：已采纳
@@ -18,9 +18,21 @@
 ## ADR-004: 多 Agent 架构与职责边界隔离
 - **状态**：已采纳
 - **上下文**：市面上诸多 AI 写作工具仅用一个聊天框切换名字，缺乏真实的职责约束与结构化输出。
-- **决策**：每个 Agent 拥有独立的系统提示词、独立的 Input/Output JSON Schema、独立的模型与温度配置、以及独立的执行日志。所有 Agent 调度必须由主编（Editor-in-Chief）或任务编排器以结构化任务形式分发。
+- **决策**：每个 Agent 拥有独立的系统提示词（统一存放于 `prompts/` 目录）、独立的 Input/Output JSON Schema、独立的模型与温度配置、以及独立的执行日志。所有 Agent 调度必须由主编（Editor-in-Chief）或任务编排器以结构化任务形式分发，禁止将假 Agent 界面混淆为多 Agent 生产系统。
 
 ## ADR-005: 记忆分层模型（L0 ~ L4）
 - **状态**：已采纳
 - **上下文**：长篇小说随着章节数扩展（100~1000章），将历史全文直接塞入上下文会导致模型幻觉、Token 费用失控和性能下降。
 - **决策**：构建 L0（工作记忆）、L1（近期剧情）、L2（中期分卷）、L3（长期结构化权威设定）、L4（全文历史检索）五层递进记忆体系。
+
+## ADR-006: 人物拓扑关系图谱可视化选型 (@xyflow/react)
+- **状态**：已采纳
+- **上下文**：长篇小说随着出场人物增多（数十上百人），静态列表难以呈现角色之间的复杂网状关系（师徒、仇敌、暗恋、结盟等），创作者需要直观的可视化图谱。
+- **决策**：选用 `@xyflow/react` (React Flow)，支持高性能节点自由拖拽、双向拉线建立关系、动画连接边、缩略图导览 (MiniMap)，连线变更实时回写本地 SQLite，兼顾视觉体验与持久化。
+
+## ADR-007: 逻辑审稿机制与 Humanizer 叙事守则集成
+- **状态**：已采纳
+- **上下文**：大模型生成网文小说极其容易出现“AI 腔调”（说明文式概括、连词滥用、抽象情感描述）、策划术语外露（Flag、回收、数值结算等）以及前后设定矛盾。
+- **决策**：
+  1. 正文作家 (Prose Writer) 与文学编辑 (Style Editor) 深度集成 Humanizer 叙事法则，强制“Show, Don't Tell”，强化对话留白与微表情。
+  2. 逻辑审稿 (Continuity Auditor) 独立执行，强制输出结构化 JSON 报告，标注冲突原句引用与修改建议，且以候选修订方式呈现，严禁擅自覆盖正文。

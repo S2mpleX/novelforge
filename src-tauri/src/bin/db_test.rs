@@ -94,5 +94,85 @@ fn main() {
         provider.name, provider.base_url, model.model_name
     );
 
-    println!("=== 100% 测试验证通过！全部业务逻辑在本地 SQLite 正确持久化！ ===");
+    // 8. 验证角色关系拓扑 (Phase 2)
+    let char2 = db
+        .create_character(CreateCharacterInput {
+            novel_id: novel.id.clone(),
+            name: "安雅".to_string(),
+            aliases: Some("首席工程师".to_string()),
+            profile: Some("先驱者号主引擎架构师".to_string()),
+            personality: Some("理智严谨、快言快语".to_string()),
+            background: Some("空间动力研究所高材生".to_string()),
+            motivation: Some("维护舰队动力系统周全".to_string()),
+        })
+        .expect("创建角色2失败");
+
+    let relation = db
+        .create_character_relationship(novelforge_ai_lib::models::CreateCharacterRelationshipInput {
+            novel_id: novel.id.clone(),
+            source_character_id: character.id.clone(),
+            target_character_id: char2.id.clone(),
+            relation_type: "生死战友".to_string(),
+            description: Some("历经三次跃迁事故，相互绝对信任".to_string()),
+        })
+        .expect("创建角色关系失败");
+    println!("10. 验证角色关系拓扑: 【{}】与【{}】关系为[{}]", character.name, char2.name, relation.relation_type);
+
+    // 9. 验证故事大纲阶段与剧情弧 (Phase 2)
+    let phase = db
+        .create_story_phase(novelforge_ai_lib::models::CreateStoryPhaseInput {
+            novel_id: novel.id.clone(),
+            title: "第一阶段：破晓远征".to_string(),
+            order_index: Some(1),
+            goal: Some("突破封锁线并进入未知星域".to_string()),
+        })
+        .expect("创建故事阶段失败");
+
+    let arc = db
+        .create_story_arc(novelforge_ai_lib::models::CreateStoryArcInput {
+            novel_id: novel.id.clone(),
+            phase_id: Some(phase.id.clone()),
+            title: "柯伊伯带突围弧".to_string(),
+            goal: Some("避开星际海盗与引力雷区".to_string()),
+            description: Some("主线核心冲突冲突点".to_string()),
+            priority: Some("MAIN".to_string()),
+        })
+        .expect("创建剧情弧失败");
+    println!("11. 验证大纲规划: 阶段【{}】 -> 剧情弧【{}】", phase.title, arc.title);
+
+    // 10. 验证章节场景细纲拆解 (Phase 2)
+    let scene = db
+        .create_scene(novelforge_ai_lib::models::CreateSceneInput {
+            chapter_id: ch1.id.clone(),
+            sequence: 1,
+            objective: "展现战舰起航前的压迫感与林远的决断".to_string(),
+            outline: "1.主引擎充能倒计时 2.安雅汇报引力读数异常 3.林远决意启动".to_string(),
+            pov_character_id: Some(character.id.clone()),
+            location_id: Some("先驱者号主舰桥".to_string()),
+        })
+        .expect("创建场景细纲失败");
+    println!("12. 验证场景拆解 (Scene): 场次[{}] 目标: {}", scene.sequence, scene.objective);
+
+    // 11. 验证逻辑审稿报告与发现入库 (Phase 3)
+    let findings = vec![novelforge_ai_lib::models::ContinuityAuditFinding {
+        severity: "MINOR".to_string(),
+        category: "TIMELINE".to_string(),
+        title: "反物质引擎预热时间细节补充".to_string(),
+        description: "建议补充主引擎从静默到全功率运作的耗时描述".to_string(),
+        evidence_quote: Some("巨大的反物质引擎在寒夜中发出沉闷的轰鸣".to_string()),
+        suggestion: "增加三分钟倒计时的临场压迫细节".to_string(),
+    }];
+
+    let report = db
+        .create_review_report(
+            &ch1.id,
+            1,
+            92,
+            "本章节奏紧凑，世界观设定严密，符合硬科幻基调。",
+            &findings,
+        )
+        .expect("创建审稿报告失败");
+    println!("13. 验证逻辑审稿报告: 得分[{}]，发现[{}]项建议，总结: {}", report.score, report.findings.len(), report.summary);
+
+    println!("=== 100% 测试验证通过！Phase 0/1/2/3 全部业务模型在本地 SQLite 正确持久化！ ===");
 }

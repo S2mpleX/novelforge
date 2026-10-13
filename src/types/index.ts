@@ -119,3 +119,110 @@ export interface StreamChunkPayload {
   is_done: boolean;
   error?: string;
 }
+
+// --- Phase 2: Relationships, Story Arcs, Scenes, Events ---
+
+export interface CharacterRelationship {
+  id: string;
+  novel_id: string;
+  source_character_id: string;
+  target_character_id: string;
+  relation_type: string;
+  description: string;
+  status: string;
+  created_at: number;
+}
+
+export interface StoryPhase {
+  id: string;
+  novel_id: string;
+  title: string;
+  order_index: number;
+  goal: string;
+  status: string;
+  created_at: number;
+}
+
+export interface StoryArc {
+  id: string;
+  novel_id: string;
+  phase_id?: string;
+  title: string;
+  goal: string;
+  description: string;
+  status: 'PLANNING' | 'DEVELOPING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+  start_chapter_id?: string;
+  planned_end: string;
+  priority: 'MAIN' | 'SUB' | 'CHARACTER' | 'WORLD';
+  created_at: number;
+}
+
+export interface Scene {
+  id: string;
+  chapter_id: string;
+  sequence: number;
+  objective: string;
+  outline: string;
+  pov_character_id?: string;
+  location_id: string;
+  status: string;
+  created_at: number;
+}
+
+export interface StoryEvent {
+  id: string;
+  novel_id: string;
+  title: string;
+  description: string;
+  story_time: string;
+  source_chapter_id?: string;
+  cause_event_id?: string;
+  location_id: string;
+  status: string;
+  created_at: number;
+}
+
+// --- Phase 3: Review Reports & Orchestrator Results ---
+
+export interface ReviewFinding {
+  id: string;
+  report_id: string;
+  severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'SUGGESTION';
+  category: 'CONTINUITY' | 'CHARACTER' | 'WORLD_RULE' | 'TIMELINE' | 'STYLE';
+  title: string;
+  description: string;
+  evidence_quote: string;
+  suggestion: string;
+  status: 'OPEN' | 'RESOLVED' | 'DISMISSED';
+  created_at: number;
+}
+
+export interface ReviewReport {
+  id: string;
+  chapter_id: string;
+  version_number: number;
+  score: number;
+  summary: string;
+  created_at: number;
+  findings: ReviewFinding[];
+}
+
+export interface StyleRevisionItem {
+  original_text: string;
+  revised_text: string;
+  rationale: string;
+}
+
+export interface StylePolishResponse {
+  summary: string;
+  revisions: StyleRevisionItem[];
+}
+
+export interface CollaborativeWorkflowResult {
+  chapter_id: string;
+  planned_scenes: Scene[];
+  generated_draft: string;
+  review_report?: ReviewReport;
+  message: string;
+}
+

@@ -215,4 +215,59 @@ impl OpenAIClient {
 
         Ok(full_text)
     }
+
+    pub async fn chat_completion(
+        &self,
+        base_url: &str,
+        api_key: &str,
+        request: ChatCompletionRequest,
+    ) -> Result<String, String> {
+        let normalized_url = base_url.trim_end_matches('/');
+        let chat_url = format!("{}/chat/completions", normalized_url);
+
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !api_key.trim().is_empty() {
+            let auth_val = format!("Bearer {}", api_key.trim());
+            if let Ok(hv) = HeaderValue::from_str(&auth_val) {
+                headers.insert(AUTHORIZATION, hv);
+            }
+        }
+
+        let mut req = request;
+        req.stream = false;
+
+        let response = self
+            .client
+            .post(&chat_url)
+            .headers(headers)
+            .json(&req)
+            .send()
+            .await
+            .map_err(|e| format!("请求发送失败: {}", e))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!("接口返回错误 (HTTP {}): {}", status, body));
+        }
+
+        let val: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("解析响应 JSON 失败: {}", e))?;
+        if let Some(choices) = val.get("choices").and_then(|c| c.as_array()) {
+            if let Some(first) = choices.first() {
+                if let Some(content) = first
+                    .get("message")
+                    .and_then(|m| m.get("content"))
+                    .and_then(|c| c.as_str())
+                {
+                    return Ok(content.to_string());
+                }
+            }
+        }
+
+        Err("返回结果中未包含有效 message content".to_string())
+    }
 }

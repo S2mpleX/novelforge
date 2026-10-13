@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
+import type {
+  ReviewReport,
+  StylePolishResponse,
+  CollaborativeWorkflowResult,
+} from '@/types';
 import {
   Send,
   Square,
@@ -10,6 +15,13 @@ import {
   AlertCircle,
   Bot,
   Zap,
+  Sparkles,
+  ShieldCheck,
+  Wand2,
+  Layers,
+  CheckCircle2,
+  Check,
+  RefreshCw,
 } from 'lucide-react';
 
 const PROMPT_PRESETS = [
@@ -31,14 +43,41 @@ export const AiAssistantPanel: React.FC = () => {
     loadProviders,
   } = useNovelStore();
 
+  const [activeTab, setActiveTab] = useState<'STREAM_WRITE' | 'COLLABORATE' | 'CONTINUITY' | 'STYLE_POLISH'>('STREAM_WRITE');
+
+  // --- STREAM WRITE STATE ---
   const [instruction, setInstruction] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamResult, setStreamResult] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  // --- COLLABORATIVE WORKFLOW STATE ---
+  const [workflowGoal, setWorkflowGoal] = useState('');
+  const [workflowWordCount, setWorkflowWordCount] = useState(3000);
+  const [isWorkflowRunning, setIsWorkflowRunning] = useState(false);
+  const [workflowResult, setWorkflowResult] = useState<CollaborativeWorkflowResult | null>(null);
+
+  // --- CONTINUITY AUDIT STATE ---
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [reviewReport, setReviewReport] = useState<ReviewReport | null>(null);
+
+  // --- STYLE POLISH STATE ---
+  const [polishInput, setPolishInput] = useState('');
+  const [isPolishing, setIsPolishing] = useState(false);
+  const [polishResult, setPolishResult] = useState<StylePolishResponse | null>(null);
+
   useEffect(() => {
     loadProviders();
-  }, []);
+  }, [loadProviders]);
+
+  // Load existing latest review report when chapter changes
+  useEffect(() => {
+    if (activeChapter) {
+      api.getLatestReviewReport(activeChapter.id).then((rep) => {
+        if (rep) setReviewReport(rep);
+      });
+    }
+  }, [activeChapter?.id]);
 
   // Listen for streaming chunks from Tauri backend
   useEffect(() => {
@@ -68,6 +107,7 @@ export const AiAssistantPanel: React.FC = () => {
 
   if (!rightPanelOpen) return null;
 
+  // --- HANDLERS: STREAM WRITE ---
   const handleStartGeneration = async () => {
     if (!activeNovel || !activeChapter) return;
     if (!instruction.trim()) {
@@ -125,15 +165,115 @@ export const AiAssistantPanel: React.FC = () => {
     setStreamResult('');
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(streamResult);
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
     setStatusMessage('已复制到剪贴板！');
     setTimeout(() => setStatusMessage(null), 2000);
   };
 
+  // --- HANDLERS: COLLABORATIVE PIPELINE ---
+  const handleRunWorkflow = async () => {
+    if (!activeNovel || !activeChapter) return;
+    if (!workflowGoal.trim()) {
+      setStatusMessage('请输入本章剧情推进目标');
+      return;
+    }
+
+    setIsWorkflowRunning(true);
+    setStatusMessage('多 Agent 流水线调度中：编剧拆解场景 -> 作家创作正文 -> 逻辑审稿质检...');
+    setWorkflowResult(null);
+
+    try {
+      const res = await api.runCollaborativeWorkflow({
+        novel_id: activeNovel.id,
+        chapter_id: activeChapter.id,
+        chapter_goal: workflowGoal.trim(),
+        target_word_count: workflowWordCount,
+      });
+      setWorkflowResult(res);
+      if (res.review_report) {
+        setReviewReport(res.review_report);
+      }
+      setStatusMessage('协作创作流水线顺利完成！');
+    } catch (e: any) {
+      setStatusMessage(`协作流水线执行失败: ${e.message || e}`);
+    } finally {
+      setIsWorkflowRunning(false);
+    }
+  };
+
+  const handleApplyWorkflowDraft = async () => {
+    if (!workflowResult?.generated_draft) return;
+    const formattedParagraphs = workflowResult.generated_draft
+      .split('\n')
+      .filter((p) => p.trim())
+      .map((p) => `<p>${p.trim()}</p>`)
+      .join('');
+
+    updateEditorContent(formattedParagraphs);
+    await saveCurrentChapter(true, 'AI_COLLABORATIVE');
+    setStatusMessage('已将协同定稿装载至编辑器！');
+  };
+
+  // --- HANDLERS: CONTINUITY AUDIT ---
+  const handleRunAudit = async () => {
+    if (!activeChapter) return;
+    setIsAuditing(true);
+    setStatusMessage('逻辑审稿 Agent 正在全面核查人物、世界法则与时间因果...');
+
+    try {
+      const rep = await api.runContinuityAudit(activeChapter.id);
+      setReviewReport(rep);
+      setStatusMessage(`审稿完成！综合健康度评分: ${rep.score} 分`);
+    } catch (e: any) {
+      setStatusMessage(`审稿执行失败: ${e.message || e}`);
+    } finally {
+      setIsAuditing(false);
+    }
+  };
+
+  const handleToggleFindingStatus = async (findingId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'RESOLVED' ? 'OPEN' : 'RESOLVED';
+    try {
+      await api.updateFindingStatus(findingId, nextStatus);
+      if (reviewReport) {
+        setReviewReport({
+          ...reviewReport,
+          findings: reviewReport.findings.map((f) =>
+            f.id === findingId ? { ...f, status: nextStatus as any } : f
+          ),
+        });
+      }
+    } catch (e) {
+      console.error('更新问题状态失败:', e);
+    }
+  };
+
+  // --- HANDLERS: STYLE POLISH ---
+  const handleRunPolish = async () => {
+    if (!activeNovel) return;
+    const textToPolish = polishInput.trim() || editorContent?.replace(/<[^>]+>/g, '').slice(0, 1000);
+    if (!textToPolish) {
+      setStatusMessage('请选择或输入待润色的段落文本');
+      return;
+    }
+
+    setIsPolishing(true);
+    setStatusMessage('文学编辑 Agent 正在基于 Humanizer 守则打磨文笔...');
+    try {
+      const res = await api.runStylePolish(activeNovel.id, textToPolish);
+      setPolishResult(res);
+      setStatusMessage('文学润色完成！');
+    } catch (e: any) {
+      setStatusMessage(`文学润色失败: ${e.message || e}`);
+    } finally {
+      setIsPolishing(false);
+    }
+  };
+
   return (
-    <aside className="w-80 border-l border-slate-800 bg-slate-950/80 flex flex-col shrink-0 select-none h-[calc(100vh-3.5rem)]">
-      {/* Header */}
+    <aside className="w-88 border-l border-slate-800 bg-slate-950/80 flex flex-col shrink-0 select-none h-[calc(100vh-3.5rem)]">
+      {/* Top Header & Model Info */}
       <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/40">
         <div className="flex items-center gap-2">
           <Bot className="w-4 h-4 text-indigo-400" />
@@ -141,111 +281,448 @@ export const AiAssistantPanel: React.FC = () => {
         </div>
         <div className="flex items-center gap-1 text-[11px] text-slate-400">
           <Zap className="w-3 h-3 text-amber-400" />
-          <span>{activeProvider ? activeProvider.name : '未配置模型'}</span>
+          <span className="max-w-[120px] truncate" title={activeProvider?.name}>
+            {activeProvider ? activeProvider.name : '未配置模型'}
+          </span>
         </div>
       </div>
 
-      {/* Preset Pills */}
-      <div className="p-3 border-b border-slate-800/60">
-        <label className="text-[11px] font-semibold text-slate-400 block mb-2">
-          快捷创作动作
-        </label>
-        <div className="grid grid-cols-2 gap-1.5">
-          {PROMPT_PRESETS.map((p) => (
-            <button
-              key={p.label}
-              onClick={() => setInstruction(p.instruction)}
-              className="px-2 py-1.5 rounded text-xs text-left bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition truncate"
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Instruction Input */}
-      <div className="p-3 flex-1 flex flex-col min-h-0">
-        <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">
-          创作指令与剧情推进
-        </label>
-        <textarea
-          value={instruction}
-          onChange={(e) => setInstruction(e.target.value)}
-          placeholder="例如：写主角进入藏经阁第七层，发现失传古籍中的惊人秘密，与守阁长老产生言语交锋..."
-          className="w-full h-24 bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none mb-2"
-        />
-
+      {/* Tabs */}
+      <div className="grid grid-cols-4 p-1.5 bg-slate-900/60 border-b border-slate-800/80 gap-1 text-center">
         <button
-          onClick={handleStartGeneration}
-          disabled={isGenerating || !activeChapter}
-          className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition shadow-sm shadow-indigo-600/30 disabled:opacity-40 disabled:cursor-not-allowed mb-3"
+          onClick={() => setActiveTab('STREAM_WRITE')}
+          className={`py-1.5 rounded-md text-[11px] font-semibold transition ${
+            activeTab === 'STREAM_WRITE'
+              ? 'bg-indigo-600 text-white'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
         >
-          {isGenerating ? (
-            <>
-              <Square className="w-3.5 h-3.5 fill-current animate-pulse" />
-              生成进行中...
-            </>
-          ) : (
-            <>
-              <Send className="w-3.5 h-3.5" />
-              启动 Agent 流式创作
-            </>
-          )}
+          单章写作
         </button>
+        <button
+          onClick={() => setActiveTab('COLLABORATE')}
+          className={`py-1.5 rounded-md text-[11px] font-semibold transition ${
+            activeTab === 'COLLABORATE'
+              ? 'bg-indigo-600 text-white'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          协同流水线
+        </button>
+        <button
+          onClick={() => setActiveTab('CONTINUITY')}
+          className={`py-1.5 rounded-md text-[11px] font-semibold transition ${
+            activeTab === 'CONTINUITY'
+              ? 'bg-indigo-600 text-white'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          逻辑审稿
+        </button>
+        <button
+          onClick={() => setActiveTab('STYLE_POLISH')}
+          className={`py-1.5 rounded-md text-[11px] font-semibold transition ${
+            activeTab === 'STYLE_POLISH'
+              ? 'bg-indigo-600 text-white'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          文学润色
+        </button>
+      </div>
 
-        {statusMessage && (
-          <div className="mb-2 p-2 rounded bg-slate-900/80 border border-slate-800 text-[11px] text-slate-400 flex items-center gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span className="truncate">{statusMessage}</span>
+      {/* Status Bar */}
+      {statusMessage && (
+        <div className="px-3 py-1.5 bg-slate-900 border-b border-slate-800 text-[11px] text-slate-300 flex items-center gap-1.5 shrink-0">
+          <AlertCircle className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+          <span className="truncate">{statusMessage}</span>
+        </div>
+      )}
+
+      {/* TAB 1: STREAM WRITE */}
+      {activeTab === 'STREAM_WRITE' && (
+        <div className="flex-1 flex flex-col min-h-0 p-3 overflow-hidden">
+          <div className="mb-2">
+            <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">
+              快捷创作动作
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {PROMPT_PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  onClick={() => setInstruction(p.instruction)}
+                  className="px-2 py-1.5 rounded text-xs text-left bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition truncate"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
 
-        {/* Stream Result Box */}
-        <div className="flex-1 flex flex-col min-h-0 border border-slate-800/80 rounded-lg bg-slate-900/40 p-2.5">
-          <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-800/60">
-            <span className="text-[11px] font-semibold text-slate-400">
-              Agent 输出候选 ({streamResult.length} 字)
-            </span>
-            {streamResult && (
-              <button
-                onClick={handleCopy}
-                className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-0.5"
-                title="复制"
-              >
-                <Copy className="w-3 h-3" />
-                复制
-              </button>
+          <div className="flex-1 flex flex-col min-h-0">
+            <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+              创作指令与剧情推进
+            </label>
+            <textarea
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+              placeholder="例如：写主角进入藏经阁第七层，发现失传古籍中的惊人秘密，与守阁长老产生言语交锋..."
+              className="w-full h-20 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-indigo-500 resize-none mb-2"
+            />
+
+            <button
+              onClick={handleStartGeneration}
+              disabled={isGenerating || !activeChapter}
+              className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-40 mb-2"
+            >
+              {isGenerating ? (
+                <>
+                  <Square className="w-3.5 h-3.5 fill-current animate-pulse" />
+                  正文流式生成中...
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  启动正文作家 Agent 写作
+                </>
+              )}
+            </button>
+
+            {/* Output stream display */}
+            <div className="flex-1 flex flex-col min-h-0 border border-slate-800/80 rounded-lg bg-slate-900/40 p-2.5">
+              <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-800/60">
+                <span className="text-[11px] font-semibold text-slate-400">
+                  实时正文草稿 ({streamResult.length} 字)
+                </span>
+                {streamResult && (
+                  <button
+                    onClick={() => handleCopy(streamResult)}
+                    className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-0.5"
+                    title="复制"
+                  >
+                    <Copy className="w-3 h-3" />
+                    复制
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-text font-serif pr-1">
+                {streamResult || (
+                  <span className="text-slate-600 italic select-none">
+                    点击上方启动后，Agent 将在此处实时流式输出生成的正文草稿...
+                  </span>
+                )}
+              </div>
+
+              {streamResult && !isGenerating && (
+                <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 mt-2">
+                  <button
+                    onClick={handleAppendToEditor}
+                    className="py-1.5 px-2 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-medium flex items-center justify-center gap-1 transition"
+                  >
+                    <PlusCircle className="w-3 h-3" />
+                    追加到文末
+                  </button>
+                  <button
+                    onClick={handleReplaceEditor}
+                    className="py-1.5 px-2 rounded bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 text-xs font-medium flex items-center justify-center gap-1 transition"
+                  >
+                    <FileCheck2 className="w-3 h-3" />
+                    替换正文
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: COLLABORATIVE PIPELINE */}
+      {activeTab === 'COLLABORATE' && (
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <div className="p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-800/50 text-xs text-indigo-200">
+            <div className="font-semibold mb-1 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              多 Agent 协作工作流 (Pipeline)
+            </div>
+            <p className="text-[11px] text-indigo-300/80 leading-relaxed">
+              自动化流水线调度：由章节编剧 (Scene Planner) 拆解场景节拍，再由正文作家 (Prose Writer) 撰写草稿，最后由逻辑审稿 (Continuity Auditor) 自动出具质检报告。
+            </p>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+              本章剧情核心推进目标 *
+            </label>
+            <textarea
+              value={workflowGoal}
+              onChange={(e) => setWorkflowGoal(e.target.value)}
+              placeholder="例如：揭开先驱者号主引擎失谐之谜，林远与安雅在引力雷区产生战术分歧，最终冒险跃迁。"
+              rows={3}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-indigo-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+              期望篇幅 (字数)
+            </label>
+            <div className="flex items-center gap-2">
+              {[2000, 3000, 4000].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => setWorkflowWordCount(num)}
+                  className={`px-2.5 py-1 rounded text-xs border ${
+                    workflowWordCount === num
+                      ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200 font-semibold'
+                      : 'bg-slate-900 border-slate-800 text-slate-400'
+                  }`}
+                >
+                  {num} 字
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={handleRunWorkflow}
+            disabled={isWorkflowRunning || !activeChapter}
+            className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-40"
+          >
+            {isWorkflowRunning ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                多 Agent 流水线协作推进中...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5" />
+                启动完整多 Agent 协同流水线
+              </>
             )}
-          </div>
+          </button>
 
-          <div className="flex-1 overflow-y-auto text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-text pr-1 font-serif">
-            {streamResult || (
-              <span className="text-slate-600 italic select-none">
-                点击上方启动后，Agent 将在此处实时流式输出生成的正文草稿...
-              </span>
-            )}
-          </div>
+          {/* Workflow Results Display */}
+          {workflowResult && (
+            <div className="space-y-3 pt-2 border-t border-slate-800">
+              <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-200">
+                    编剧拆解的场景节拍 ({workflowResult.planned_scenes.length} 幕)
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {workflowResult.planned_scenes.map((s) => (
+                    <div key={s.id} className="p-2 rounded bg-slate-950/80 border border-slate-800/80 text-xs">
+                      <div className="font-semibold text-indigo-300">
+                        场次 {s.sequence}：{s.objective}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">{s.outline}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-          {streamResult && !isGenerating && (
-            <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 mt-2">
-              <button
-                onClick={handleAppendToEditor}
-                className="py-1.5 px-2 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-medium flex items-center justify-center gap-1 transition"
-              >
-                <PlusCircle className="w-3 h-3" />
-                追加到文末
-              </button>
-              <button
-                onClick={handleReplaceEditor}
-                className="py-1.5 px-2 rounded bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 text-xs font-medium flex items-center justify-center gap-1 transition"
-              >
-                <FileCheck2 className="w-3 h-3" />
-                替换正文
-              </button>
+              <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-200">
+                    生成的初稿草稿 ({workflowResult.generated_draft.length} 字)
+                  </span>
+                  <button
+                    onClick={handleApplyWorkflowDraft}
+                    className="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded transition flex items-center gap-1"
+                  >
+                    <Check className="w-3 h-3" />
+                    装载至正文
+                  </button>
+                </div>
+                <div className="max-h-40 overflow-y-auto text-xs text-slate-300 font-serif leading-relaxed whitespace-pre-wrap p-2 bg-slate-950 rounded border border-slate-800/80">
+                  {workflowResult.generated_draft}
+                </div>
+              </div>
             </div>
           )}
         </div>
-      </div>
+      )}
+
+      {/* TAB 3: CONTINUITY AUDIT */}
+      {activeTab === 'CONTINUITY' && (
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-semibold text-slate-200">逻辑审稿与设定核查</h3>
+              <p className="text-[11px] text-slate-400">核查人物性格、世界法则与时间线冲突</p>
+            </div>
+            <button
+              onClick={handleRunAudit}
+              disabled={isAuditing || !activeChapter}
+              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm disabled:opacity-40"
+            >
+              <ShieldCheck className={`w-3.5 h-3.5 ${isAuditing ? 'animate-spin' : ''}`} />
+              执行审稿
+            </button>
+          </div>
+
+          {reviewReport ? (
+            <div className="space-y-3">
+              {/* Score Card */}
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] text-slate-400">本章综合合规评分</div>
+                  <div className="text-2xl font-bold text-slate-100 mt-0.5">
+                    {reviewReport.score} <span className="text-xs font-normal text-slate-500">/ 100</span>
+                  </div>
+                </div>
+                <div className="text-right max-w-[170px]">
+                  <span className="text-[11px] text-indigo-400 font-medium line-clamp-2">
+                    {reviewReport.summary}
+                  </span>
+                </div>
+              </div>
+
+              {/* Findings List */}
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold text-slate-400">
+                  审查发现与整改建议 ({reviewReport.findings.length})
+                </div>
+
+                {reviewReport.findings.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-lg">
+                    未发现设定冲突或逻辑硬伤，剧情逻辑严密！
+                  </div>
+                ) : (
+                  reviewReport.findings.map((f) => {
+                    const isResolved = f.status === 'RESOLVED';
+                    const severityColor =
+                      f.severity === 'CRITICAL'
+                        ? 'border-rose-500/60 bg-rose-950/20 text-rose-300'
+                        : f.severity === 'MAJOR'
+                        ? 'border-amber-500/60 bg-amber-950/20 text-amber-300'
+                        : 'border-indigo-500/60 bg-indigo-950/20 text-indigo-300';
+
+                    return (
+                      <div
+                        key={f.id}
+                        className={`p-3 rounded-lg border transition-all ${
+                          isResolved ? 'opacity-50 border-slate-800 bg-slate-900/40' : severityColor
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/40 border border-current">
+                            {f.severity} · {f.category}
+                          </span>
+                          <button
+                            onClick={() => handleToggleFindingStatus(f.id, f.status)}
+                            className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                          >
+                            <CheckCircle2 className={`w-3.5 h-3.5 ${isResolved ? 'text-emerald-400' : ''}`} />
+                            {isResolved ? '已解决' : '标记已改'}
+                          </button>
+                        </div>
+
+                        <div className="text-xs font-semibold text-slate-100">{f.title}</div>
+                        <div className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                          {f.description}
+                        </div>
+
+                        {f.evidence_quote && (
+                          <div className="mt-1.5 p-1.5 rounded bg-black/30 border border-slate-800 text-[11px] text-slate-400 italic">
+                            “{f.evidence_quote}”
+                          </div>
+                        )}
+
+                        <div className="mt-1.5 text-[11px] text-indigo-300 font-medium">
+                          修改建议：{f.suggestion}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-lg">
+              点击“执行审稿”对当前正文进行全面逻辑因果体检
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: STYLE POLISH */}
+      {activeTab === 'STYLE_POLISH' && (
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <div className="p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-800/50 text-xs text-indigo-200">
+            <div className="font-semibold mb-1 flex items-center gap-1.5">
+              <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
+              Humanizer 文学精修守则
+            </div>
+            <p className="text-[11px] text-indigo-300/80 leading-relaxed">
+              坚决剔除“AI 腔调”与空洞说明文套话，清退策划/引擎术语，增强微表情、对话留白与临场动作呼吸感。
+            </p>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+              待润色正文选段
+            </label>
+            <textarea
+              value={polishInput}
+              onChange={(e) => setPolishInput(e.target.value)}
+              placeholder="粘贴或输入需要润色的段落（留空则默认截取当前正文前段）..."
+              rows={4}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-indigo-500 resize-none"
+            />
+          </div>
+
+          <button
+            onClick={handleRunPolish}
+            disabled={isPolishing}
+            className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-40"
+          >
+            {isPolishing ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                文学编辑 Agent 精修润色中...
+              </>
+            ) : (
+              <>
+                <Wand2 className="w-3.5 h-3.5" />
+                启动文学编辑润色
+              </>
+            )}
+          </button>
+
+          {polishResult && (
+            <div className="space-y-3 pt-2 border-t border-slate-800">
+              <div className="text-[11px] text-slate-400 italic">
+                {polishResult.summary}
+              </div>
+
+              {polishResult.revisions.map((rev, idx) => (
+                <div key={idx} className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+                  <div className="text-[11px] text-slate-500 line-through">
+                    原文：{rev.original_text}
+                  </div>
+                  <div className="text-xs text-slate-100 font-serif leading-relaxed bg-slate-950 p-2 rounded border border-slate-800/80">
+                    精修：{rev.revised_text}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-indigo-300">
+                    <span>理由：{rev.rationale}</span>
+                    <button
+                      onClick={() => handleCopy(rev.revised_text)}
+                      className="text-slate-400 hover:text-white flex items-center gap-0.5"
+                    >
+                      <Copy className="w-3 h-3" />
+                      复制精修
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </aside>
   );
 };

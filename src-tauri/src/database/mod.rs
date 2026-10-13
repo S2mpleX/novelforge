@@ -7,9 +7,12 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::models::{
-    AiModel, AiProvider, Chapter, ChapterVersion, Character, CreateChapterInput,
-    CreateCharacterInput, CreateNovelInput, CreatePlotThreadInput, CreateWorldRuleInput, Novel,
-    PlotThread, SaveProviderInput, Volume, WorldRule,
+    AiModel, AiProvider, Chapter, ChapterVersion, Character, CharacterRelationship,
+    ContinuityAuditFinding, CreateChapterInput, CreateCharacterInput,
+    CreateCharacterRelationshipInput, CreateNovelInput, CreatePlotThreadInput, CreateSceneInput,
+    CreateStoryArcInput, CreateStoryEventInput, CreateStoryPhaseInput, CreateWorldRuleInput, Novel,
+    PlotThread, ReviewFinding, ReviewReport, SaveProviderInput, Scene, StoryArc, StoryEvent,
+    StoryPhase, Volume, WorldRule,
 };
 
 #[derive(Clone)]
@@ -876,6 +879,481 @@ impl DbManager {
             }
             Err(_) => Ok(None),
         }
+    }
+
+    // --- CHARACTER RELATIONSHIPS ---
+
+    pub fn list_character_relationships(&self, novel_id: &str) -> Result<Vec<CharacterRelationship>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, source_character_id, target_character_id, relation_type, description, status, created_at
+             FROM character_relationships WHERE novel_id = ?1 ORDER BY created_at ASC",
+        )?;
+
+        let rows = stmt.query_map(params![novel_id], |row| {
+            Ok(CharacterRelationship {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                source_character_id: row.get(2)?,
+                target_character_id: row.get(3)?,
+                relation_type: row.get(4)?,
+                description: row.get(5)?,
+                status: row.get(6)?,
+                created_at: row.get(7)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn create_character_relationship(&self, input: CreateCharacterRelationshipInput) -> Result<CharacterRelationship> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let desc = input.description.unwrap_or_default();
+
+        conn.execute(
+            "INSERT INTO character_relationships (id, novel_id, source_character_id, target_character_id, relation_type, description, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'ACTIVE', ?7)",
+            params![
+                &id,
+                &input.novel_id,
+                &input.source_character_id,
+                &input.target_character_id,
+                &input.relation_type,
+                &desc,
+                now
+            ],
+        )?;
+
+        Ok(CharacterRelationship {
+            id,
+            novel_id: input.novel_id,
+            source_character_id: input.source_character_id,
+            target_character_id: input.target_character_id,
+            relation_type: input.relation_type,
+            description: desc,
+            status: "ACTIVE".to_string(),
+            created_at: now,
+        })
+    }
+
+    pub fn delete_character_relationship(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM character_relationships WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // --- STORY PHASES ---
+
+    pub fn list_story_phases(&self, novel_id: &str) -> Result<Vec<StoryPhase>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, title, order_index, goal, status, created_at
+             FROM story_phases WHERE novel_id = ?1 ORDER BY order_index ASC",
+        )?;
+
+        let rows = stmt.query_map(params![novel_id], |row| {
+            Ok(StoryPhase {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                title: row.get(2)?,
+                order_index: row.get(3)?,
+                goal: row.get(4)?,
+                status: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn create_story_phase(&self, input: CreateStoryPhaseInput) -> Result<StoryPhase> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let order_idx = input.order_index.unwrap_or_else(|| {
+            let max_idx: Option<i64> = conn
+                .query_row(
+                    "SELECT MAX(order_index) FROM story_phases WHERE novel_id = ?1",
+                    params![&input.novel_id],
+                    |r| r.get(0),
+                )
+                .ok();
+            max_idx.unwrap_or(0) + 1
+        });
+        let goal = input.goal.unwrap_or_default();
+
+        conn.execute(
+            "INSERT INTO story_phases (id, novel_id, title, order_index, goal, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, 'PLANNING', ?6)",
+            params![&id, &input.novel_id, &input.title, order_idx, &goal, now],
+        )?;
+
+        Ok(StoryPhase {
+            id,
+            novel_id: input.novel_id,
+            title: input.title,
+            order_index: order_idx,
+            goal,
+            status: "PLANNING".to_string(),
+            created_at: now,
+        })
+    }
+
+    pub fn delete_story_phase(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM story_phases WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // --- STORY ARCS ---
+
+    pub fn list_story_arcs(&self, novel_id: &str) -> Result<Vec<StoryArc>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, phase_id, title, goal, description, status, start_chapter_id, planned_end, priority, created_at
+             FROM story_arcs WHERE novel_id = ?1 ORDER BY created_at ASC",
+        )?;
+
+        let rows = stmt.query_map(params![novel_id], |row| {
+            Ok(StoryArc {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                phase_id: row.get(2)?,
+                title: row.get(3)?,
+                goal: row.get(4)?,
+                description: row.get(5)?,
+                status: row.get(6)?,
+                start_chapter_id: row.get(7)?,
+                planned_end: row.get(8)?,
+                priority: row.get(9)?,
+                created_at: row.get(10)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn create_story_arc(&self, input: CreateStoryArcInput) -> Result<StoryArc> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let goal = input.goal.unwrap_or_default();
+        let desc = input.description.unwrap_or_default();
+        let priority = input.priority.unwrap_or_else(|| "MAIN".to_string());
+
+        conn.execute(
+            "INSERT INTO story_arcs (id, novel_id, phase_id, title, goal, description, status, priority, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'DEVELOPING', ?7, ?8)",
+            params![&id, &input.novel_id, &input.phase_id, &input.title, &goal, &desc, &priority, now],
+        )?;
+
+        Ok(StoryArc {
+            id,
+            novel_id: input.novel_id,
+            phase_id: input.phase_id,
+            title: input.title,
+            goal,
+            description: desc,
+            status: "DEVELOPING".to_string(),
+            start_chapter_id: None,
+            planned_end: "".to_string(),
+            priority,
+            created_at: now,
+        })
+    }
+
+    pub fn update_story_arc_status(&self, id: &str, status: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("UPDATE story_arcs SET status = ?1 WHERE id = ?2", params![status, id])?;
+        Ok(())
+    }
+
+    // --- SCENES ---
+
+    pub fn list_scenes(&self, chapter_id: &str) -> Result<Vec<Scene>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, chapter_id, sequence, objective, outline, pov_character_id, location_id, status, created_at
+             FROM scenes WHERE chapter_id = ?1 ORDER BY sequence ASC",
+        )?;
+
+        let rows = stmt.query_map(params![chapter_id], |row| {
+            Ok(Scene {
+                id: row.get(0)?,
+                chapter_id: row.get(1)?,
+                sequence: row.get(2)?,
+                objective: row.get(3)?,
+                outline: row.get(4)?,
+                pov_character_id: row.get(5)?,
+                location_id: row.get(6)?,
+                status: row.get(7)?,
+                created_at: row.get(8)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn create_scene(&self, input: CreateSceneInput) -> Result<Scene> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let location_id = input.location_id.unwrap_or_default();
+
+        conn.execute(
+            "INSERT INTO scenes (id, chapter_id, sequence, objective, outline, pov_character_id, location_id, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'PLANNED', ?8)",
+            params![
+                &id,
+                &input.chapter_id,
+                input.sequence,
+                &input.objective,
+                &input.outline,
+                &input.pov_character_id,
+                &location_id,
+                now
+            ],
+        )?;
+
+        Ok(Scene {
+            id,
+            chapter_id: input.chapter_id,
+            sequence: input.sequence,
+            objective: input.objective,
+            outline: input.outline,
+            pov_character_id: input.pov_character_id,
+            location_id,
+            status: "PLANNED".to_string(),
+            created_at: now,
+        })
+    }
+
+    pub fn update_scene_status(&self, id: &str, status: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("UPDATE scenes SET status = ?1 WHERE id = ?2", params![status, id])?;
+        Ok(())
+    }
+
+    // --- STORY EVENTS ---
+
+    pub fn list_story_events(&self, novel_id: &str) -> Result<Vec<StoryEvent>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, title, description, story_time, source_chapter_id, cause_event_id, location_id, status, created_at
+             FROM story_events WHERE novel_id = ?1 ORDER BY created_at ASC",
+        )?;
+
+        let rows = stmt.query_map(params![novel_id], |row| {
+            Ok(StoryEvent {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                title: row.get(2)?,
+                description: row.get(3)?,
+                story_time: row.get(4)?,
+                source_chapter_id: row.get(5)?,
+                cause_event_id: row.get(6)?,
+                location_id: row.get(7)?,
+                status: row.get(8)?,
+                created_at: row.get(9)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn create_story_event(&self, input: CreateStoryEventInput) -> Result<StoryEvent> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let desc = input.description.unwrap_or_default();
+        let story_time = input.story_time.unwrap_or_default();
+
+        conn.execute(
+            "INSERT INTO story_events (id, novel_id, title, description, story_time, source_chapter_id, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'OCCURRED', ?7)",
+            params![
+                &id,
+                &input.novel_id,
+                &input.title,
+                &desc,
+                &story_time,
+                &input.source_chapter_id,
+                now
+            ],
+        )?;
+
+        Ok(StoryEvent {
+            id,
+            novel_id: input.novel_id,
+            title: input.title,
+            description: desc,
+            story_time,
+            source_chapter_id: input.source_chapter_id,
+            cause_event_id: None,
+            location_id: "".to_string(),
+            status: "OCCURRED".to_string(),
+            created_at: now,
+        })
+    }
+
+    // --- REVIEW REPORTS & FINDINGS ---
+
+    pub fn create_review_report(
+        &self,
+        chapter_id: &str,
+        version_number: i64,
+        score: i64,
+        summary: &str,
+        findings: &[ContinuityAuditFinding],
+    ) -> Result<ReviewReport> {
+        let conn = self.conn.lock();
+        let report_id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+
+        conn.execute(
+            "INSERT INTO review_reports (id, chapter_id, version_number, score, summary, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![&report_id, chapter_id, version_number, score, summary, now],
+        )?;
+
+        let mut saved_findings = Vec::new();
+        for f in findings {
+            let f_id = Uuid::new_v4().to_string();
+            let quote = f.evidence_quote.clone().unwrap_or_default();
+            conn.execute(
+                "INSERT INTO review_findings (id, report_id, severity, category, title, description, evidence_quote, suggestion, status, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'OPEN', ?9)",
+                params![
+                    &f_id,
+                    &report_id,
+                    &f.severity,
+                    &f.category,
+                    &f.title,
+                    &f.description,
+                    &quote,
+                    &f.suggestion,
+                    now
+                ],
+            )?;
+
+            saved_findings.push(ReviewFinding {
+                id: f_id,
+                report_id: report_id.clone(),
+                severity: f.severity.clone(),
+                category: f.category.clone(),
+                title: f.title.clone(),
+                description: f.description.clone(),
+                evidence_quote: quote,
+                suggestion: f.suggestion.clone(),
+                status: "OPEN".to_string(),
+                created_at: now,
+            });
+        }
+
+        Ok(ReviewReport {
+            id: report_id,
+            chapter_id: chapter_id.to_string(),
+            version_number,
+            score,
+            summary: summary.to_string(),
+            created_at: now,
+            findings: saved_findings,
+        })
+    }
+
+    pub fn list_review_reports(&self, chapter_id: &str) -> Result<Vec<ReviewReport>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, chapter_id, version_number, score, summary, created_at
+             FROM review_reports WHERE chapter_id = ?1 ORDER BY created_at DESC",
+        )?;
+
+        let rows = stmt.query_map(params![chapter_id], |row| {
+            let r_id: String = row.get(0)?;
+            Ok((
+                r_id,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, i64>(5)?,
+            ))
+        })?;
+
+        let mut reports = Vec::new();
+        let raw_reports: Vec<_> = rows.filter_map(|r| r.ok()).collect();
+
+        for (r_id, ch_id, ver, score, summary, created_at) in raw_reports {
+            let mut f_stmt = conn.prepare(
+                "SELECT id, report_id, severity, category, title, description, evidence_quote, suggestion, status, created_at
+                 FROM review_findings WHERE report_id = ?1 ORDER BY created_at ASC",
+            )?;
+
+            let f_rows = f_stmt.query_map(params![&r_id], |f_row| {
+                Ok(ReviewFinding {
+                    id: f_row.get(0)?,
+                    report_id: f_row.get(1)?,
+                    severity: f_row.get(2)?,
+                    category: f_row.get(3)?,
+                    title: f_row.get(4)?,
+                    description: f_row.get(5)?,
+                    evidence_quote: f_row.get(6)?,
+                    suggestion: f_row.get(7)?,
+                    status: f_row.get(8)?,
+                    created_at: f_row.get(9)?,
+                })
+            })?;
+
+            let findings = f_rows.filter_map(|f| f.ok()).collect();
+
+            reports.push(ReviewReport {
+                id: r_id,
+                chapter_id: ch_id,
+                version_number: ver,
+                score,
+                summary,
+                created_at,
+                findings,
+            });
+        }
+
+        Ok(reports)
+    }
+
+    pub fn get_latest_review_report(&self, chapter_id: &str) -> Result<Option<ReviewReport>> {
+        let reports = self.list_review_reports(chapter_id)?;
+        Ok(reports.into_iter().next())
+    }
+
+    pub fn update_finding_status(&self, finding_id: &str, status: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE review_findings SET status = ?1 WHERE id = ?2",
+            params![status, finding_id],
+        )?;
+        Ok(())
     }
 }
 
