@@ -56,24 +56,24 @@ export const VersionDrawer: React.FC<Props> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end animate-in fade-in">
-      <div className="w-full max-w-xl bg-slate-900 border-l border-slate-800 h-full flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex justify-end animate-in fade-in">
+      <div className="w-full max-w-xl bg-[#fdfbf7] border-l border-[#ded5c4] h-full flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+        <div className="p-4 border-b border-[#ded5c4] flex items-center justify-between bg-[#efe9dc]">
           <div className="flex items-center gap-2">
-            <History className="w-5 h-5 text-indigo-400" />
+            <History className="w-5 h-5 text-[#854d0e]" />
             <div>
-              <h2 className="text-sm font-bold text-slate-100">
-                第 {activeChapter?.chapter_number} 章 历史版本与恢复
+              <h2 className="text-sm font-serif font-bold text-[#2b2621]">
+                第 {activeChapter?.chapter_number} 章 · 历史卷宗与版本回溯
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#685f54] font-serif">
                 共记录 {versions.length} 个快照版本，数据均持久化在本地 SQLite
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition"
+            className="p-1 rounded-lg text-[#685f54] hover:text-[#2b2621] hover:bg-[#e5ded0] transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -82,7 +82,7 @@ export const VersionDrawer: React.FC<Props> = ({ onClose }) => {
         {/* Content Body: Split list & preview */}
         <div className="flex-1 flex overflow-hidden">
           {/* Version List */}
-          <div className="w-52 border-r border-slate-800 overflow-y-auto p-2 space-y-1 shrink-0">
+          <div className="w-52 border-r border-[#ded5c4] bg-[#f7f2e7] overflow-y-auto p-2 space-y-1 shrink-0">
             {versions.map((v) => {
               const isSelected = selectedVersion?.id === v.id;
               const dateStr = new Date(v.created_at).toLocaleTimeString();
@@ -91,17 +91,17 @@ export const VersionDrawer: React.FC<Props> = ({ onClose }) => {
                 <div
                   key={v.id}
                   onClick={() => setSelectedVersion(v)}
-                  className={`p-2.5 rounded-lg cursor-pointer transition select-none text-xs ${
+                  className={`p-2.5 rounded-lg cursor-pointer transition select-none text-xs font-serif ${
                     isSelected
-                      ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-medium'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      ? 'bg-[#fdfbf7] text-[#854d0e] border border-[#ded5c4] shadow-2xs font-semibold'
+                      : 'text-[#685f54] hover:text-[#2b2621] hover:bg-[#efe9dc]'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-slate-200">V{v.version_number}</span>
+                    <span className="font-bold text-[#2b2621]">V{v.version_number}</span>
                     {getSourceBadge(v.source_type)}
                   </div>
-                  <div className="flex items-center gap-1 text-[11px] text-slate-500">
+                  <div className="flex items-center gap-1 text-[11px] text-[#786f65]">
                     <Clock className="w-3 h-3" />
                     <span>{fullDate} {dateStr}</span>
                   </div>
@@ -111,33 +111,33 @@ export const VersionDrawer: React.FC<Props> = ({ onClose }) => {
           </div>
 
           {/* Version Preview */}
-          <div className="flex-1 flex flex-col p-4 overflow-hidden bg-slate-950/30">
+          <div className="flex-1 flex flex-col p-4 overflow-hidden bg-[#f4efe6]">
             {selectedVersion ? (
               <>
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#ded5c4]">
                   <div>
-                    <span className="text-xs font-semibold text-slate-200 mr-2">
+                    <span className="text-xs font-serif font-bold text-[#2b2621] mr-2">
                       快照 V{selectedVersion.version_number} 预览
                     </span>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-[#786f65] font-serif">
                       ({selectedVersion.content.length} 字符)
                     </span>
                   </div>
                   <button
                     onClick={() => handleRestore(selectedVersion)}
-                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition shadow-sm"
+                    className="px-3 py-1.5 rounded-lg bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] text-xs font-serif font-medium flex items-center gap-1.5 transition shadow-xs"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     恢复为此版本
                   </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto bg-slate-900 border border-slate-800/80 rounded-lg p-4 text-xs text-slate-300 whitespace-pre-wrap leading-relaxed font-serif select-text">
+                <div className="flex-1 overflow-y-auto bg-[#fdfbf7] border border-[#ded5c4] rounded-xl p-5 text-xs text-[#2b2621] whitespace-pre-wrap leading-relaxed font-serif select-text shadow-2xs">
                   {selectedVersion.content || '(本版本内容为空)'}
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-slate-500 text-xs">
+              <div className="flex-1 flex items-center justify-center text-[#786f65] text-xs font-serif">
                 选择左侧版本查看历史快照
               </div>
             )}

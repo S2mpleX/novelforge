@@ -119,16 +119,16 @@ export const StoryBibleView: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-900/40 select-none overflow-hidden h-[calc(100vh-3.5rem)]">
+    <div className="flex-1 flex flex-col bg-[#f4efe6] select-none overflow-hidden h-[calc(100vh-3.5rem)]">
       {/* Top Bible Sub-Navigation */}
-      <div className="h-12 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-950/40 shrink-0">
+      <div className="h-12 border-b border-[#ded5c4] px-6 flex items-center justify-between bg-[#efe9dc]/95 shrink-0 shadow-xs">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('CHARACTERS')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
               activeTab === 'CHARACTERS'
-                ? 'bg-indigo-600 text-white'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-[#854d0e] text-white shadow-xs'
+                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
@@ -138,8 +138,8 @@ export const StoryBibleView: React.FC = () => {
             onClick={() => setActiveTab('RELATIONSHIPS')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
               activeTab === 'RELATIONSHIPS'
-                ? 'bg-indigo-600 text-white'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-[#854d0e] text-white shadow-xs'
+                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
             }`}
           >
             <GitCommit className="w-3.5 h-3.5" />
@@ -149,8 +149,8 @@ export const StoryBibleView: React.FC = () => {
             onClick={() => setActiveTab('RULES')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
               activeTab === 'RULES'
-                ? 'bg-indigo-600 text-white'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-[#854d0e] text-white shadow-xs'
+                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
             }`}
           >
             <Compass className="w-3.5 h-3.5" />
@@ -160,8 +160,8 @@ export const StoryBibleView: React.FC = () => {
             onClick={() => setActiveTab('PLOT_ARCS')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
               activeTab === 'PLOT_ARCS'
-                ? 'bg-indigo-600 text-white'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-[#854d0e] text-white shadow-xs'
+                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -171,8 +171,8 @@ export const StoryBibleView: React.FC = () => {
             onClick={() => setActiveTab('PLOTS')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
               activeTab === 'PLOTS'
-                ? 'bg-indigo-600 text-white'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-[#854d0e] text-white shadow-xs'
+                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
             }`}
           >
             <Bookmark className="w-3.5 h-3.5" />
@@ -184,7 +184,7 @@ export const StoryBibleView: React.FC = () => {
           {activeTab === 'CHARACTERS' && (
             <button
               onClick={() => setShowAddChar(true)}
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm"
+              className="px-3 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
               新建人物
@@ -193,7 +193,7 @@ export const StoryBibleView: React.FC = () => {
           {activeTab === 'RULES' && (
             <button
               onClick={() => setShowAddRule(true)}
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm"
+              className="px-3 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
               新增世界观规则
@@ -202,7 +202,7 @@ export const StoryBibleView: React.FC = () => {
           {activeTab === 'PLOTS' && (
             <button
               onClick={() => setShowAddThread(true)}
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm"
+              className="px-3 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
               埋设新伏笔
@@ -227,194 +227,194 @@ export const StoryBibleView: React.FC = () => {
             {activeTab === 'CHARACTERS' && (
               <div>
                 {characters.length === 0 ? (
-                  <div className="text-center py-16 border border-dashed border-slate-800 rounded-xl">
-                    <Users className="w-10 h-10 text-slate-600 mx-auto mb-2 opacity-50" />
-                  <p className="text-xs text-slate-400 mb-3">暂无角色档案。创建人物后，写作 Agent 将在生成章节时自动遵守人物性格与动机！</p>
-                  <button
-                    onClick={() => setShowAddChar(true)}
-                    className="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium"
-                  >
-                    创建首位角色
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {characters.map((c) => (
-                    <div
-                      key={c.id}
-                      className="p-4 rounded-xl bg-slate-900 border border-slate-800 shadow-sm space-y-2.5"
+                  <div className="text-center py-16 border border-dashed border-[#ded5c4] rounded-xl bg-[#fdfbf7]">
+                    <Users className="w-10 h-10 text-[#9e9383] mx-auto mb-2 opacity-50" />
+                    <p className="text-xs text-[#786f65] mb-3">暂无角色档案。创建人物后，写作 Agent 将在生成章节时自动遵守人物性格与动机！</p>
+                    <button
+                      onClick={() => setShowAddChar(true)}
+                      className="px-3.5 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium"
                     >
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-100 text-sm">{c.name}</span>
-                          {c.aliases && (
-                            <span className="text-[11px] text-slate-400">({c.aliases})</span>
-                          )}
+                      创建首位角色
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {characters.map((c) => (
+                      <div
+                        key={c.id}
+                        className="p-4 rounded-xl bg-[#fdfbf7] border border-[#ded5c4] shadow-xs space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between pb-2 border-b border-[#ded5c4]">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-[#1f1d1a] text-sm font-serif">{c.name}</span>
+                            {c.aliases && (
+                              <span className="text-[11px] text-[#786f65]">({c.aliases})</span>
+                            )}
+                          </div>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-800/10 text-amber-800 border border-amber-800/20 font-medium">
+                            已激活
+                          </span>
                         </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                          已激活
-                        </span>
+
+                        {c.personality && (
+                          <div className="text-xs text-[#3d362e]">
+                            <span className="text-[#786f65] mr-1.5">性格：</span>
+                            {c.personality}
+                          </div>
+                        )}
+                        {c.motivation && (
+                          <div className="text-xs text-[#3d362e]">
+                            <span className="text-[#786f65] mr-1.5">核心动机：</span>
+                            {c.motivation}
+                          </div>
+                        )}
+                        {c.background && (
+                          <div className="text-xs text-[#685f54] leading-relaxed">
+                            <span className="text-[#786f65] mr-1.5">生平背景：</span>
+                            {c.background}
+                          </div>
+                        )}
                       </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-                      {c.personality && (
-                        <div className="text-xs text-slate-300">
-                          <span className="text-slate-500 mr-1.5">性格：</span>
-                          {c.personality}
-                        </div>
-                      )}
-                      {c.motivation && (
-                        <div className="text-xs text-slate-300">
-                          <span className="text-slate-500 mr-1.5">核心动机：</span>
-                          {c.motivation}
-                        </div>
-                      )}
-                      {c.background && (
-                        <div className="text-xs text-slate-400 leading-relaxed">
-                          <span className="text-slate-500 mr-1.5">生平背景：</span>
-                          {c.background}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* WORLD RULES (CANON) TAB */}
-          {activeTab === 'RULES' && (
-            <div>
-              {rules.length === 0 ? (
-                <div className="text-center py-16 border border-dashed border-slate-800 rounded-xl">
-                  <Compass className="w-10 h-10 text-slate-600 mx-auto mb-2 opacity-50" />
-                  <p className="text-xs text-slate-400 mb-3">暂无世界观设定。记录战力体系、地理法则等权威规则，防止长篇创作前后矛盾！</p>
-                  <button
-                    onClick={() => setShowAddRule(true)}
-                    className="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium"
-                  >
-                    添加核心规则
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {rules.map((r) => (
-                    <div
-                      key={r.id}
-                      className="p-4 rounded-xl bg-slate-900 border border-slate-800 shadow-sm"
+            {/* WORLD RULES (CANON) TAB */}
+            {activeTab === 'RULES' && (
+              <div>
+                {rules.length === 0 ? (
+                  <div className="text-center py-16 border border-dashed border-[#ded5c4] rounded-xl bg-[#fdfbf7]">
+                    <Compass className="w-10 h-10 text-[#9e9383] mx-auto mb-2 opacity-50" />
+                    <p className="text-xs text-[#786f65] mb-3">暂无世界观设定。记录战力体系、地理法则等权威规则，防止长篇创作前后矛盾！</p>
+                    <button
+                      onClick={() => setShowAddRule(true)}
+                      className="px-3.5 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                          <h4 className="text-sm font-bold text-slate-100">{r.title}</h4>
+                      添加核心规则
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {rules.map((r) => (
+                      <div
+                        key={r.id}
+                        className="p-4 rounded-xl bg-[#fdfbf7] border border-[#ded5c4] shadow-xs"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                            <h4 className="text-sm font-bold text-[#1f1d1a] font-serif">{r.title}</h4>
+                          </div>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-800/10 text-emerald-800 border border-emerald-800/20 font-semibold font-mono">
+                            {r.authority_level} (权威)
+                          </span>
                         </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
-                          {r.authority_level} (权威)
-                        </span>
+                        <p className="text-xs text-[#3d362e] leading-relaxed">{r.rule_content}</p>
                       </div>
-                      <p className="text-xs text-slate-300 leading-relaxed">{r.rule_content}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* PLOT THREADS TAB */}
-          {activeTab === 'PLOTS' && (
-            <div>
-              {threads.length === 0 ? (
-                <div className="text-center py-16 border border-dashed border-slate-800 rounded-xl">
-                  <Bookmark className="w-10 h-10 text-slate-600 mx-auto mb-2 opacity-50" />
-                  <p className="text-xs text-slate-400 mb-3">暂无悬念伏笔。登记尚未揭晓的秘密与伏笔线索，辅助多 Agent 持续追踪！</p>
-                  <button
-                    onClick={() => setShowAddThread(true)}
-                    className="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium"
-                  >
-                    埋设第一条伏笔
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {threads.map((t) => (
-                    <div
-                      key={t.id}
-                      className="p-4 rounded-xl bg-slate-900 border border-slate-800 shadow-sm"
+            {/* PLOT THREADS TAB */}
+            {activeTab === 'PLOTS' && (
+              <div>
+                {threads.length === 0 ? (
+                  <div className="text-center py-16 border border-dashed border-[#ded5c4] rounded-xl bg-[#fdfbf7]">
+                    <Bookmark className="w-10 h-10 text-[#9e9383] mx-auto mb-2 opacity-50" />
+                    <p className="text-xs text-[#786f65] mb-3">暂无悬念伏笔。登记尚未揭晓的秘密与伏笔线索，辅助多 Agent 持续追踪！</p>
+                    <button
+                      onClick={() => setShowAddThread(true)}
+                      className="px-3.5 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-amber-400" />
-                          <h4 className="text-sm font-bold text-slate-100">{t.title}</h4>
+                      埋设第一条伏笔
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {threads.map((t) => (
+                      <div
+                        key={t.id}
+                        className="p-4 rounded-xl bg-[#fdfbf7] border border-[#ded5c4] shadow-xs"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-amber-700" />
+                            <h4 className="text-sm font-bold text-[#1f1d1a] font-serif">{t.title}</h4>
+                          </div>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-amber-800/10 text-amber-800 border border-amber-800/20 font-semibold font-mono">
+                            {t.status}
+                          </span>
                         </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
-                          {t.status}
-                        </span>
+                        <p className="text-xs text-[#3d362e] leading-relaxed">{t.description}</p>
                       </div>
-                      <p className="text-xs text-slate-300 leading-relaxed">{t.description}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
       )}
 
       {/* MODAL: ADD CHARACTER */}
       {showAddChar && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-bold text-slate-100">新建人物档案</h3>
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#fdfbf7] border border-[#ded5c4] rounded-xl p-5 space-y-4 shadow-xl">
+            <h3 className="text-sm font-bold text-[#1f1d1a] font-serif">新建人物档案</h3>
             <form onSubmit={handleAddChar} className="space-y-3">
               <div>
-                <label className="text-xs text-slate-300 block mb-1">姓名 *</label>
+                <label className="text-xs text-[#685f54] block mb-1">姓名 *</label>
                 <input
                   required
                   value={charName}
                   onChange={(e) => setCharName(e.target.value)}
                   placeholder="如：叶修、顾清怀、陈平安..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621]"
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-300 block mb-1">性格特质</label>
+                <label className="text-xs text-[#685f54] block mb-1">性格特质</label>
                 <input
                   value={charPersonality}
                   onChange={(e) => setCharPersonality(e.target.value)}
                   placeholder="如：沉稳果决、玩世不恭、外冷内热..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621]"
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-300 block mb-1">核心动机 / 目标</label>
+                <label className="text-xs text-[#685f54] block mb-1">核心动机 / 目标</label>
                 <input
                   value={charMotivation}
                   onChange={(e) => setCharMotivation(e.target.value)}
                   placeholder="如：重返荣耀巅峰、为宗门复仇..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621]"
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-300 block mb-1">背景身世</label>
+                <label className="text-xs text-[#685f54] block mb-1">背景身世</label>
                 <textarea
                   rows={3}
                   value={charBackground}
                   onChange={(e) => setCharBackground(e.target.value)}
                   placeholder="生平过往、家族背景与隐藏秘密..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 resize-none"
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] resize-none"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAddChar(false)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-400"
+                  className="px-3 py-1.5 rounded-lg border border-[#d5cbb8] text-xs text-[#685f54] hover:bg-[#eae2d3]"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium"
+                  className="px-4 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium"
                 >
                   保存人物
                 </button>
@@ -426,26 +426,26 @@ export const StoryBibleView: React.FC = () => {
 
       {/* MODAL: ADD WORLD RULE */}
       {showAddRule && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-bold text-slate-100">新增世界观法则 (Canon)</h3>
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#fdfbf7] border border-[#ded5c4] rounded-xl p-5 space-y-4 shadow-xl">
+            <h3 className="text-sm font-bold text-[#1f1d1a] font-serif">新增世界观法则 (Canon)</h3>
             <form onSubmit={handleAddRule} className="space-y-3">
               <div>
-                <label className="text-xs text-slate-300 block mb-1">规则名称 *</label>
+                <label className="text-xs text-[#685f54] block mb-1">规则名称 *</label>
                 <input
                   required
                   value={ruleTitle}
                   onChange={(e) => setRuleTitle(e.target.value)}
                   placeholder="如：灵气潮汐法则、热力学禁区、超凡契约..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621]"
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-300 block mb-1">权威分级</label>
+                <label className="text-xs text-[#685f54] block mb-1">权威分级</label>
                 <select
                   value={ruleAuthority}
                   onChange={(e: any) => setRuleAuthority(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621]"
                 >
                   <option value="CANON">CANON (权威不可动摇)</option>
                   <option value="EXTENDED">EXTENDED (可扩展推演)</option>
@@ -453,27 +453,27 @@ export const StoryBibleView: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-300 block mb-1">规则详细描述 *</label>
+                <label className="text-xs text-[#685f54] block mb-1">规则详细描述 *</label>
                 <textarea
                   required
                   rows={4}
                   value={ruleContent}
                   onChange={(e) => setRuleContent(e.target.value)}
                   placeholder="详细规则与约束边界..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 resize-none"
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] resize-none"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAddRule(false)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-400"
+                  className="px-3 py-1.5 rounded-lg border border-[#d5cbb8] text-xs text-[#685f54] hover:bg-[#eae2d3]"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium"
+                  className="px-4 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium"
                 >
                   保存规则
                 </button>
@@ -485,41 +485,41 @@ export const StoryBibleView: React.FC = () => {
 
       {/* MODAL: ADD PLOT THREAD */}
       {showAddThread && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-bold text-slate-100">埋设新伏笔 / 故事线</h3>
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#fdfbf7] border border-[#ded5c4] rounded-xl p-5 space-y-4 shadow-xl">
+            <h3 className="text-sm font-bold text-[#1f1d1a] font-serif">埋设新伏笔 / 故事线</h3>
             <form onSubmit={handleAddThread} className="space-y-3">
               <div>
-                <label className="text-xs text-slate-300 block mb-1">伏笔标题 *</label>
+                <label className="text-xs text-[#685f54] block mb-1">伏笔标题 *</label>
                 <input
                   required
                   value={threadTitle}
                   onChange={(e) => setThreadTitle(e.target.value)}
                   placeholder="如：青铜古剑的真正来历、主角身世玉佩的缺口..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621]"
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-300 block mb-1">线索内容与预期回收</label>
+                <label className="text-xs text-[#685f54] block mb-1">线索内容与预期回收</label>
                 <textarea
                   rows={4}
                   value={threadDesc}
                   onChange={(e) => setThreadDesc(e.target.value)}
                   placeholder="描述当前已埋设的细节线索及未来推进设想..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 resize-none"
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] resize-none"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAddThread(false)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-400"
+                  className="px-3 py-1.5 rounded-lg border border-[#d5cbb8] text-xs text-[#685f54] hover:bg-[#eae2d3]"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium"
+                  className="px-4 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium"
                 >
                   登记伏笔
                 </button>

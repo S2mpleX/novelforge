@@ -2,23 +2,24 @@
 
 @layer base {
   :root {
-    --background: 224 35% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 30% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 30% 9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 238 84% 67%;
-    --primary-foreground: 210 40% 98%;
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 14%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 18%;
-    --input: 217 33% 18%;
-    --ring: 238 84% 67%;
+    /* Warm Parchment / Literary Paper Design System */
+    --background: 42 35% 94%;       /* #f5f0e6 宣纸底色 */
+    --foreground: 30 15% 15%;       /* #2b2621 松烟浓墨 */
+    --card: 40 40% 97%;             /* #fcfaf5 象牙纸页 */
+    --card-foreground: 30 15% 15%;
+    --popover: 40 40% 97%;
+    --popover-foreground: 30 15% 15%;
+    --primary: 28 80% 42%;          /* #c2410c 典雅朱砂印泥 */
+    --primary-foreground: 45 40% 98%;
+    --muted: 40 25% 88%;            /* #e7dfcf 次级宣纸 */
+    --muted-foreground: 30 10% 45%; /* #786f65 浅淡水墨 */
+    --accent: 35 45% 88%;           /* #eadecc 暖米金 */
+    --accent-foreground: 30 15% 15%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 45 40% 98%;
+    --border: 38 25% 82%;           /* #dcd1be 纸卷折痕线 */
+    --input: 38 25% 82%;
+    --ring: 28 80% 42%;
   }
 }
 
@@ -28,78 +29,88 @@ body {
   padding: 0;
   overflow: hidden;
   user-select: none;
-  background-color: #090c10;
-  color: #f1f5f9;
+  background-color: #f4efe6;
+  color: #2b2621;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ambient Studio Background */
+/* Ambient Paper Desk Background */
 .ambient-bg {
-  background-color: #090c10;
+  background-color: #f4efe6;
   background-image: 
-    radial-gradient(at 15% 15%, rgba(99, 102, 241, 0.08) 0px, transparent 50%),
-    radial-gradient(at 85% 20%, rgba(168, 85, 247, 0.07) 0px, transparent 45%),
-    radial-gradient(at 50% 90%, rgba(16, 185, 129, 0.05) 0px, transparent 55%);
+    radial-gradient(at 15% 15%, rgba(180, 83, 9, 0.05) 0px, transparent 55%),
+    radial-gradient(at 85% 20%, rgba(194, 65, 12, 0.04) 0px, transparent 50%),
+    radial-gradient(at 50% 90%, rgba(120, 80, 40, 0.04) 0px, transparent 60%);
 }
 
-/* Glassmorphism Classes */
+/* Paper Texture & Panels */
 .glass-panel {
-  background: rgba(13, 17, 23, 0.75);
+  background: rgba(246, 241, 232, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid #ddd2bf;
 }
 
 .glass-panel-subtle {
-  background: rgba(18, 24, 38, 0.5);
+  background: rgba(249, 245, 238, 0.75);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid #e3d9c7;
 }
 
 .glass-card {
-  background: linear-gradient(135deg, rgba(22, 29, 44, 0.7) 0%, rgba(15, 20, 31, 0.7) 100%);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(145deg, #fdfbf7 0%, #f7f2e7 100%);
+  border: 1px solid #ded3bf;
+  box-shadow: 0 4px 16px -2px rgba(130, 95, 55, 0.08);
 }
 
 .glass-card:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 8px 30px -4px rgba(99, 102, 241, 0.15);
+  border-color: #c2410c;
+  box-shadow: 0 6px 20px -3px rgba(194, 65, 12, 0.12);
 }
 
-/* Glow & Accent Effects */
+/* Paper Sheet - Physical Writing Canvas */
+.paper-sheet {
+  background: #fdfbf7;
+  border: 1px solid #ded4c1;
+  box-shadow: 
+    0 1px 3px rgba(120, 90, 50, 0.05),
+    0 8px 24px -4px rgba(110, 80, 45, 0.09),
+    0 0 0 1px rgba(225, 212, 192, 0.4);
+  border-radius: 12px;
+}
+
+/* Glow & Accent Effects for Paper Theme */
 .glow-indigo {
-  box-shadow: 0 0 25px -4px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 20px -3px rgba(180, 83, 9, 0.25);
 }
 
 .glow-emerald {
-  box-shadow: 0 0 25px -4px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 0 20px -3px rgba(22, 101, 52, 0.25);
 }
 
 .glow-purple {
-  box-shadow: 0 0 25px -4px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 20px -3px rgba(162, 28, 175, 0.25);
 }
 
-/* Gradient Text Utilities */
+/* Seal & Ink Gradient Text Utilities */
 .text-gradient-brand {
-  background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+  background: linear-gradient(135deg, #b45309 0%, #c2410c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .text-gradient-emerald {
-  background: linear-gradient(135deg, #34d399 0%, #2dd4bf 100%);
+  background: linear-gradient(135deg, #15803d 0%, #047857 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* Custom Sleek Scrollbars */
+/* Custom Sleek Scrollbars (Ink Wash Style) */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -107,50 +118,50 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.25);
+  background: rgba(140, 120, 95, 0.25);
   border-radius: 9999px;
   transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.5);
+  background: rgba(140, 120, 95, 0.45);
 }
 
-/* Tiptap Literary Editor Styling */
+/* Tiptap Literary Paper Editor Styling */
 .ProseMirror {
   outline: none !important;
-  min-height: 520px;
-  font-family: "PingFang SC", "Microsoft YaHei", "Source Han Serif SC", "Noto Serif CJK SC", SimSun, serif;
-  font-size: 1.15rem;
-  line-height: 2.0;
-  letter-spacing: 0.025em;
-  color: #e2e8f0;
+  min-height: 560px;
+  font-family: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", SimSun, "PingFang SC", "Microsoft YaHei", serif;
+  font-size: 1.18rem;
+  line-height: 2.15;
+  letter-spacing: 0.03em;
+  color: #231f1a; /* 徽墨浓黑 */
   user-select: text;
-  padding-bottom: 120px;
+  padding-bottom: 140px;
 }
 
 .ProseMirror p {
-  margin-bottom: 1.4em;
+  margin-bottom: 1.35em;
   text-indent: 2em;
   text-align: justify;
 }
 
 .ProseMirror blockquote {
-  border-left: 3px solid #6366f1;
+  border-left: 3px solid #b45309;
   padding-left: 1.25em;
   margin-left: 0;
   margin-right: 0;
-  color: #94a3b8;
+  color: #635749;
   font-style: normal;
-  background: rgba(99, 102, 241, 0.05);
-  padding-top: 0.5em;
-  padding-bottom: 0.5em;
+  background: rgba(180, 83, 9, 0.05);
+  padding-top: 0.6em;
+  padding-bottom: 0.6em;
   border-radius: 0 8px 8px 0;
 }
 
 .ProseMirror blockquote p {
   text-indent: 0;
-  margin-bottom: 0.5em;
+  margin-bottom: 0.4em;
 }
 
 .ProseMirror blockquote p:last-child {
@@ -159,27 +170,27 @@ body {
 
 .ProseMirror hr {
   border: none;
-  border-top: 1px dashed rgba(255, 255, 255, 0.15);
+  border-top: 1px dashed #d5c8b2;
   margin: 2.5em 0;
 }
 
 .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 {
   text-indent: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   font-weight: 700;
-  color: #f8fafc;
+  color: #1a1612;
   margin-top: 1.8em;
   margin-bottom: 0.8em;
 }
 
-.ProseMirror h1 { font-size: 1.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.3em; }
-.ProseMirror h2 { font-size: 1.4rem; }
-.ProseMirror h3 { font-size: 1.2rem; }
+.ProseMirror h1 { font-size: 1.8rem; border-bottom: 1px solid #ded3bf; padding-bottom: 0.4em; }
+.ProseMirror h2 { font-size: 1.45rem; }
+.ProseMirror h3 { font-size: 1.25rem; }
 
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: #475569;
+  color: #9e917f;
   pointer-events: none;
   height: 0;
 }
@@ -187,7 +198,7 @@ body {
 /* Animations */
 @keyframes pulse-subtle {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(0.98); }
+  50% { opacity: 0.75; transform: scale(0.98); }
 }
 
 .animate-pulse-subtle {

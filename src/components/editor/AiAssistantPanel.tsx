@@ -271,19 +271,19 @@ export const AiAssistantPanel: React.FC = () => {
   };
 
   return (
-    <aside className="w-96 border-l border-white/[0.08] bg-[#0c1017]/90 backdrop-blur-xl flex flex-col shrink-0 select-none h-[calc(100vh-3.5rem)] shadow-xl">
+    <aside className="w-96 border-l border-[#ded5c4] bg-[#f3ede1]/95 backdrop-blur-xl flex flex-col shrink-0 select-none h-[calc(100vh-3.5rem)] shadow-sm">
       {/* Top Header & Model Info */}
-      <div className="p-3.5 border-b border-white/[0.06] flex items-center justify-between bg-slate-900/30">
+      <div className="p-3.5 border-b border-[#ded5c4] flex items-center justify-between bg-[#eae2d3]/50">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20">
+          <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-amber-700 to-orange-700 flex items-center justify-center text-white shadow-sm">
             <Bot className="w-3.5 h-3.5" />
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-100">AI 创作智囊团</span>
+            <span className="text-xs font-bold text-[#2b2621]">AI 创作智囊团</span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/80 border border-white/[0.06] text-[11px] text-slate-300">
-          <Zap className="w-3 h-3 text-amber-400" />
+        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#fdfbf7] border border-[#d5cbb8] text-[11px] text-[#6b6255]">
+          <Zap className="w-3 h-3 text-amber-700" />
           <span className="max-w-[130px] truncate font-medium" title={activeProvider?.name}>
             {activeProvider ? activeProvider.name : '未配置模型'}
           </span>
@@ -291,13 +291,13 @@ export const AiAssistantPanel: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-4 p-1.5 bg-slate-900/50 border-b border-white/[0.06] gap-1 text-center">
+      <div className="grid grid-cols-4 p-1.5 bg-[#e4dcce] border-b border-[#ded5c4] gap-1 text-center">
         <button
           onClick={() => setActiveTab('STREAM_WRITE')}
           className={`py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
             activeTab === 'STREAM_WRITE'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+              ? 'bg-[#854d0e] text-white shadow-sm'
+              : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#ded4c3]'
           }`}
         >
           单章写作
@@ -306,8 +306,8 @@ export const AiAssistantPanel: React.FC = () => {
           onClick={() => setActiveTab('COLLABORATE')}
           className={`py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
             activeTab === 'COLLABORATE'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+              ? 'bg-[#854d0e] text-white shadow-sm'
+              : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#ded4c3]'
           }`}
         >
           协同编排
@@ -316,8 +316,8 @@ export const AiAssistantPanel: React.FC = () => {
           onClick={() => setActiveTab('CONTINUITY')}
           className={`py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
             activeTab === 'CONTINUITY'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+              ? 'bg-[#854d0e] text-white shadow-sm'
+              : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#ded4c3]'
           }`}
         >
           逻辑审稿
@@ -326,8 +326,8 @@ export const AiAssistantPanel: React.FC = () => {
           onClick={() => setActiveTab('STYLE_POLISH')}
           className={`py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
             activeTab === 'STYLE_POLISH'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+              ? 'bg-[#854d0e] text-white shadow-sm'
+              : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#ded4c3]'
           }`}
         >
           文学润色
@@ -336,17 +336,17 @@ export const AiAssistantPanel: React.FC = () => {
 
       {/* Status Bar */}
       {statusMessage && (
-        <div className="px-3.5 py-2 bg-indigo-950/40 border-b border-indigo-800/40 text-[11px] text-indigo-200 flex items-center gap-2 shrink-0 animate-in fade-in">
-          <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+        <div className="px-3.5 py-2 bg-[#faecd8] border-b border-[#f0d4b2] text-[11px] text-amber-900 flex items-center gap-2 shrink-0 animate-in fade-in">
+          <Sparkles className="w-3.5 h-3.5 text-amber-700 shrink-0" />
           <span className="truncate">{statusMessage}</span>
         </div>
       )}
 
       {/* TAB 1: STREAM WRITE */}
       {activeTab === 'STREAM_WRITE' && (
-        <div className="flex-1 flex flex-col min-h-0 p-3 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 p-3 overflow-hidden bg-[#f3ede1]/40">
           <div className="mb-2">
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">
+            <label className="text-[11px] font-semibold text-[#786f65] block mb-1.5">
               快捷创作动作
             </label>
             <div className="grid grid-cols-2 gap-1.5">
@@ -354,7 +354,7 @@ export const AiAssistantPanel: React.FC = () => {
                 <button
                   key={p.label}
                   onClick={() => setInstruction(p.instruction)}
-                  className="px-2 py-1.5 rounded text-xs text-left bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition truncate"
+                  className="px-2 py-1.5 rounded text-xs text-left bg-[#fdfbf7] hover:bg-[#eae2d3] text-[#3d362e] hover:text-[#1a1714] border border-[#d5cbb8] transition truncate shadow-xs"
                 >
                   {p.label}
                 </button>
@@ -363,20 +363,20 @@ export const AiAssistantPanel: React.FC = () => {
           </div>
 
           <div className="flex-1 flex flex-col min-h-0">
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+            <label className="text-[11px] font-semibold text-[#786f65] block mb-1">
               创作指令与剧情推进
             </label>
             <textarea
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
               placeholder="例如：写主角进入藏经阁第七层，发现失传古籍中的惊人秘密，与守阁长老产生言语交锋..."
-              className="w-full h-20 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-indigo-500 resize-none mb-2"
+              className="w-full h-20 bg-[#fdfbf7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] placeholder-[#9e9383] focus:outline-hidden focus:border-amber-700 resize-none mb-2"
             />
 
             <button
               onClick={handleStartGeneration}
               disabled={isGenerating || !activeChapter}
-              className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-40 mb-2"
+              className="w-full py-2 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-40 mb-2"
             >
               {isGenerating ? (
                 <>
@@ -392,15 +392,15 @@ export const AiAssistantPanel: React.FC = () => {
             </button>
 
             {/* Output stream display */}
-            <div className="flex-1 flex flex-col min-h-0 border border-slate-800/80 rounded-lg bg-slate-900/40 p-2.5">
-              <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-800/60">
-                <span className="text-[11px] font-semibold text-slate-400">
+            <div className="flex-1 flex flex-col min-h-0 border border-[#ded5c4] rounded-lg bg-[#fdfbf7] p-2.5 shadow-xs">
+              <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-[#ded5c4]">
+                <span className="text-[11px] font-semibold text-[#786f65]">
                   实时正文草稿 ({streamResult.length} 字)
                 </span>
                 {streamResult && (
                   <button
                     onClick={() => handleCopy(streamResult)}
-                    className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-0.5"
+                    className="text-[10px] text-[#786f65] hover:text-[#231f1a] flex items-center gap-0.5"
                     title="复制"
                   >
                     <Copy className="w-3 h-3" />
@@ -409,26 +409,26 @@ export const AiAssistantPanel: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-text font-serif pr-1">
+              <div className="flex-1 overflow-y-auto text-xs text-[#2b2621] whitespace-pre-wrap leading-relaxed select-text font-serif pr-1">
                 {streamResult || (
-                  <span className="text-slate-600 italic select-none">
+                  <span className="text-[#a89f92] italic select-none">
                     点击上方启动后，Agent 将在此处实时流式输出生成的正文草稿...
                   </span>
                 )}
               </div>
 
               {streamResult && !isGenerating && (
-                <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 mt-2">
+                <div className="pt-2 border-t border-[#ded5c4] grid grid-cols-2 gap-2 mt-2">
                   <button
                     onClick={handleAppendToEditor}
-                    className="py-1.5 px-2 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-medium flex items-center justify-center gap-1 transition"
+                    className="py-1.5 px-2 rounded bg-emerald-800/10 hover:bg-emerald-800/20 text-emerald-800 border border-emerald-800/25 text-xs font-medium flex items-center justify-center gap-1 transition"
                   >
                     <PlusCircle className="w-3 h-3" />
                     追加到文末
                   </button>
                   <button
                     onClick={handleReplaceEditor}
-                    className="py-1.5 px-2 rounded bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 text-xs font-medium flex items-center justify-center gap-1 transition"
+                    className="py-1.5 px-2 rounded bg-amber-800/10 hover:bg-amber-800/20 text-amber-800 border border-amber-800/25 text-xs font-medium flex items-center justify-center gap-1 transition"
                   >
                     <FileCheck2 className="w-3 h-3" />
                     替换正文
@@ -442,19 +442,19 @@ export const AiAssistantPanel: React.FC = () => {
 
       {/* TAB 2: COLLABORATIVE PIPELINE */}
       {activeTab === 'COLLABORATE' && (
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <div className="p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-800/50 text-xs text-indigo-200">
-            <div className="font-semibold mb-1 flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+        <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#f3ede1]/40">
+          <div className="p-2.5 rounded-lg bg-[#fdfbf7] border border-[#ded5c4] text-xs text-[#2b2621] shadow-xs">
+            <div className="font-semibold mb-1 flex items-center gap-1.5 text-amber-900">
+              <Layers className="w-3.5 h-3.5 text-amber-700" />
               多 Agent 协作工作流 (Pipeline)
             </div>
-            <p className="text-[11px] text-indigo-300/80 leading-relaxed">
+            <p className="text-[11px] text-[#786f65] leading-relaxed">
               自动化流水线调度：由章节编剧 (Scene Planner) 拆解场景节拍，再由正文作家 (Prose Writer) 撰写草稿，最后由逻辑审稿 (Continuity Auditor) 自动出具质检报告。
             </p>
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+            <label className="text-[11px] font-semibold text-[#786f65] block mb-1">
               本章剧情核心推进目标 *
             </label>
             <textarea
@@ -462,12 +462,12 @@ export const AiAssistantPanel: React.FC = () => {
               onChange={(e) => setWorkflowGoal(e.target.value)}
               placeholder="例如：揭开先驱者号主引擎失谐之谜，林远与安雅在引力雷区产生战术分歧，最终冒险跃迁。"
               rows={3}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-indigo-500 resize-none"
+              className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] placeholder-[#9e9383] focus:outline-hidden focus:border-amber-700 resize-none"
             />
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+            <label className="text-[11px] font-semibold text-[#786f65] block mb-1">
               期望篇幅 (字数)
             </label>
             <div className="flex items-center gap-2">
@@ -476,10 +476,10 @@ export const AiAssistantPanel: React.FC = () => {
                   key={num}
                   type="button"
                   onClick={() => setWorkflowWordCount(num)}
-                  className={`px-2.5 py-1 rounded text-xs border ${
+                  className={`px-2.5 py-1 rounded text-xs border transition ${
                     workflowWordCount === num
-                      ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200 font-semibold'
-                      : 'bg-slate-900 border-slate-800 text-slate-400'
+                      ? 'bg-amber-800/15 border-amber-800 text-amber-900 font-semibold shadow-xs'
+                      : 'bg-[#fdfbf7] border-[#d5cbb8] text-[#6b6255] hover:text-[#2b2621]'
                   }`}
                 >
                   {num} 字
@@ -491,7 +491,7 @@ export const AiAssistantPanel: React.FC = () => {
           <button
             onClick={handleRunWorkflow}
             disabled={isWorkflowRunning || !activeChapter}
-            className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-40"
+            className="w-full py-2.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-40"
           >
             {isWorkflowRunning ? (
               <>
@@ -508,39 +508,39 @@ export const AiAssistantPanel: React.FC = () => {
 
           {/* Workflow Results Display */}
           {workflowResult && (
-            <div className="space-y-3 pt-2 border-t border-slate-800">
-              <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+            <div className="space-y-3 pt-2 border-t border-[#ded5c4]">
+              <div className="p-2.5 rounded-lg bg-[#fdfbf7] border border-[#ded5c4] space-y-2 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-200">
+                  <span className="text-xs font-semibold text-[#2b2621]">
                     编剧拆解的场景节拍 ({workflowResult.planned_scenes.length} 幕)
                   </span>
                 </div>
                 <div className="space-y-1.5">
                   {workflowResult.planned_scenes.map((s) => (
-                    <div key={s.id} className="p-2 rounded bg-slate-950/80 border border-slate-800/80 text-xs">
-                      <div className="font-semibold text-indigo-300">
+                    <div key={s.id} className="p-2 rounded bg-[#f7f2e7] border border-[#e3d9c7] text-xs">
+                      <div className="font-semibold text-amber-900">
                         场次 {s.sequence}：{s.objective}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">{s.outline}</div>
+                      <div className="text-[11px] text-[#6b6255] mt-0.5">{s.outline}</div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+              <div className="p-2.5 rounded-lg bg-[#fdfbf7] border border-[#ded5c4] space-y-2 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-200">
+                  <span className="text-xs font-semibold text-[#2b2621]">
                     生成的初稿草稿 ({workflowResult.generated_draft.length} 字)
                   </span>
                   <button
                     onClick={handleApplyWorkflowDraft}
-                    className="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded transition flex items-center gap-1"
+                    className="text-xs px-2.5 py-1 bg-emerald-800 hover:bg-emerald-700 text-white font-medium rounded transition flex items-center gap-1 shadow-xs"
                   >
                     <Check className="w-3 h-3" />
                     装载至正文
                   </button>
                 </div>
-                <div className="max-h-40 overflow-y-auto text-xs text-slate-300 font-serif leading-relaxed whitespace-pre-wrap p-2 bg-slate-950 rounded border border-slate-800/80">
+                <div className="max-h-40 overflow-y-auto text-xs text-[#2b2621] font-serif leading-relaxed whitespace-pre-wrap p-2 bg-[#f7f2e7] rounded border border-[#e3d9c7]">
                   {workflowResult.generated_draft}
                 </div>
               </div>
@@ -551,16 +551,16 @@ export const AiAssistantPanel: React.FC = () => {
 
       {/* TAB 3: CONTINUITY AUDIT */}
       {activeTab === 'CONTINUITY' && (
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#f3ede1]/40">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-xs font-semibold text-slate-200">逻辑审稿与设定核查</h3>
-              <p className="text-[11px] text-slate-400">核查人物性格、世界法则与时间线冲突</p>
+              <h3 className="text-xs font-semibold text-[#2b2621]">逻辑审稿与设定核查</h3>
+              <p className="text-[11px] text-[#786f65]">核查人物性格、世界法则与时间线冲突</p>
             </div>
             <button
               onClick={handleRunAudit}
               disabled={isAuditing || !activeChapter}
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm disabled:opacity-40"
+              className="px-3 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm disabled:opacity-40"
             >
               <ShieldCheck className={`w-3.5 h-3.5 ${isAuditing ? 'animate-spin' : ''}`} />
               执行审稿
@@ -570,15 +570,15 @@ export const AiAssistantPanel: React.FC = () => {
           {reviewReport ? (
             <div className="space-y-3">
               {/* Score Card */}
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+              <div className="p-3 rounded-xl bg-[#fdfbf7] border border-[#ded5c4] flex items-center justify-between shadow-xs">
                 <div>
-                  <div className="text-[11px] text-slate-400">本章综合合规评分</div>
-                  <div className="text-2xl font-bold text-slate-100 mt-0.5">
-                    {reviewReport.score} <span className="text-xs font-normal text-slate-500">/ 100</span>
+                  <div className="text-[11px] text-[#786f65]">本章综合合规评分</div>
+                  <div className="text-2xl font-bold text-[#1f1d1a] mt-0.5">
+                    {reviewReport.score} <span className="text-xs font-normal text-[#9e9383]">/ 100</span>
                   </div>
                 </div>
                 <div className="text-right max-w-[170px]">
-                  <span className="text-[11px] text-indigo-400 font-medium line-clamp-2">
+                  <span className="text-[11px] text-amber-900 font-medium line-clamp-2">
                     {reviewReport.summary}
                   </span>
                 </div>
@@ -586,12 +586,12 @@ export const AiAssistantPanel: React.FC = () => {
 
               {/* Findings List */}
               <div className="space-y-2">
-                <div className="text-[11px] font-semibold text-slate-400">
+                <div className="text-[11px] font-semibold text-[#786f65]">
                   审查发现与整改建议 ({reviewReport.findings.length})
                 </div>
 
                 {reviewReport.findings.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-lg">
+                  <div className="py-6 text-center text-xs text-[#786f65] border border-dashed border-[#ded5c4] rounded-lg bg-[#fdfbf7]">
                     未发现设定冲突或逻辑硬伤，剧情逻辑严密！
                   </div>
                 ) : (
@@ -599,43 +599,43 @@ export const AiAssistantPanel: React.FC = () => {
                     const isResolved = f.status === 'RESOLVED';
                     const severityColor =
                       f.severity === 'CRITICAL'
-                        ? 'border-rose-500/60 bg-rose-950/20 text-rose-300'
+                        ? 'border-rose-300 bg-rose-50 text-rose-900'
                         : f.severity === 'MAJOR'
-                        ? 'border-amber-500/60 bg-amber-950/20 text-amber-300'
-                        : 'border-indigo-500/60 bg-indigo-950/20 text-indigo-300';
+                        ? 'border-amber-300 bg-amber-50 text-amber-900'
+                        : 'border-orange-200 bg-orange-50 text-orange-950';
 
                     return (
                       <div
                         key={f.id}
                         className={`p-3 rounded-lg border transition-all ${
-                          isResolved ? 'opacity-50 border-slate-800 bg-slate-900/40' : severityColor
+                          isResolved ? 'opacity-50 border-[#ded5c4] bg-[#eae3d4]' : severityColor
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/40 border border-current">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/70 border border-current">
                             {f.severity} · {f.category}
                           </span>
                           <button
                             onClick={() => handleToggleFindingStatus(f.id, f.status)}
-                            className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                            className="text-[11px] text-[#6b6255] hover:text-[#1f1d1a] flex items-center gap-1"
                           >
-                            <CheckCircle2 className={`w-3.5 h-3.5 ${isResolved ? 'text-emerald-400' : ''}`} />
+                            <CheckCircle2 className={`w-3.5 h-3.5 ${isResolved ? 'text-emerald-700' : ''}`} />
                             {isResolved ? '已解决' : '标记已改'}
                           </button>
                         </div>
 
-                        <div className="text-xs font-semibold text-slate-100">{f.title}</div>
-                        <div className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                        <div className="text-xs font-semibold text-[#1f1d1a]">{f.title}</div>
+                        <div className="text-[11px] text-[#3d362e] mt-1 leading-relaxed">
                           {f.description}
                         </div>
 
                         {f.evidence_quote && (
-                          <div className="mt-1.5 p-1.5 rounded bg-black/30 border border-slate-800 text-[11px] text-slate-400 italic">
+                          <div className="mt-1.5 p-1.5 rounded bg-white/60 border border-[#e3d9c7] text-[11px] text-[#6b6255] italic">
                             “{f.evidence_quote}”
                           </div>
                         )}
 
-                        <div className="mt-1.5 text-[11px] text-indigo-300 font-medium">
+                        <div className="mt-1.5 text-[11px] text-amber-900 font-medium">
                           修改建议：{f.suggestion}
                         </div>
                       </div>
@@ -645,7 +645,7 @@ export const AiAssistantPanel: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="py-12 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-lg">
+            <div className="py-12 text-center text-xs text-[#786f65] border border-dashed border-[#ded5c4] rounded-lg bg-[#fdfbf7]">
               点击“执行审稿”对当前正文进行全面逻辑因果体检
             </div>
           )}
@@ -654,19 +654,19 @@ export const AiAssistantPanel: React.FC = () => {
 
       {/* TAB 4: STYLE POLISH */}
       {activeTab === 'STYLE_POLISH' && (
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <div className="p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-800/50 text-xs text-indigo-200">
-            <div className="font-semibold mb-1 flex items-center gap-1.5">
-              <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
+        <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#f3ede1]/40">
+          <div className="p-2.5 rounded-lg bg-[#fdfbf7] border border-[#ded5c4] text-xs text-[#2b2621] shadow-xs">
+            <div className="font-semibold mb-1 flex items-center gap-1.5 text-amber-900">
+              <Wand2 className="w-3.5 h-3.5 text-amber-700" />
               Humanizer 文学精修守则
             </div>
-            <p className="text-[11px] text-indigo-300/80 leading-relaxed">
+            <p className="text-[11px] text-[#786f65] leading-relaxed">
               坚决剔除“AI 腔调”与空洞说明文套话，清退策划/引擎术语，增强微表情、对话留白与临场动作呼吸感。
             </p>
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+            <label className="text-[11px] font-semibold text-[#786f65] block mb-1">
               待润色正文选段
             </label>
             <textarea
@@ -674,14 +674,14 @@ export const AiAssistantPanel: React.FC = () => {
               onChange={(e) => setPolishInput(e.target.value)}
               placeholder="粘贴或输入需要润色的段落（留空则默认截取当前正文前段）..."
               rows={4}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-indigo-500 resize-none"
+              className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] placeholder-[#9e9383] focus:outline-hidden focus:border-amber-700 resize-none"
             />
           </div>
 
           <button
             onClick={handleRunPolish}
             disabled={isPolishing}
-            className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-40"
+            className="w-full py-2.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-40"
           >
             {isPolishing ? (
               <>
@@ -697,24 +697,24 @@ export const AiAssistantPanel: React.FC = () => {
           </button>
 
           {polishResult && (
-            <div className="space-y-3 pt-2 border-t border-slate-800">
-              <div className="text-[11px] text-slate-400 italic">
+            <div className="space-y-3 pt-2 border-t border-[#ded5c4]">
+              <div className="text-[11px] text-[#786f65] italic">
                 {polishResult.summary}
               </div>
 
               {polishResult.revisions.map((rev, idx) => (
-                <div key={idx} className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
-                  <div className="text-[11px] text-slate-500 line-through">
+                <div key={idx} className="p-3 rounded-lg bg-[#fdfbf7] border border-[#ded5c4] space-y-2 shadow-xs">
+                  <div className="text-[11px] text-[#8e8476] line-through">
                     原文：{rev.original_text}
                   </div>
-                  <div className="text-xs text-slate-100 font-serif leading-relaxed bg-slate-950 p-2 rounded border border-slate-800/80">
+                  <div className="text-xs text-[#1f1d1a] font-serif leading-relaxed bg-[#f7f2e7] p-2.5 rounded border border-[#e3d9c7]">
                     精修：{rev.revised_text}
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-indigo-300">
+                  <div className="flex items-center justify-between text-[11px] text-amber-900">
                     <span>理由：{rev.rationale}</span>
                     <button
                       onClick={() => handleCopy(rev.revised_text)}
-                      className="text-slate-400 hover:text-white flex items-center gap-0.5"
+                      className="text-[#786f65] hover:text-[#1f1d1a] flex items-center gap-0.5"
                     >
                       <Copy className="w-3 h-3" />
                       复制精修
