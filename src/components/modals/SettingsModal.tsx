@@ -29,6 +29,7 @@ export const SettingsModal: React.FC<Props> = ({ onClose }) => {
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [dbStats, setDbStats] = useState<{ db_path: string; total_novels: number; total_providers: number } | null>(null);
 
   useEffect(() => {
@@ -42,7 +43,12 @@ export const SettingsModal: React.FC<Props> = ({ onClose }) => {
 
   const handleTestConnection = async () => {
     if (!baseUrl.trim()) {
-      alert('请输入 Base URL');
+      setTestResult({
+        success: false,
+        latency_ms: 0,
+        message: '请输入有效 Base URL (例如 http://127.0.0.1:8317/v1)',
+        models_found: [],
+      });
       return;
     }
     setIsTesting(true);
@@ -74,6 +80,7 @@ export const SettingsModal: React.FC<Props> = ({ onClose }) => {
     e.preventDefault();
     setIsSaving(true);
     setSaveSuccess(false);
+    setSaveError(null);
 
     try {
       await api.saveProvider({
@@ -95,8 +102,8 @@ export const SettingsModal: React.FC<Props> = ({ onClose }) => {
       await loadProviders();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
-    } catch (e) {
-      alert(`保存失败: ${e}`);
+    } catch (e: any) {
+      setSaveError(`保存失败: ${e.message || e}`);
     } finally {
       setIsSaving(false);
     }
@@ -267,7 +274,13 @@ export const SettingsModal: React.FC<Props> = ({ onClose }) => {
                   设置已成功保存并激活！
                 </span>
               )}
-              {!saveSuccess && <span />}
+              {saveError && (
+                <span className="text-xs text-[#b91c1c] flex items-center gap-1 font-serif font-medium">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  {saveError}
+                </span>
+              )}
+              {!saveSuccess && !saveError && <span />}
 
               <div className="flex items-center gap-2">
                 <button
