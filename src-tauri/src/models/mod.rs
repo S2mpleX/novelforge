@@ -496,4 +496,37 @@ pub struct StartSerializationJobInput {
     pub budget_tokens: Option<i64>,
 }
 
+// --- PHASE 6 & 7: PUBLISHING & DIAGNOSTICS ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseHealthReport {
+    pub db_path: String,
+    pub db_size_bytes: u64,
+    pub integrity_status: String,
+    pub wal_checkpoint: String,
+    pub total_novels: i64,
+    pub total_chapters: i64,
+    pub total_versions: i64,
+    pub total_characters: i64,
+    pub total_world_rules: i64,
+    pub total_canon_facts: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NovelArchive {
+    pub novel: Novel,
+    pub chapters: Vec<Chapter>,
+    pub characters: Vec<Character>,
+    pub character_relationships: Vec<CharacterRelationship>,
+    pub character_states: Vec<CharacterStateEvent>,
+    pub world_rules: Vec<WorldRule>,
+    pub canon_facts: Vec<CanonFact>,
+    pub plot_threads: Vec<PlotThread>,
+    pub story_phases: Vec<StoryPhase>,
+    pub story_arcs: Vec<StoryArc>,
+    pub exported_at: i64,
+    pub version: String,
+}
+
+
 

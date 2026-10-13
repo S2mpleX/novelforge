@@ -302,4 +302,20 @@ export interface StartSerializationJobInput {
   budget_tokens?: number;
 }
 
+// --- Phase 6 & 7: Publishing & Diagnostics ---
+
+export interface DatabaseHealthReport {
+  db_path: string;
+  db_size_bytes: number;
+  integrity_status: string;
+  wal_checkpoint: string;
+  total_novels: number;
+  total_chapters: number;
+  total_versions: number;
+  total_characters: number;
+  total_world_rules: number;
+  total_canon_facts: number;
+}
+
+
 

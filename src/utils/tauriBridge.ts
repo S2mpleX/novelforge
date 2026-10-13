@@ -26,6 +26,7 @@ import type {
   ExtractChapterMemoryResult,
   SerializationJob,
   StartSerializationJobInput,
+  DatabaseHealthReport,
 } from '@/types';
 
 export const api = {
@@ -294,4 +295,16 @@ export const api = {
     invoke<void>('cancel_serialization_job', { jobId }),
   advanceSerializationJobStep: (jobId: string) =>
     invoke<SerializationJob>('advance_serialization_job_step', { jobId }),
+
+  // Phase 6 & 7: Publishing & System Diagnostics
+  exportNovelHtmlBook: (novelId: string) =>
+    invoke<string>('export_novel_html_book', { novelId }),
+  exportNovelArchive: (novelId: string) =>
+    invoke<string>('export_novel_archive', { novelId }),
+  importNovelArchive: (archiveJson: string) =>
+    invoke<Novel>('import_novel_archive', { archiveJson }),
+  backupDatabase: () =>
+    invoke<string>('backup_database'),
+  optimizeDatabase: () =>
+    invoke<DatabaseHealthReport>('optimize_database'),
 };

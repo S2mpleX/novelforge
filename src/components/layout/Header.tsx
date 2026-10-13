@@ -17,9 +17,11 @@ import {
   PanelRightOpen,
   Brain,
   TrendingUp,
+  Archive,
 } from 'lucide-react';
 import { SettingsModal } from '@/components/modals/SettingsModal';
 import { SerializationModal } from '@/components/modals/SerializationModal';
+import { PublishingModal } from '@/components/modals/PublishingModal';
 
 export const Header: React.FC = () => {
   const {
@@ -36,6 +38,7 @@ export const Header: React.FC = () => {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showSerializationModal, setShowSerializationModal] = useState(false);
+  const [showPublishingModal, setShowPublishingModal] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
 
   // Accurate word count: characters excluding whitespace
@@ -221,6 +224,14 @@ export const Header: React.FC = () => {
           {/* Export Dropdown / Buttons */}
           <div className="flex items-center gap-1">
             <button
+              onClick={() => setShowPublishingModal(true)}
+              className="px-2.5 py-1.5 rounded text-xs bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 transition flex items-center gap-1 border border-emerald-800/60"
+              title="打开发布交付中心与数据库灾备"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              发布与备份
+            </button>
+            <button
               onClick={() => handleExport('txt')}
               className="px-2.5 py-1.5 rounded text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 border border-slate-700/80"
               title="导出当前章节 TXT"
@@ -271,6 +282,9 @@ export const Header: React.FC = () => {
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showSerializationModal && (
         <SerializationModal onClose={() => setShowSerializationModal(false)} />
+      )}
+      {showPublishingModal && (
+        <PublishingModal onClose={() => setShowPublishingModal(false)} />
       )}
     </>
   );

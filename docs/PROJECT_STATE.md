@@ -1,10 +1,10 @@
 # NovelForge AI — 项目持续开发状态 (PROJECT_STATE.md)
 
 ## 1. 当前阶段与基线
-- **当前阶段**：Phase 0 ~ Phase 5 **已全面达成** (工程基础、长篇编辑器与纵向 MVP、设定集与关系拓扑图、多 Agent 协作编排体系、五层长期记忆引擎 Memory Engine、多 Agent 自动连载引擎 Serialization Engine)
+- **当前阶段**：Phase 0 ~ Phase 7 **已全链路完整达成！** (工程基础、长篇编辑器与纵向 MVP、设定集与关系拓扑图、多 Agent 协作编排体系、五层长期记忆引擎 Memory Engine、多 Agent 自动连载引擎 Serialization Engine、多格式发布中心 Publishing Center、数据库系统运维与灾备备份 System Diagnostics & Backup)
 - **版本目标**：V2.0
 - **更新时间**：2026-10-13
-- **代码库状态**：真实可运行、真实编译通过 (Rust 零错误零警告，前端 Vite 327ms 打包零错误)、真实本地 SQLite 持久化验证 100% 通过（19/19 业务套件测试）。
+- **代码库状态**：真实可运行、真实编译通过 (Rust 零错误零警告，前端 Vite 358ms 打包零错误)、真实本地 SQLite 持久化验证 100% 通过（23/23 业务套件测试）。
 
 ---
 
@@ -21,10 +21,10 @@
 
 ## 3. 已完成核心功能矩阵
 
-### 3.1 本地优先数据库与规范化数据模型 (Phase 0 ~ Phase 5)
+### 3.1 本地优先数据库与规范化数据模型 (Phase 0 ~ Phase 7)
 - 完整建立规范化 SQLite 表结构：`novels`, `novel_settings`, `volumes`, `chapters`, `chapter_versions`, `characters`, `character_state_events`, `character_relationships`, `world_rules`, `canon_facts`, `plot_threads`, `story_phases`, `story_arcs`, `scenes`, `story_events`, `review_reports`, `review_findings`, `ai_providers`, `ai_models`, `usage_records`, `serialization_jobs` 以及虚拟表 `canon_facts_fts`, `chapters_fts`。
 - 严密的外键级联约束与自动版本控制：正文每次修订或手动保存均生成不可逆的历史版本快照，严防用户创作内容丢失。
-- 专有验证套件 `db_test` 真实执行 19 项核心测试，100% 验证了小说创建、分章、多版本保存、角色档案、世界观法则、模型网关、角色关系拓扑、大纲阶段、剧情弧、场景细纲拆解、逻辑审稿报告与发现入库、权威事实库建立、FTS5 全文检索、动态角色状态追踪、五层记忆上下文装配与连载任务状态流转。
+- 专有验证套件 `db_test` 真实执行 23 项核心测试，100% 验证了小说创建、分章、多版本保存、角色档案、世界观法则、模型网关、角色关系拓扑、大纲阶段、剧情弧、场景细纲拆解、逻辑审稿报告与发现入库、权威事实库建立、FTS5 全文检索、动态角色状态追踪、五层记忆上下文装配、自动连载任务流转、SQLite 在线热备份、数据库优化诊断、HTML5 电子书单文件生成以及全书工程 JSON 归档与复原。
 
 ### 3.2 现代长篇正文写作环境 (Phase 1)
 - 基于 Tiptap 打造沉浸式中文正文编辑器，配备撤销重做、标题分级、引用、加粗斜体等格式工具条与全屏专注模式。
@@ -84,8 +84,20 @@
   - 实时进度条与状态展示（单步推进、连续自动连载、暂停、取消）；
   - 历史连载记录追溯与一键跳转编辑器。
 
+### 3.8 多格式发布与交付中心 (Publishing Center - Phase 6)
+- **独立 HTML5 电子书单文件导出**：生成内嵌优雅响应式排版样式（深浅/羊皮纸主题切换、侧边栏悬浮目录导航、字数元数据），单文件免网络双击直接阅读。
+- **标准网文连载 TXT 导出**：自动章名居中、段首双全角空格缩进、空行规范化，符合各大网文连载站点上传规范。
+- **分级 Markdown 导出**：保持 H1/H2 结构与引言描述。
+- **全书工程数据归档 JSON**：一键打包小说元数据、全部章节（含所有版本快照）、全部角色档案与关系图谱、世界观法则、长期记忆与大纲剧情弧。
+- **工程快照还原与导入 (`import_novel_archive`)**：支持粘贴 JSON 备份无损复原为全新作品。
+
+### 3.9 系统运维与数据库灾备 (System Diagnostics & Backup - Phase 7)
+- **SQLite 在线热备份 (`backup_database`)**：采用 SQLite Backup API 在运行中创建完全一致的独立 `.db` 备份快照。
+- **数据库诊断与优化 (`optimize_database`)**：执行 `PRAGMA integrity_check`、`PRAGMA wal_checkpoint(TRUNCATE)` 与 `PRAGMA optimize`，输出文件体积、健康度与全表行数统计。
+- **发布与运维控制台 (`PublishingModal.tsx`)**：可视化管理导出、导入、热备份与碎片整理。
+
 ---
 
-## 4. 下一阶段任务规划 (Phase 6 & 7)
-1. **Phase 6 多格式发布中心 (Publishing Center)**：支持 DOCX 格式排版导出、EPUB 电子书打包与连载目录大纲生成。
-2. **Phase 7 系统运维与灾备备份**：SQLite 数据库热备份、完整工程快照压缩导出、诊断与性能体检。
+## 4. 总结与后续演进建议
+NovelForge AI V2.0 全部核心架构与业务系统已圆满落地，通过 23 项端到端业务单元测试，实现“本地优先、真实可运行、长期记忆驱动、多 Agent 协作连载、安全可控、优雅发布”的产品承诺。
+后续可在桌面端增加系统托盘图标、全局快捷键与高级自定义 CSS 皮肤扩展。

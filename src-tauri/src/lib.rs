@@ -85,6 +85,12 @@ pub fn run() {
             commands::pause_serialization_job,
             commands::cancel_serialization_job,
             commands::advance_serialization_job_step,
+            // Publishing & System Diagnostics (Phase 6 & 7)
+            commands::export_novel_html_book,
+            commands::export_novel_archive,
+            commands::import_novel_archive,
+            commands::backup_database,
+            commands::optimize_database,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovelForge AI application");

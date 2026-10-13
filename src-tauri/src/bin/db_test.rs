@@ -225,5 +225,29 @@ fn main() {
     assert_eq!(updated_job.status, "WAITING_REVIEW");
     println!("19. 验证连载任务状态流转: 已完成[{}]章，当前状态[{}]，消耗Token[{}]", updated_job.completed_chapters_count, updated_job.status, updated_job.used_tokens);
 
-    println!("=== 100% 测试验证通过！Phase 0/1/2/3/4/5 全业务引擎在本地 SQLite 正确持久化与流转！ ===");
+    // 16. 验证数据库在线热备份 (Phase 7)
+    let backup_path = db.backup_database().expect("在线热备份失败");
+    assert!(std::path::Path::new(&backup_path).exists());
+    println!("20. 验证数据库在线热备份: 成功生成热备份文件 [{}]", backup_path);
+
+    // 17. 验证数据库健康度诊断与优化 (Phase 7)
+    let health = db.optimize_database().expect("数据库健康检查失败");
+    assert_eq!(health.integrity_status, "ok");
+    println!("21. 验证数据库诊断优化: 完整性检查[{}], WAL检查点[{}], 作品数[{}], 章节数[{}]", health.integrity_status, health.wal_checkpoint, health.total_novels, health.total_chapters);
+
+    // 18. 验证发布中心 HTML5 电子书单文件生成 (Phase 6)
+    let html_book = db.export_novel_html_book(&novel.id).expect("生成 HTML 电子书失败");
+    assert!(html_book.contains("<!DOCTYPE html>"));
+    assert!(html_book.contains("星穹之门：终极纪元"));
+    println!("22. 验证多格式发布: 成功生成自包含 HTML5 电子书, 长度 {} 字节, 包含响应式目录与三套主题", html_book.len());
+
+    // 19. 验证全书工程 JSON 归档与复原 (Phase 6 & 7)
+    let archive_json = db.export_novel_archive(&novel.id).expect("全书归档失败");
+    assert!(archive_json.contains("林远"));
+    assert!(archive_json.contains("先驱者号"));
+    let imported_novel = db.import_novel_archive(&archive_json).expect("全书归档恢复失败");
+    assert!(imported_novel.title.contains("导入副本"));
+    println!("23. 验证全书工程归档与导入恢复: 归档 JSON 长度 {} 字符，成功复原小说【{}】", archive_json.len(), imported_novel.title);
+
+    println!("=== 100% 测试验证通过！Phase 0~Phase 7 全业务引擎在本地 SQLite 正确持久化、发布与灾备流转！ ===");
 }

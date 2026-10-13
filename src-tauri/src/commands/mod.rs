@@ -10,7 +10,7 @@ use crate::models::{
     CreateStoryEventInput, CreateStoryPhaseInput, CreateWorldRuleInput, ExtractChapterMemoryResult,
     GenerateStreamInput, MemoryContextPack, Novel, PlotThread, ReviewReport, SaveProviderInput,
     Scene, SerializationJob, StartSerializationJobInput, StoryArc, StoryEvent, StoryPhase,
-    StreamChunkPayload, StylePolishResponse, Volume, WorldRule,
+    StreamChunkPayload, StylePolishResponse, Volume, WorldRule, DatabaseHealthReport,
 };
 use crate::providers::{
     ChatMessage, ChatCompletionRequest, ConnectionTestResult, OpenAIClient,
@@ -1300,5 +1300,46 @@ pub async fn advance_serialization_job_step(
 
     db.get_serialization_job(&job_id).map_err(|e| e.to_string())
 }
+
+// --- PHASE 6 & 7: PUBLISHING & SYSTEM DIAGNOSTICS ---
+
+#[tauri::command]
+pub fn export_novel_html_book(
+    db: State<DbManager>,
+    novel_id: String,
+) -> Result<String, String> {
+    db.export_novel_html_book(&novel_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn export_novel_archive(
+    db: State<DbManager>,
+    novel_id: String,
+) -> Result<String, String> {
+    db.export_novel_archive(&novel_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn import_novel_archive(
+    db: State<DbManager>,
+    archive_json: String,
+) -> Result<Novel, String> {
+    db.import_novel_archive(&archive_json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn backup_database(
+    db: State<DbManager>,
+) -> Result<String, String> {
+    db.backup_database().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn optimize_database(
+    db: State<DbManager>,
+) -> Result<DatabaseHealthReport, String> {
+    db.optimize_database().map_err(|e| e.to_string())
+}
+
 
 

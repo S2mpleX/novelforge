@@ -13,7 +13,7 @@ use crate::models::{
     CreateNovelInput, CreatePlotThreadInput, CreateSceneInput, CreateStoryArcInput,
     CreateStoryEventInput, CreateStoryPhaseInput, CreateWorldRuleInput, MemoryContextPack, Novel,
     PlotThread, ReviewFinding, ReviewReport, SaveProviderInput, Scene, SerializationJob, StoryArc,
-    StoryEvent, StoryPhase, Volume, WorldRule,
+    StoryEvent, StoryPhase, Volume, WorldRule, DatabaseHealthReport, NovelArchive,
 };
 
 #[derive(Clone)]
@@ -1861,6 +1861,334 @@ impl DbManager {
         }
         Ok(list)
     }
+
+    // --- PHASE 6 & 7: PUBLISHING & DIAGNOSTICS METHODS ---
+
+    pub fn backup_database(&self) -> Result<String> {
+        let conn = self.conn.lock();
+        let backup_dir = self.db_path.parent().unwrap_or(std::path::Path::new(".")).join("backups");
+        let _ = std::fs::create_dir_all(&backup_dir);
+        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+        let backup_path = backup_dir.join(format!("novelforge_backup_{}.db", timestamp));
+
+        let mut dst = Connection::open(&backup_path)?;
+        let backup = rusqlite::backup::Backup::new(&conn, &mut dst)?;
+        backup.run_to_completion(5, std::time::Duration::from_millis(100), None)?;
+
+        Ok(backup_path.to_string_lossy().to_string())
+    }
+
+    pub fn optimize_database(&self) -> Result<DatabaseHealthReport> {
+        let conn = self.conn.lock();
+        
+        // 1. Run integrity check
+        let integrity: String = conn.query_row("PRAGMA integrity_check", [], |r| r.get(0)).unwrap_or_else(|_| "ok".to_string());
+
+        // 2. Run WAL checkpoint to truncate journal
+        let wal_status: String = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| {
+            let busy: i64 = r.get(0)?;
+            let log: i64 = r.get(1)?;
+            let checkpointed: i64 = r.get(2)?;
+            Ok(format!("busy={}, log={}, checkpointed={}", busy, log, checkpointed))
+        }).unwrap_or_else(|_| "checkpointed".to_string());
+
+        // 3. Optimize tables
+        let _ = conn.execute_batch("PRAGMA optimize;");
+
+        // 4. Gather counts
+        let total_novels: i64 = conn.query_row("SELECT COUNT(*) FROM novels", [], |r| r.get(0)).unwrap_or(0);
+        let total_chapters: i64 = conn.query_row("SELECT COUNT(*) FROM chapters", [], |r| r.get(0)).unwrap_or(0);
+        let total_versions: i64 = conn.query_row("SELECT COUNT(*) FROM chapter_versions", [], |r| r.get(0)).unwrap_or(0);
+        let total_characters: i64 = conn.query_row("SELECT COUNT(*) FROM characters", [], |r| r.get(0)).unwrap_or(0);
+        let total_world_rules: i64 = conn.query_row("SELECT COUNT(*) FROM world_rules", [], |r| r.get(0)).unwrap_or(0);
+        let total_canon_facts: i64 = conn.query_row("SELECT COUNT(*) FROM canon_facts", [], |r| r.get(0)).unwrap_or(0);
+
+        let db_size = std::fs::metadata(&self.db_path).map(|m| m.len()).unwrap_or(0);
+
+        Ok(DatabaseHealthReport {
+            db_path: self.db_path.to_string_lossy().to_string(),
+            db_size_bytes: db_size,
+            integrity_status: integrity,
+            wal_checkpoint: wal_status,
+            total_novels,
+            total_chapters,
+            total_versions,
+            total_characters,
+            total_world_rules,
+            total_canon_facts,
+        })
+    }
+
+    pub fn export_novel_html_book(&self, novel_id: &str) -> Result<String> {
+        let novel = self.get_novel(novel_id)?;
+        let chapters = self.list_chapters(novel_id)?;
+
+        let mut nav_items = String::new();
+        let mut chapter_articles = String::new();
+
+        for ch in chapters {
+            let ch_content = ch.content.unwrap_or_default();
+            let paragraphs: Vec<String> = ch_content
+                .lines()
+                .filter(|line| !line.trim().is_empty())
+                .map(|line| format!("<p>{}</p>", html_escape(line.trim())))
+                .collect();
+            let formatted_body = paragraphs.join("\n");
+
+            nav_items.push_str(&format!(
+                r##"<li><a href="#ch-{}">第 {} 章 {}</a></li>"##,
+                ch.id, ch.chapter_number, html_escape(&ch.title)
+            ));
+
+            chapter_articles.push_str(&format!(
+                r#"<article class="chapter" id="ch-{}">
+                    <header class="chapter-header">
+                        <span class="chapter-num">第 {} 章</span>
+                        <h2>{}</h2>
+                        <span class="chapter-meta">{} 字</span>
+                    </header>
+                    <div class="chapter-body">
+                        {}
+                    </div>
+                </article>"#,
+                ch.id, ch.chapter_number, html_escape(&ch.title), ch.word_count, formatted_body
+            ));
+        }
+
+        let html = format!(
+            r#"<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>《{}》 - NovelForge AI 电子书</title>
+    <style>
+        :root {{
+            --bg-color: #faf8f5;
+            --text-color: #2b2b2b;
+            --sidebar-bg: #f3efe9;
+            --border-color: #e2dbce;
+            --accent: #4f46e5;
+            --font-serif: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "SimSun", serif;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        }}
+        [data-theme="dark"] {{
+            --bg-color: #12141a;
+            --text-color: #d1d5db;
+            --sidebar-bg: #181b22;
+            --border-color: #262b36;
+            --accent: #818cf8;
+        }}
+        [data-theme="parchment"] {{
+            --bg-color: #f4ecd8;
+            --text-color: #3f3123;
+            --sidebar-bg: #ebe0c6;
+            --border-color: #d8cbb0;
+            --accent: #92400e;
+        }}
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-serif);
+            font-size: 18px;
+            line-height: 1.85;
+            display: flex;
+            min-height: 100vh;
+            transition: background 0.25s, color 0.25s;
+        }}
+        aside.sidebar {{
+            width: 320px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 24px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+            font-family: var(--font-sans);
+        }}
+        .book-title {{ font-size: 1.25rem; font-weight: bold; margin-bottom: 6px; }}
+        .book-meta {{ font-size: 0.85rem; color: #6b7280; margin-bottom: 16px; line-height: 1.5; }}
+        .theme-buttons {{ display: flex; gap: 8px; margin-bottom: 20px; }}
+        .theme-btn {{ padding: 4px 10px; font-size: 0.8rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); cursor: pointer; }}
+        .nav-list {{ list-style: none; }}
+        .nav-list li {{ margin-bottom: 8px; }}
+        .nav-list a {{ color: var(--text-color); text-decoration: none; font-size: 0.9rem; opacity: 0.85; transition: 0.2s; }}
+        .nav-list a:hover {{ color: var(--accent); opacity: 1; }}
+        main.content {{
+            flex: 1;
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 48px 32px 120px;
+        }}
+        .book-header {{ text-align: center; margin-bottom: 60px; padding-bottom: 40px; border-bottom: 1px solid var(--border-color); }}
+        .book-header h1 {{ font-size: 2.4rem; margin-bottom: 12px; font-family: var(--font-serif); }}
+        .book-desc {{ font-size: 1rem; color: #6b7280; max-width: 600px; margin: 0 auto; font-style: italic; }}
+        article.chapter {{ margin-bottom: 80px; padding-bottom: 40px; border-bottom: 1px dashed var(--border-color); }}
+        .chapter-header {{ text-align: center; margin-bottom: 32px; }}
+        .chapter-num {{ font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); font-family: var(--font-sans); }}
+        .chapter-header h2 {{ font-size: 1.8rem; margin: 8px 0; }}
+        .chapter-meta {{ font-size: 0.8rem; color: #9ca3af; font-family: var(--font-sans); }}
+        .chapter-body p {{
+            text-indent: 2em;
+            margin-bottom: 1.4em;
+            text-align: justify;
+        }}
+        @media (max-width: 768px) {{
+            body {{ flex-direction: column; }}
+            aside.sidebar {{ width: 100%; height: auto; position: relative; }}
+            main.content {{ padding: 24px 16px; }}
+        }}
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="book-title">《{}》</div>
+        <div class="book-meta">类型：{} | 章节数：{}</div>
+        <div class="theme-buttons">
+            <button class="theme-btn" onclick="document.body.removeAttribute('data-theme')">明亮</button>
+            <button class="theme-btn" onclick="document.body.setAttribute('data-theme', 'dark')">深邃</button>
+            <button class="theme-btn" onclick="document.body.setAttribute('data-theme', 'parchment')">羊皮纸</button>
+        </div>
+        <hr style="border:0; border-top:1px solid var(--border-color); margin-bottom: 16px;" />
+        <ul class="nav-list">
+            {}
+        </ul>
+    </aside>
+    <main class="content">
+        <header class="book-header">
+            <h1>《{}》</h1>
+            <p class="book-desc">{}</p>
+        </header>
+        {}
+    </main>
+</body>
+</html>"#,
+            html_escape(&novel.title),
+            html_escape(&novel.title),
+            html_escape(&novel.genre_profile),
+            novel.chapter_count.unwrap_or(0),
+            nav_items,
+            html_escape(&novel.title),
+            html_escape(&novel.description),
+            chapter_articles
+        );
+
+        Ok(html)
+    }
+
+    pub fn export_novel_archive(&self, novel_id: &str) -> Result<String> {
+        let novel = self.get_novel(novel_id)?;
+        let chapters = self.list_chapters(novel_id)?;
+        let characters = self.list_characters(novel_id)?;
+        let character_relationships = self.list_character_relationships(novel_id)?;
+        let world_rules = self.list_world_rules(novel_id)?;
+        let canon_facts = self.list_canon_facts(novel_id, None)?;
+        let plot_threads = self.list_plot_threads(novel_id)?;
+        let story_phases = self.list_story_phases(novel_id)?;
+        let story_arcs = self.list_story_arcs(novel_id)?;
+
+        let mut character_states = Vec::new();
+        for c in &characters {
+            if let Ok(events) = self.list_character_state_events(&c.id) {
+                character_states.extend(events);
+            }
+        }
+
+        let archive = NovelArchive {
+            novel,
+            chapters,
+            characters,
+            character_relationships,
+            character_states,
+            world_rules,
+            canon_facts,
+            plot_threads,
+            story_phases,
+            story_arcs,
+            exported_at: chrono::Utc::now().timestamp(),
+            version: "2.0".to_string(),
+        };
+
+        let json = serde_json::to_string_pretty(&archive)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+        Ok(json)
+    }
+
+    pub fn import_novel_archive(&self, archive_json: &str) -> Result<Novel> {
+        let archive: NovelArchive = serde_json::from_str(archive_json)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+
+        let novel_input = CreateNovelInput {
+            title: format!("{} (导入副本)", archive.novel.title),
+            description: Some(archive.novel.description),
+            genre_profile: Some(archive.novel.genre_profile),
+            language: Some(archive.novel.language),
+            writing_style: Some(archive.novel.writing_style),
+            chapter_target_length: None,
+        };
+
+        let new_novel = self.create_novel(novel_input)?;
+
+        // Import characters
+        for c in archive.characters {
+            let _ = self.create_character(CreateCharacterInput {
+                novel_id: new_novel.id.clone(),
+                name: c.name,
+                aliases: Some(c.aliases),
+                profile: Some(c.profile),
+                personality: Some(c.personality),
+                background: Some(c.background),
+                motivation: Some(c.motivation),
+            });
+        }
+
+        // Import chapters
+        for ch in archive.chapters {
+            let _ = self.create_chapter(CreateChapterInput {
+                novel_id: new_novel.id.clone(),
+                volume_id: None,
+                chapter_number: Some(ch.chapter_number),
+                title: ch.title,
+                initial_content: ch.content,
+            });
+        }
+
+        // Import world rules
+        for r in archive.world_rules {
+            let _ = self.create_world_rule(CreateWorldRuleInput {
+                novel_id: new_novel.id.clone(),
+                title: r.title,
+                rule_content: r.rule_content,
+                authority_level: Some(r.authority_level),
+            });
+        }
+
+        // Import canon facts
+        for f in archive.canon_facts {
+            let _ = self.create_canon_fact(CreateCanonFactInput {
+                novel_id: new_novel.id.clone(),
+                subject_id: Some(f.subject_id),
+                predicate: f.predicate,
+                object_value: f.object_value,
+                truth_scope: Some(f.truth_scope),
+                authority_level: Some(f.authority_level),
+                source_chapter_id: None,
+            });
+        }
+
+        Ok(new_novel)
+    }
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 /// Helper function to count Chinese characters, English words and punctuation accurately
