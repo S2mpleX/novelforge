@@ -32,3 +32,10 @@ src-tauri/target/
 *.db-wal
 *.db-shm
 *.db-journal
+
+# Tauri Updater private keys & secrets
+*.key
+*.priv
+*.pem
+updater.key
+*.key.pub

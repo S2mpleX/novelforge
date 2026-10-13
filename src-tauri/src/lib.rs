@@ -4,13 +4,30 @@ pub mod models;
 pub mod providers;
 
 use database::DbManager;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    println!("[NovelForge] 1. Initializing SQLite DbManager...");
     let db = DbManager::new().expect("Failed to initialize SQLite database");
+    println!("[NovelForge] 2. SQLite DbManager initialized successfully.");
 
+    println!("[NovelForge] 3. Building Tauri application...");
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .setup(|app| {
+            println!("[NovelForge] 4. App setup hook triggered!");
+            if let Some(window) = app.get_webview_window("main") {
+                println!("[NovelForge] 5. Successfully found 'main' window. Showing and focusing window...");
+                let _ = window.show();
+                let _ = window.set_focus();
+            } else {
+                eprintln!("[NovelForge] ⚠️ Warning: 'main' window was not found in setup hook!");
+            }
+            Ok(())
+        })
         .manage(db)
         .invoke_handler(tauri::generate_handler![
             // Novels
@@ -91,6 +108,45 @@ pub fn run() {
             commands::import_novel_archive,
             commands::backup_database,
             commands::optimize_database,
+            // V2.0 Multi-Level Hierarchy & Plot System
+            commands::create_series,
+            commands::list_series,
+            commands::get_series,
+            commands::delete_series,
+            commands::create_part,
+            commands::list_parts,
+            commands::get_part,
+            commands::delete_part,
+            commands::get_novel_hierarchy_config,
+            commands::update_novel_hierarchy_config,
+            commands::create_volume,
+            commands::delete_volume,
+            commands::delete_scene,
+            commands::create_plot_beat,
+            commands::list_plot_beats,
+            commands::update_plot_beat_status,
+            commands::delete_plot_beat,
+            commands::create_character_arc,
+            commands::list_character_arcs,
+            commands::update_character_arc_stage,
+            commands::delete_character_arc,
+            commands::create_parallel_thread,
+            commands::list_parallel_threads,
+            commands::update_parallel_thread_status,
+            commands::delete_parallel_thread,
+            commands::create_plot_association,
+            commands::delete_plot_association,
+            commands::list_plot_associations_for_target,
+            commands::list_plot_associations_for_entity,
+            commands::list_novel_plot_matrix,
+            commands::move_node,
+            commands::split_chapter,
+            commands::merge_chapters,
+            commands::split_scene,
+            commands::merge_scenes,
+            commands::renumber_hierarchy,
+            commands::get_novel_content_tree,
+            commands::assemble_hierarchical_creation_context,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovelForge AI application");

@@ -1,0 +1,111 @@
+import React, { useEffect } from 'react';
+import { useWorkspaceStore } from '@/stores/useWorkspaceStore';
+import { useNovelStore } from '@/stores/useNovelStore';
+import { LayoutRenderer } from './LayoutRenderer';
+import { FloatingPanelContainer } from './FloatingPanelContainer';
+import { WorkspaceToolbar } from './WorkspaceToolbar';
+import { PanelWrapper } from './PanelWrapper';
+import { PANEL_METADATA_MAP } from './PanelRegistry';
+import { allPanelsInTree } from '@/utils/dockingTree';
+import { Minimize2 } from 'lucide-react';
+
+export const DockingWorkspace: React.FC = () => {
+  const {
+    layout,
+    loadWorkspace,
+    draggingState,
+    toggleMaximizePanel,
+  } = useWorkspaceStore();
+  const { activeNovel, zenMode } = useNovelStore();
+
+  useEffect(() => {
+    loadWorkspace(activeNovel?.id);
+  }, [activeNovel?.id]);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+M or Cmd+M: Toggle maximize
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        if (layout.maximizedInstanceId) {
+          toggleMaximizePanel(null);
+        } else {
+          // Maximize active chapter editor if available
+          toggleMaximizePanel('editor_main');
+        }
+      }
+      // Escape: Exit maximized panel mode
+      if (e.key === 'Escape' && layout.maximizedInstanceId) {
+        toggleMaximizePanel(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [layout.maximizedInstanceId, toggleMaximizePanel]);
+
+  // Find maximized panel if active
+  const maximizedPanel = layout.maximizedInstanceId
+    ? allPanelsInTree(layout.root).find((p) => p.instanceId === layout.maximizedInstanceId) ||
+      layout.floatingPanels.find((f) => f.panel.instanceId === layout.maximizedInstanceId)?.panel
+    : null;
+
+  return (
+    <div className="flex-1 flex flex-col w-full h-full overflow-hidden relative bg-[#f4efe6]">
+      {/* Workspace Sub-Toolbar */}
+      {!zenMode && <WorkspaceToolbar />}
+
+      {/* Main Layout Area */}
+      <div className="flex-1 w-full h-full overflow-hidden relative">
+        {maximizedPanel ? (
+          <div className="w-full h-full flex flex-col z-30 bg-[#fdfbf7] relative">
+            <div className="h-8 bg-[#eadecb] border-b border-[#ded5c4] px-3 flex items-center justify-between text-xs shrink-0">
+              <span className="font-bold text-[#854d0e] flex items-center gap-1.5">
+                <span>[已最大化独占模式]</span>
+                <span>{maximizedPanel.title || PANEL_METADATA_MAP[maximizedPanel.panelType]?.title}</span>
+              </span>
+              <button
+                onClick={() => toggleMaximizePanel(null)}
+                className="px-2.5 py-0.5 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium transition flex items-center gap-1.5 text-[11px] cursor-pointer shadow-xs active:scale-95"
+                title="退出最大化独占模式 (Esc / 点击恢复)"
+              >
+                <Minimize2 className="w-3 h-3" />
+                <span>退出最大化 (Esc)</span>
+              </button>
+            </div>
+            <div className="flex-1 w-full h-full overflow-hidden">
+              <PanelWrapper
+                panel={maximizedPanel}
+                isMaximized={true}
+                showTitlebar={false}
+              />
+            </div>
+          </div>
+        ) : (
+          <LayoutRenderer node={layout.root} />
+        )}
+
+        {/* Floating Windows Layer */}
+        {!zenMode && !maximizedPanel && <FloatingPanelContainer />}
+
+        {/* Dragging Ghost Cursor Pill */}
+        {draggingState && (
+          <div
+            style={{
+              left: `${draggingState.currentMousePos.x - draggingState.offset.x}px`,
+              top: `${draggingState.currentMousePos.y - draggingState.offset.y}px`,
+            }}
+            className="fixed pointer-events-none z-[9999] px-3 py-1.5 rounded-lg bg-[#fdfbf7] border-2 border-amber-800 text-[#854d0e] font-bold text-xs shadow-2xl flex items-center gap-2 opacity-95 animate-pulse"
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-800" />
+            <span>
+              {draggingState.panel.title ||
+                PANEL_METADATA_MAP[draggingState.panel.panelType]?.title ||
+                '拖动模块'}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

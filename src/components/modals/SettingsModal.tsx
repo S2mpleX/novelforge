@@ -14,12 +14,18 @@ import {
   Lock,
 } from 'lucide-react';
 
+import { UpdateCenter } from '@/features/updater/components/UpdateCenter';
+import { useUpdateStore } from '@/features/updater/stores/useUpdateStore';
+
 interface Props {
   onClose: () => void;
+  initialTab?: 'MODEL' | 'UPDATER';
 }
 
-export const SettingsModal: React.FC<Props> = ({ onClose }) => {
+export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }) => {
   const { activeProvider, loadProviders } = useNovelStore();
+  const { status } = useUpdateStore();
+  const [activeTab, setActiveTab] = useState<'MODEL' | 'UPDATER'>(initialTab);
 
   const [providerName, setProviderName] = useState('本地网关 (CPA / OpenAI 兼容)');
   const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:8317/v1');
@@ -111,30 +117,60 @@ export const SettingsModal: React.FC<Props> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-      <div className="w-full max-w-xl bg-[#fdfbf7] border border-[#ded5c4] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className={`w-full ${activeTab === 'UPDATER' ? 'max-w-3xl' : 'max-w-xl'} bg-[#fdfbf7] border border-[#ded5c4] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all duration-200`}>
         {/* Header */}
         <div className="p-4 border-b border-[#ded5c4] flex items-center justify-between bg-[#efe9dc]">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-[#854d0e] flex items-center justify-center text-[#fdfbf7] shadow-xs">
               <Settings className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-sm font-serif font-bold text-[#2b2621]">
-                模型网关配置 · Model Gateway
-              </h2>
-              <span className="text-[11px] text-[#685f54] font-serif">支持 OpenAI 兼容协议、Gemini 与本地 CPA 端点</span>
+            {/* Tabs */}
+            <div className="flex items-center bg-[#e4dcce] p-1 rounded-xl border border-[#d5cbb8]">
+              <button
+                type="button"
+                onClick={() => setActiveTab('MODEL')}
+                className={`px-3 py-1 rounded-lg text-xs font-serif font-bold transition cursor-pointer ${
+                  activeTab === 'MODEL'
+                    ? 'bg-[#fdfbf7] text-[#854d0e] shadow-2xs'
+                    : 'text-[#685f54] hover:text-[#2b2621]'
+                }`}
+              >
+                模型网关配置
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('UPDATER')}
+                className={`px-3 py-1 rounded-lg text-xs font-serif font-bold transition flex items-center gap-1.5 cursor-pointer relative ${
+                  activeTab === 'UPDATER'
+                    ? 'bg-[#fdfbf7] text-[#854d0e] shadow-2xs'
+                    : 'text-[#685f54] hover:text-[#2b2621]'
+                }`}
+              >
+                <span>软件更新</span>
+                {status === 'UPDATE_AVAILABLE' && (
+                  <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping absolute -top-0.5 -right-0.5" />
+                )}
+                {status === 'UPDATE_AVAILABLE' && (
+                  <span className="w-2 h-2 rounded-full bg-rose-600 absolute -top-0.5 -right-0.5" />
+                )}
+              </button>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#685f54] hover:text-[#2b2621] hover:bg-[#e5ded0] transition"
+            className="p-1.5 rounded-lg text-[#685f54] hover:text-[#2b2621] hover:bg-[#e5ded0] transition cursor-pointer"
           >
             <X className="w-4.5 h-4.5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto space-y-5 bg-[#fdfbf7]">
+        {activeTab === 'UPDATER' ? (
+          <div className="p-6 overflow-y-auto bg-[#fdfbf7]">
+            <UpdateCenter />
+          </div>
+        ) : (
+          <div className="p-6 overflow-y-auto space-y-5 bg-[#fdfbf7]">
           {/* Privacy Note */}
           <div className="p-3.5 rounded-xl bg-[#efe9dc]/80 border border-[#ded5c4] text-xs text-[#4a4237] flex items-start gap-3">
             <Lock className="w-4 h-4 text-[#854d0e] shrink-0 mt-0.5" />
@@ -342,6 +378,7 @@ export const SettingsModal: React.FC<Props> = ({ onClose }) => {
             </div>
           </form>
         </div>
+        )}
       </div>
     </div>
   );

@@ -2,13 +2,24 @@ import { create } from 'zustand';
 import { api } from '@/utils/tauriBridge';
 import type {
   Novel,
+  Volume,
   Chapter,
   ChapterVersion,
   AiProvider,
+  Part,
+  Scene,
+  PlotBeat,
+  CharacterArc,
+  ParallelThread,
+  PlotAssociationView,
+  HierarchyConfig,
+  NovelContentTree,
+  HierarchicalCreationContext,
 } from '@/types';
 
 export type ActiveTab = 'EDITOR' | 'DASHBOARD' | 'CHARACTERS' | 'WORLD' | 'PLOTS' | 'MEMORY' | 'SETTINGS';
 export type SaveStatus = 'SAVED' | 'SAVING' | 'DIRTY' | 'ERROR';
+export type ThemeMode = 'light' | 'dark';
 
 interface NovelState {
   novels: Novel[];
@@ -26,6 +37,21 @@ interface NovelState {
   sidebarCollapsed: boolean;
   rightPanelOpen: boolean;
   zenMode: boolean;
+  themeMode: ThemeMode;
+  uiScale: number;
+
+  // V2.0 State
+  contentTree: NovelContentTree | null;
+  hierarchyConfig: HierarchyConfig | null;
+  parts: Part[];
+  volumes: Volume[];
+  scenes: Scene[];
+  activeScene: Scene | null;
+  plotBeats: PlotBeat[];
+  characterArcs: CharacterArc[];
+  parallelThreads: ParallelThread[];
+  plotMatrix: PlotAssociationView[];
+  creationContext: HierarchicalCreationContext | null;
 
   // Actions
   setActiveTab: (tab: ActiveTab) => void;
@@ -33,6 +59,12 @@ interface NovelState {
   toggleRightPanel: () => void;
   toggleZenMode: () => void;
   setZenMode: (zenMode: boolean) => void;
+  setThemeMode: (mode: ThemeMode) => void;
+  toggleThemeMode: () => void;
+  setUiScale: (scale: number) => void;
+  increaseUiScale: () => void;
+  decreaseUiScale: () => void;
+  resetUiScale: () => void;
   loadNovels: () => Promise<void>;
   selectNovel: (novel: Novel) => Promise<void>;
   createNovel: (input: {
@@ -56,6 +88,22 @@ interface NovelState {
   setIsGenerating: (isGenerating: boolean) => void;
   setStreamText: (text: string) => void;
   appendStreamText: (chunk: string) => void;
+
+  // V2.0 Actions
+  loadHierarchyConfig: (novelId: string) => Promise<void>;
+  updateHierarchyConfig: (config: HierarchyConfig) => Promise<void>;
+  loadContentTree: (novelId?: string) => Promise<void>;
+  loadHierarchyPartsAndVolumes: (novelId: string) => Promise<void>;
+  loadScenesForChapter: (chapterId: string) => Promise<void>;
+  selectScene: (scene: Scene) => Promise<void>;
+  loadPlotBeats: (sceneId: string) => Promise<void>;
+  loadCharacterArcs: (novelId?: string) => Promise<void>;
+  loadParallelThreads: (novelId?: string) => Promise<void>;
+  loadPlotMatrix: (novelId?: string) => Promise<void>;
+  loadCreationContext: (chapterId: string, sceneId?: string) => Promise<void>;
+  splitChapter: (splitPoint: number, newTitle?: string) => Promise<void>;
+  mergeChapters: (sourceId: string, targetId: string) => Promise<void>;
+  renumberHierarchy: () => Promise<void>;
 }
 
 export const useNovelStore = create<NovelState>((set, get) => ({
@@ -74,12 +122,65 @@ export const useNovelStore = create<NovelState>((set, get) => ({
   sidebarCollapsed: false,
   rightPanelOpen: true,
   zenMode: false,
+  themeMode: (typeof localStorage !== 'undefined' && (localStorage.getItem('novelforge_theme_mode') as ThemeMode)) || 'light',
+  uiScale: (typeof localStorage !== 'undefined' && parseInt(localStorage.getItem('novelforge_ui_scale') || '100', 10)) || 100,
+
+  // V2.0 Initial State
+  contentTree: null,
+  hierarchyConfig: null,
+  parts: [],
+  volumes: [],
+  scenes: [],
+  activeScene: null,
+  plotBeats: [],
+  characterArcs: [],
+  parallelThreads: [],
+  plotMatrix: [],
+  creationContext: null,
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   toggleRightPanel: () => set((s) => ({ rightPanelOpen: !s.rightPanelOpen })),
   toggleZenMode: () => set((s) => ({ zenMode: !s.zenMode })),
   setZenMode: (zenMode) => set({ zenMode }),
+  setThemeMode: (mode) => {
+    set({ themeMode: mode });
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('novelforge_theme_mode', mode);
+    }
+    if (typeof document !== 'undefined') {
+      if (mode === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.body.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.body.classList.remove('dark');
+      }
+    }
+  },
+  toggleThemeMode: () => {
+    const next = get().themeMode === 'dark' ? 'light' : 'dark';
+    get().setThemeMode(next);
+  },
+  setUiScale: (scale) => {
+    const clamped = Math.min(140, Math.max(80, scale));
+    set({ uiScale: clamped });
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('novelforge_ui_scale', String(clamped));
+    }
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.zoom = `${clamped}%`;
+    }
+  },
+  increaseUiScale: () => {
+    get().setUiScale(get().uiScale + 5);
+  },
+  decreaseUiScale: () => {
+    get().setUiScale(get().uiScale - 5);
+  },
+  resetUiScale: () => {
+    get().setUiScale(100);
+  },
 
   loadNovels: async () => {
     try {
@@ -94,8 +195,32 @@ export const useNovelStore = create<NovelState>((set, get) => ({
   },
 
   selectNovel: async (novel) => {
-    set({ activeNovel: novel, activeChapter: null, editorContent: '', chapters: [] });
+    set({
+      activeNovel: novel,
+      activeChapter: null,
+      editorContent: '',
+      chapters: [],
+      contentTree: null,
+      hierarchyConfig: null,
+      parts: [],
+      volumes: [],
+      scenes: [],
+      activeScene: null,
+      plotBeats: [],
+      characterArcs: [],
+      parallelThreads: [],
+      plotMatrix: [],
+      creationContext: null,
+    });
     await get().loadChapters(novel.id);
+    await Promise.all([
+      get().loadHierarchyConfig(novel.id),
+      get().loadContentTree(novel.id),
+      get().loadHierarchyPartsAndVolumes(novel.id),
+      get().loadCharacterArcs(novel.id),
+      get().loadParallelThreads(novel.id),
+      get().loadPlotMatrix(novel.id),
+    ]);
   },
 
   createNovel: async (input) => {
@@ -103,6 +228,7 @@ export const useNovelStore = create<NovelState>((set, get) => ({
     const novels = await api.listNovels();
     set({ novels, activeNovel: newNovel });
     await get().loadChapters(newNovel.id);
+    await get().loadContentTree(newNovel.id);
     return newNovel;
   },
 
@@ -115,6 +241,7 @@ export const useNovelStore = create<NovelState>((set, get) => ({
       activeChapter: null,
       editorContent: '',
       chapters: [],
+      contentTree: null,
     });
     if (novels.length > 0) {
       await get().loadChapters(novels[0].id);
@@ -146,7 +273,11 @@ export const useNovelStore = create<NovelState>((set, get) => ({
         editorContent: freshChapter.content || '',
         saveStatus: 'SAVED',
       });
-      await get().loadVersions(chapter.id);
+      await Promise.all([
+        get().loadVersions(chapter.id),
+        get().loadScenesForChapter(chapter.id),
+        get().loadCreationContext(chapter.id),
+      ]);
     } catch (e) {
       console.error('读取章节详情失败:', e);
     }
@@ -243,4 +374,189 @@ export const useNovelStore = create<NovelState>((set, get) => ({
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setStreamText: (streamText) => set({ streamText }),
   appendStreamText: (chunk) => set((s) => ({ streamText: s.streamText + chunk })),
+
+  // --- V2.0 Actions Implementation ---
+  loadHierarchyConfig: async (novelId) => {
+    try {
+      const hierarchyConfig = await api.getNovelHierarchyConfig(novelId);
+      set({ hierarchyConfig });
+    } catch (e) {
+      console.error('加载层级配置失败:', e);
+    }
+  },
+
+  updateHierarchyConfig: async (config) => {
+    const novel = get().activeNovel;
+    if (!novel) return;
+    try {
+      const updated = await api.updateNovelHierarchyConfig(novel.id, config);
+      set({ hierarchyConfig: updated });
+      await get().loadContentTree(novel.id);
+    } catch (e) {
+      console.error('更新层级配置失败:', e);
+    }
+  },
+
+  loadContentTree: async (novelId) => {
+    const id = novelId || get().activeNovel?.id;
+    if (!id) return;
+    try {
+      const contentTree = await api.getNovelContentTree(id);
+      set({ contentTree, hierarchyConfig: contentTree.hierarchy_config });
+    } catch (e) {
+      console.error('加载大纲内容树失败:', e);
+    }
+  },
+
+  loadHierarchyPartsAndVolumes: async (novelId) => {
+    try {
+      const [parts, volumes] = await Promise.all([
+        api.listParts(novelId),
+        api.listVolumes(novelId),
+      ]);
+      set({ parts, volumes });
+    } catch (e) {
+      console.error('加载部与分卷失败:', e);
+    }
+  },
+
+  loadScenesForChapter: async (chapterId) => {
+    try {
+      const scenes = await api.listScenes(chapterId);
+      set({
+        scenes,
+        activeScene: scenes.length > 0 ? scenes[0] : null,
+      });
+      if (scenes.length > 0) {
+        await get().loadPlotBeats(scenes[0].id);
+      } else {
+        set({ plotBeats: [] });
+      }
+    } catch (e) {
+      console.error('加载场景列表失败:', e);
+    }
+  },
+
+  selectScene: async (scene) => {
+    set({ activeScene: scene });
+    await Promise.all([
+      get().loadPlotBeats(scene.id),
+      get().loadCreationContext(scene.chapter_id, scene.id),
+    ]);
+  },
+
+  loadPlotBeats: async (sceneId) => {
+    try {
+      const plotBeats = await api.listPlotBeats(sceneId);
+      set({ plotBeats });
+    } catch (e) {
+      console.error('加载情节节拍失败:', e);
+    }
+  },
+
+  loadCharacterArcs: async (novelId) => {
+    const id = novelId || get().activeNovel?.id;
+    if (!id) return;
+    try {
+      const characterArcs = await api.listCharacterArcs(id);
+      set({ characterArcs });
+    } catch (e) {
+      console.error('加载角色成长弧失败:', e);
+    }
+  },
+
+  loadParallelThreads: async (novelId) => {
+    const id = novelId || get().activeNovel?.id;
+    if (!id) return;
+    try {
+      const parallelThreads = await api.listParallelThreads(id);
+      set({ parallelThreads });
+    } catch (e) {
+      console.error('加载并行叙事线失败:', e);
+    }
+  },
+
+  loadPlotMatrix: async (novelId) => {
+    const id = novelId || get().activeNovel?.id;
+    if (!id) return;
+    try {
+      const plotMatrix = await api.listNovelPlotMatrix(id);
+      set({ plotMatrix });
+    } catch (e) {
+      console.error('加载剧情关系矩阵失败:', e);
+    }
+  },
+
+  loadCreationContext: async (chapterId, sceneId) => {
+    const novel = get().activeNovel;
+    if (!novel) return;
+    try {
+      const creationContext = await api.assembleHierarchicalCreationContext(novel.id, chapterId, sceneId);
+      set({ creationContext });
+    } catch (e) {
+      console.error('加载创作上下文失败:', e);
+    }
+  },
+
+  splitChapter: async (splitPoint, newTitle) => {
+    const chapter = get().activeChapter;
+    const novel = get().activeNovel;
+    if (!chapter || !novel) return;
+
+    try {
+      const [originalCh] = await api.splitChapter({
+        chapter_id: chapter.id,
+        split_type: 'CONTENT_OFFSET',
+        split_point: splitPoint,
+        new_chapter_title: newTitle,
+      });
+
+      await get().loadChapters(novel.id);
+      await get().loadContentTree(novel.id);
+      await get().selectChapter(originalCh);
+    } catch (e) {
+      console.error('拆分章节失败:', e);
+      throw e;
+    }
+  },
+
+  mergeChapters: async (sourceId, targetId) => {
+    const novel = get().activeNovel;
+    if (!novel) return;
+
+    try {
+      const mergedCh = await api.mergeChapters({
+        source_chapter_id: sourceId,
+        target_chapter_id: targetId,
+      });
+
+      await get().loadChapters(novel.id);
+      await get().loadContentTree(novel.id);
+      await get().selectChapter(mergedCh);
+    } catch (e) {
+      console.error('合并章节失败:', e);
+      throw e;
+    }
+  },
+
+  renumberHierarchy: async () => {
+    const novel = get().activeNovel;
+    if (!novel) return;
+
+    try {
+      await api.renumberHierarchy({
+        novel_id: novel.id,
+        per_volume_chapter_numbering: false,
+      });
+
+      await Promise.all([
+        get().loadChapters(novel.id),
+        get().loadContentTree(novel.id),
+        get().loadHierarchyPartsAndVolumes(novel.id),
+      ]);
+    } catch (e) {
+      console.error('层级重编号失败:', e);
+      throw e;
+    }
+  },
 }));

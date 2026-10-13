@@ -13,9 +13,9 @@ import {
   Redo,
   Save,
   Maximize2,
-  Minimize2,
   Sparkles,
   AlignLeft,
+  AlignJustify,
   Lightbulb,
   Clock,
   Target,
@@ -24,8 +24,33 @@ import {
 } from 'lucide-react';
 import { CreateNovelModal } from '@/components/modals/CreateNovelModal';
 import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
+import { WindowControls } from '@/components/layout/WindowControls';
 
 type PaperTheme = 'xuan' | 'bamboo' | 'kraft' | 'midnight';
+
+interface PaperThemeConfig {
+  label: string;
+  shortLabel: string;
+  desc: string;
+  canvasClass: string;
+  sheetClass: string;
+  swatch: string;
+  swatchBorder: string;
+  activeBtnBg: string;
+  variables: {
+    textColor: string;
+    headingColor: string;
+    accentColor: string;
+    quoteColor: string;
+    quoteBg: string;
+    borderColor: string;
+    ruledColor: string;
+    sealBorder: string;
+    sealColor: string;
+    sealBg: string;
+  };
+  seal: string;
+}
 
 const FONT_PRESETS = [
   { size: 14, label: '小号字', desc: '14px' },
@@ -36,38 +61,98 @@ const FONT_PRESETS = [
   { size: 26, label: '特大字', desc: '26px' },
 ];
 
-const PAPER_STYLES: Record<PaperTheme, { bg: string; paper: string; border: string; text: string; shadow: string; label: string }> = {
+const PAPER_THEMES: Record<PaperTheme, PaperThemeConfig> = {
   xuan: {
     label: '温润宣纸',
-    bg: 'bg-[#f4efe6]',
-    paper: 'bg-[#fdfbf7]',
-    border: 'border-[#ded5c4]',
-    text: 'text-[#2b2621]',
-    shadow: 'shadow-[0_4px_25px_-5px_rgba(120,90,50,0.08),0_0_0_1px_rgba(215,200,180,0.5)]',
+    shortLabel: '宣纸',
+    desc: '手工熟宣细筋肌理 · 徽墨松烟',
+    canvasClass: 'paper-canvas-xuan',
+    sheetClass: 'paper-sheet-xuan',
+    swatch: '#fbf7ee',
+    swatchBorder: '#c8b496',
+    activeBtnBg: 'bg-[#854d0e]',
+    variables: {
+      textColor: '#231d17',
+      headingColor: '#17130f',
+      accentColor: '#c2410c',
+      quoteColor: '#635749',
+      quoteBg: 'rgba(194, 65, 12, 0.04)',
+      borderColor: '#ded5c4',
+      ruledColor: 'rgba(180, 140, 90, 0.14)',
+      sealBorder: '#c2410c',
+      sealColor: '#c2410c',
+      sealBg: '#fef2f2',
+    },
+    seal: '【 宣纸 · 澄品 】',
   },
   bamboo: {
     label: '澄心竹纸',
-    bg: 'bg-[#f2f4f0]',
-    paper: 'bg-[#ffffff]',
-    border: 'border-[#dce1d9]',
-    text: 'text-[#1c221a]',
-    shadow: 'shadow-[0_4px_25px_-5px_rgba(50,80,60,0.06),0_0_0_1px_rgba(200,210,195,0.5)]',
+    shortLabel: '竹纸',
+    desc: '江南竹浆素帘纹 · 幽雅竹墨',
+    canvasClass: 'paper-canvas-bamboo',
+    sheetClass: 'paper-sheet-bamboo',
+    swatch: '#edf5eb',
+    swatchBorder: '#a9c2a5',
+    activeBtnBg: 'bg-[#047857]',
+    variables: {
+      textColor: '#17241a',
+      headingColor: '#0e1810',
+      accentColor: '#047857',
+      quoteColor: '#435447',
+      quoteBg: 'rgba(4, 120, 87, 0.05)',
+      borderColor: '#cdd9ca',
+      ruledColor: 'rgba(60, 120, 80, 0.12)',
+      sealBorder: '#047857',
+      sealColor: '#047857',
+      sealBg: '#f0fdf4',
+    },
+    seal: '【 竹笺 · 幽韵 】',
   },
   kraft: {
     label: '复古牛皮',
-    bg: 'bg-[#ebe0cb]',
-    paper: 'bg-[#f4ebdc]',
-    border: 'border-[#cfbf9e]',
-    text: 'text-[#261f16]',
-    shadow: 'shadow-[0_4px_25px_-5px_rgba(100,70,30,0.12),0_0_0_1px_rgba(190,170,140,0.6)]',
+    shortLabel: '牛皮',
+    desc: '做旧原浆羊皮斑驳 · 沉香焦褐墨',
+    canvasClass: 'paper-canvas-kraft',
+    sheetClass: 'paper-sheet-kraft',
+    swatch: '#ecdab9',
+    swatchBorder: '#b39162',
+    activeBtnBg: 'bg-[#92400e]',
+    variables: {
+      textColor: '#2a1b10',
+      headingColor: '#1a0f07',
+      accentColor: '#92400e',
+      quoteColor: '#5c432d',
+      quoteBg: 'rgba(146, 64, 14, 0.08)',
+      borderColor: '#ba9e74',
+      ruledColor: 'rgba(120, 75, 25, 0.16)',
+      sealBorder: '#92400e',
+      sealColor: '#92400e',
+      sealBg: '#fef3c7',
+    },
+    seal: '【 秘卷 · 珍藏 】',
   },
   midnight: {
     label: '水墨夜读',
-    bg: 'bg-[#18181b]',
-    paper: 'bg-[#222226]',
-    border: 'border-[#3f3f46]',
-    text: 'text-[#e4e4e7]',
-    shadow: 'shadow-[0_4px_25px_-5px_rgba(0,0,0,0.5),0_0_0_1px_rgba(60,60,65,0.8)]',
+    shortLabel: '夜读',
+    desc: '深宵歙砚水墨氤氲 · 柔和月华白',
+    canvasClass: 'paper-canvas-midnight',
+    sheetClass: 'paper-sheet-midnight',
+    swatch: '#1c1c22',
+    swatchBorder: '#52525e',
+    activeBtnBg: 'bg-[#27272a] border border-[#f59e0b]/40',
+    variables: {
+      textColor: '#dfdbd0',
+      headingColor: '#f6f3eb',
+      accentColor: '#f59e0b',
+      quoteColor: '#a39e93',
+      quoteBg: 'rgba(245, 158, 11, 0.08)',
+      borderColor: '#383842',
+      ruledColor: 'rgba(180, 180, 200, 0.08)',
+      sealBorder: '#d97706',
+      sealColor: '#f59e0b',
+      sealBg: '#27272a',
+    },
+    seal: '【 夜墨 · 沉吟 】',
   },
 };
 
@@ -82,13 +167,40 @@ export const NovelEditor: React.FC = () => {
     streamText,
     isGenerating,
     zenMode,
+    themeMode,
+    setThemeMode,
   } = useNovelStore();
 
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [paperTheme, setPaperTheme] = useState<PaperTheme>(() => {
-    return (localStorage.getItem('novelforge_paper_theme') as PaperTheme) || 'xuan';
+    const saved = localStorage.getItem('novelforge_paper_theme') as PaperTheme;
+    if (saved) return saved;
+    return (localStorage.getItem('novelforge_theme_mode') === 'dark') ? 'midnight' : 'xuan';
   });
+  const [showRuledLines, setShowRuledLines] = useState<boolean>(() => {
+    return localStorage.getItem('novelforge_ruled_lines') === 'true';
+  });
+
+  // Automatically sync paperTheme with global themeMode
+  useEffect(() => {
+    if (themeMode === 'dark' && paperTheme !== 'midnight') {
+      setPaperTheme('midnight');
+      localStorage.setItem('novelforge_paper_theme', 'midnight');
+    } else if (themeMode === 'light' && paperTheme === 'midnight') {
+      const savedLight = (localStorage.getItem('novelforge_light_paper_theme') as PaperTheme) || 'xuan';
+      setPaperTheme(savedLight);
+      localStorage.setItem('novelforge_paper_theme', savedLight);
+    }
+  }, [themeMode]);
+
+  const handleToggleRuledLines = () => {
+    setShowRuledLines((prev) => {
+      const next = !prev;
+      localStorage.setItem('novelforge_ruled_lines', String(next));
+      return next;
+    });
+  };
   const [fontSize, setFontSize] = useState<number>(() => {
     const saved = localStorage.getItem('novelforge_font_size');
     if (saved) {
@@ -122,6 +234,16 @@ export const NovelEditor: React.FC = () => {
   const handleSetPaperTheme = (theme: PaperTheme) => {
     setPaperTheme(theme);
     localStorage.setItem('novelforge_paper_theme', theme);
+    if (theme !== 'midnight') {
+      localStorage.setItem('novelforge_light_paper_theme', theme);
+    }
+    // If user clicked midnight, harmonize app into dark mode
+    if (theme === 'midnight' && themeMode !== 'dark') {
+      setThemeMode('dark');
+    } else if (theme !== 'midnight' && themeMode === 'dark') {
+      // If user chose a daylight paper, harmonize app into light mode
+      setThemeMode('light');
+    }
   };
 
   const handleSetFontSize = (size: number) => {
@@ -189,17 +311,21 @@ export const NovelEditor: React.FC = () => {
     }
   };
 
-  // Handle Ctrl+S keyboard shortcut
+  // Handle Ctrl+S keyboard shortcut & Escape to exit editor fullscreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         saveCurrentChapter(true, 'USER_MANUAL_SAVE');
       }
+      // Escape exits editor's own fullscreen mode
+      if (e.key === 'Escape' && isFullScreen) {
+        setIsFullScreen(false);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveCurrentChapter]);
+  }, [saveCurrentChapter, isFullScreen]);
 
   // Clean up timer on unmount
   useEffect(() => {
@@ -351,23 +477,28 @@ export const NovelEditor: React.FC = () => {
 
   return (
     <div
-      className={`flex-1 flex flex-col min-w-0 h-[calc(100vh-3.5rem)] transition-all ${
+      className={`flex-1 flex flex-col min-w-0 w-full h-full transition-all ${
         isFullScreen ? 'fixed inset-0 z-50 bg-[#f4efe6] p-6' : ''
       }`}
     >
       {/* Editor Formatting Floating Toolbar */}
-      <div className="h-12 border-b border-[#ded5c4] px-4 md:px-6 flex items-center justify-between bg-[#efe9dc]/95 backdrop-blur-xl select-none shrink-0 z-10 shadow-sm gap-2">
+      <div className="h-12 border-b border-[#ded5c4] px-2.5 md:px-4 flex items-center justify-between bg-[#efe9dc]/95 backdrop-blur-xl select-none shrink-0 z-10 shadow-sm gap-1.5 overflow-hidden min-w-0">
         {/* Left: Text Formatting Controls & Zen Mode Indicator */}
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto scrollbar-none py-1">
           {zenMode && (
-            <span className="mr-2 px-2 py-0.5 rounded bg-amber-800/10 text-amber-800 border border-amber-800/20 text-[10px] font-serif font-bold">
+            <span className="mr-2 px-2 py-0.5 rounded bg-amber-800/10 text-amber-800 border border-amber-800/20 text-[10px] font-serif font-bold shrink-0 whitespace-nowrap">
               禅意专注 (Esc退出)
+            </span>
+          )}
+          {isFullScreen && (
+            <span className="mr-2 px-2 py-0.5 rounded bg-amber-800/10 text-amber-800 border border-amber-800/20 text-[10px] font-serif font-bold shrink-0 whitespace-nowrap">
+              全屏专注 (Esc退出)
             </span>
           )}
           <button
             onClick={() => editor?.chain().focus().undo().run()}
             disabled={!editor?.can().undo()}
-            className="p-1.5 rounded-md hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] disabled:opacity-25 transition"
+            className="p-1.5 rounded-md hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] disabled:opacity-25 transition shrink-0 cursor-pointer"
             title="撤销 (Ctrl+Z)"
           >
             <Undo className="w-3.5 h-3.5" />
@@ -375,17 +506,17 @@ export const NovelEditor: React.FC = () => {
           <button
             onClick={() => editor?.chain().focus().redo().run()}
             disabled={!editor?.can().redo()}
-            className="p-1.5 rounded-md hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] disabled:opacity-25 transition"
+            className="p-1.5 rounded-md hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] disabled:opacity-25 transition shrink-0 cursor-pointer"
             title="重做 (Ctrl+Y)"
           >
             <Redo className="w-3.5 h-3.5" />
           </button>
 
-          <div className="w-px h-4 bg-[#ded5c4] mx-1" />
+          <div className="w-px h-4 bg-[#ded5c4] mx-1 shrink-0" />
 
           <button
             onClick={() => editor?.chain().focus().toggleBold().run()}
-            className={`p-1.5 rounded-md transition ${
+            className={`p-1.5 rounded-md transition shrink-0 cursor-pointer ${
               editor?.isActive('bold')
                 ? 'bg-amber-800/15 text-amber-900 border border-amber-800/30 shadow-xs'
                 : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
@@ -396,7 +527,7 @@ export const NovelEditor: React.FC = () => {
           </button>
           <button
             onClick={() => editor?.chain().focus().toggleItalic().run()}
-            className={`p-1.5 rounded-md transition ${
+            className={`p-1.5 rounded-md transition shrink-0 cursor-pointer ${
               editor?.isActive('italic')
                 ? 'bg-amber-800/15 text-amber-900 border border-amber-800/30 shadow-xs'
                 : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
@@ -408,7 +539,7 @@ export const NovelEditor: React.FC = () => {
 
           <button
             onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={`p-1.5 rounded-md transition ${
+            className={`p-1.5 rounded-md transition shrink-0 cursor-pointer ${
               editor?.isActive('heading', { level: 1 })
                 ? 'bg-amber-800/15 text-amber-900 border border-amber-800/30 shadow-xs'
                 : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
@@ -419,7 +550,7 @@ export const NovelEditor: React.FC = () => {
           </button>
           <button
             onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={`p-1.5 rounded-md transition ${
+            className={`p-1.5 rounded-md transition shrink-0 cursor-pointer ${
               editor?.isActive('heading', { level: 2 })
                 ? 'bg-amber-800/15 text-amber-900 border border-amber-800/30 shadow-xs'
                 : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
@@ -431,7 +562,7 @@ export const NovelEditor: React.FC = () => {
 
           <button
             onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-            className={`p-1.5 rounded-md transition ${
+            className={`p-1.5 rounded-md transition shrink-0 cursor-pointer ${
               editor?.isActive('blockquote')
                 ? 'bg-amber-800/15 text-amber-900 border border-amber-800/30 shadow-xs'
                 : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
@@ -442,47 +573,76 @@ export const NovelEditor: React.FC = () => {
           </button>
           <button
             onClick={() => editor?.chain().focus().setHorizontalRule().run()}
-            className="p-1.5 rounded-md hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] transition"
+            className="p-1.5 rounded-md hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] transition shrink-0 cursor-pointer"
             title="分割线"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
 
-          <div className="w-px h-4 bg-[#ded5c4] mx-1" />
+          <div className="w-px h-4 bg-[#ded5c4] mx-1 shrink-0" />
 
           {/* One-click Formatting */}
           <button
             onClick={handleAutoFormat}
-            className="px-2 py-1 rounded-md bg-[#efe9dc] hover:bg-[#e4dcce] text-[#854d0e] border border-[#ded5c4] text-xs font-serif flex items-center gap-1 transition shadow-2xs"
+            className="px-2 py-1 rounded-md bg-[#efe9dc] hover:bg-[#e4dcce] text-[#854d0e] border border-[#ded5c4] text-xs font-serif flex items-center gap-1 transition shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
             title="一键文学规范排版：清理空行、全角标点规范化"
           >
             {formatSuccess ? <Check className="w-3.5 h-3.5 text-[#047857]" /> : <AlignLeft className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{formatSuccess ? '排版完成' : '规范排版'}</span>
+            <span className="hidden md:inline whitespace-nowrap">{formatSuccess ? '排版完成' : '规范排版'}</span>
           </button>
 
-          <div className="w-px h-4 bg-[#ded5c4] mx-1" />
+          <div className="w-px h-4 bg-[#ded5c4] mx-1 shrink-0" />
 
-          {/* Paper Theme Selector */}
-          <div className="flex items-center gap-0.5 bg-[#e8e0d0] p-0.5 rounded-md border border-[#d5cbb8]">
-            {(['xuan', 'bamboo', 'kraft', 'midnight'] as PaperTheme[]).map((theme) => (
-              <button
-                key={theme}
-                onClick={() => handleSetPaperTheme(theme)}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-serif transition ${
-                  paperTheme === theme
-                    ? 'bg-[#854d0e] text-white font-bold shadow-xs'
-                    : 'text-[#6b6255] hover:text-[#231f1a]'
-                }`}
-                title={`切换纸张主题：${PAPER_STYLES[theme].label}`}
-              >
-                {theme === 'xuan' ? '宣纸' : theme === 'bamboo' ? '竹纸' : theme === 'kraft' ? '牛皮' : '夜读'}
-              </button>
-            ))}
+          {/* Paper Theme Selector & Ruled Lines Toggle */}
+          <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
+            <div className="flex items-center gap-0.5 bg-[#e8e0d0] p-0.5 rounded-md border border-[#d5cbb8] shadow-2xs shrink-0">
+              {(Object.keys(PAPER_THEMES) as PaperTheme[]).map((themeKey) => {
+                const conf = PAPER_THEMES[themeKey];
+                const isActive = paperTheme === themeKey;
+                return (
+                  <button
+                    key={themeKey}
+                    type="button"
+                    onClick={() => handleSetPaperTheme(themeKey)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-serif transition-all flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
+                      isActive
+                        ? `${conf.activeBtnBg} text-white font-bold shadow-xs scale-102`
+                        : 'text-[#6b6255] hover:text-[#231f1a] hover:bg-[#dfd5c4]'
+                    }`}
+                    title={`切换纸张主题：${conf.label}（${conf.desc}）`}
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border shrink-0 transition-transform shadow-2xs"
+                      style={{
+                        backgroundColor: conf.swatch,
+                        borderColor: conf.swatchBorder,
+                        transform: isActive ? 'scale(1.15)' : 'scale(1)',
+                      }}
+                    />
+                    <span>{conf.shortLabel}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleToggleRuledLines}
+              className={`px-2 py-1 rounded-md text-xs font-serif flex items-center gap-1 transition-all cursor-pointer border shrink-0 whitespace-nowrap ${
+                showRuledLines
+                  ? 'bg-[#854d0e]/15 text-[#854d0e] border-[#854d0e]/30 font-bold shadow-2xs'
+                  : 'bg-[#efe9dc] hover:bg-[#e4dcce] text-[#6b6255] border-[#ded5c4]'
+              }`}
+              title="开启/关闭信笺稿纸行线（开启后呈现真实原稿信笺纸横格）"
+            >
+              <AlignJustify className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden xl:inline whitespace-nowrap">信笺横线</span>
+            </button>
           </div>
 
           {/* Font Size Adjuster & Quick Presets */}
-          <div ref={fontSizeMenuRef} className="relative flex items-center">
-            <div className="flex items-center gap-0.5 bg-[#e8e0d0] p-0.5 rounded-md border border-[#d5cbb8] shadow-2xs">
+          <div ref={fontSizeMenuRef} className="relative flex items-center shrink-0 whitespace-nowrap">
+            <div className="flex items-center gap-0.5 bg-[#e8e0d0] p-0.5 rounded-md border border-[#d5cbb8] shadow-2xs shrink-0">
               <button
                 type="button"
                 onClick={handleDecreaseFontSize}
@@ -496,7 +656,7 @@ export const NovelEditor: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowFontSizeMenu((prev) => !prev)}
-                className="px-1.5 py-0.5 rounded text-[10px] font-mono text-[#854d0e] font-bold hover:bg-[#dfd5c4] transition cursor-pointer flex items-center gap-0.5"
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono text-[#854d0e] font-bold hover:bg-[#dfd5c4] transition cursor-pointer flex items-center gap-0.5 whitespace-nowrap"
                 title="点击快速选择字号或恢复默认"
               >
                 {fontSize}px
@@ -562,9 +722,9 @@ export const NovelEditor: React.FC = () => {
         </div>
 
         {/* Center/Right: Target Word Count & Reading Time Tracker */}
-        <div className="hidden lg:flex items-center gap-3 text-xs font-serif text-[#685f54] bg-[#f7f2e7] px-3 py-1 rounded-lg border border-[#ded5c4]">
-          <div className="flex items-center gap-1.5">
-            <Target className="w-3.5 h-3.5 text-[#854d0e]" />
+        <div className="hidden 2xl:flex items-center gap-3 text-xs font-serif text-[#685f54] bg-[#f7f2e7] px-3 py-1 rounded-lg border border-[#ded5c4] shrink-0 whitespace-nowrap">
+          <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+            <Target className="w-3.5 h-3.5 text-[#854d0e] shrink-0" />
             <span>目标:</span>
             <span className="font-bold text-[#2b2621]">
               {charCount} / {targetWords} 字
@@ -578,89 +738,183 @@ export const NovelEditor: React.FC = () => {
             </span>
           </div>
 
-          <div className="w-px h-3 bg-[#ded5c4]" />
+          <div className="w-px h-3 bg-[#ded5c4] shrink-0" />
 
-          <div className="flex items-center gap-1 text-[#786f65]">
-            <Clock className="w-3.5 h-3.5 text-[#854d0e]" />
+          <div className="flex items-center gap-1 text-[#786f65] shrink-0 whitespace-nowrap">
+            <Clock className="w-3.5 h-3.5 text-[#854d0e] shrink-0" />
             <span>~{estimatedReadMinutes} 分钟</span>
           </div>
         </div>
 
-        {/* Right: Actions (Scratchpad, Save, Fullscreen) */}
-        <div className="flex items-center gap-2">
+        {/* Right: Actions (Scratchpad, Save, Fullscreen/放大) */}
+        <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap ml-auto z-10">
           {/* Scratchpad Toggle */}
           <button
             onClick={() => setShowScratchpad(!showScratchpad)}
-            className={`px-2.5 py-1 rounded-lg text-xs font-serif font-medium flex items-center gap-1.5 transition border ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-serif font-medium flex items-center gap-1.5 transition border shrink-0 whitespace-nowrap cursor-pointer ${
               showScratchpad
                 ? 'bg-[#854d0e] text-[#fdfbf7] border-[#854d0e] shadow-xs'
                 : 'bg-[#efe9dc] hover:bg-[#e4dcce] text-[#2b2621] border-[#ded5c4]'
             }`}
             title="展开/折叠灵感随手记便签"
           >
-            <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-            <span className="hidden sm:inline">灵感便签</span>
+            <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span className="hidden lg:inline whitespace-nowrap">灵感便签</span>
           </button>
 
           <button
             onClick={() => saveCurrentChapter(true, 'USER_MANUAL_SAVE')}
             disabled={saveStatus === 'SAVING'}
-            className="px-3 py-1 rounded-lg bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] text-xs font-serif font-medium flex items-center gap-1.5 transition shadow-xs active:scale-95 disabled:opacity-40"
+            className="px-3 py-1 rounded-lg bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] text-xs font-serif font-medium flex items-center gap-1.5 transition shadow-xs active:scale-95 disabled:opacity-40 shrink-0 whitespace-nowrap cursor-pointer"
             title="保存当前快照 (Ctrl+S)"
           >
-            <Save className="w-3.5 h-3.5" />
-            <span>保存快照</span>
+            <Save className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline whitespace-nowrap">保存快照</span>
           </button>
 
-          <button
-            onClick={() => setIsFullScreen(!isFullScreen)}
-            className="p-1.5 rounded-lg hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] transition"
-            title={isFullScreen ? '退出全屏专注模式' : '全屏专注模式'}
-          >
-            {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
+          {isFullScreen ? (
+            <button
+              onClick={() => setIsFullScreen(false)}
+              className="px-2.5 py-1 rounded-lg bg-rose-700/10 hover:bg-rose-700 hover:text-white text-rose-800 border border-rose-700/25 text-xs font-serif font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer group"
+              title="退出全屏专注模式 (Esc / 点击关闭)"
+            >
+              <X className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+              <span>退出全屏 (Esc)</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsFullScreen(true)}
+              className="p-1.5 rounded-lg hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] transition shrink-0 cursor-pointer"
+              title="全屏专注写作模式"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* 全屏模式下显示窗口控制按钮，确保关闭/最大化/最小化始终可达 */}
+          {isFullScreen && <WindowControls />}
         </div>
       </div>
 
       {/* Main Workspace (Editor Canvas + Optional Scratchpad Drawer) */}
-      <div className={`flex-1 flex overflow-hidden transition-colors duration-200 ${PAPER_STYLES[paperTheme].bg}`}>
+      <div className={`flex-1 flex overflow-hidden transition-colors duration-300 ${PAPER_THEMES[paperTheme].canvasClass}`}>
         {/* Editor Content Area (Physical Paper Sheet Layout) */}
         <div className="flex-1 overflow-y-auto px-4 md:px-12 lg:px-20 py-8">
-          <div className={`max-w-3xl mx-auto p-8 md:p-14 rounded-2xl border transition-colors duration-200 ${PAPER_STYLES[paperTheme].paper} ${PAPER_STYLES[paperTheme].border} ${PAPER_STYLES[paperTheme].text} ${PAPER_STYLES[paperTheme].shadow}`}>
+          <div
+            className={`max-w-3xl mx-auto p-8 md:p-14 rounded-2xl transition-all duration-300 relative ${PAPER_THEMES[paperTheme].sheetClass}`}
+            style={{
+              '--editor-text-color': PAPER_THEMES[paperTheme].variables.textColor,
+              '--editor-heading-color': PAPER_THEMES[paperTheme].variables.headingColor,
+              '--editor-accent-color': PAPER_THEMES[paperTheme].variables.accentColor,
+              '--editor-quote-color': PAPER_THEMES[paperTheme].variables.quoteColor,
+              '--editor-quote-bg': PAPER_THEMES[paperTheme].variables.quoteBg,
+              '--editor-border-color': PAPER_THEMES[paperTheme].variables.borderColor,
+              '--paper-ruled-color': PAPER_THEMES[paperTheme].variables.ruledColor,
+              '--editor-seal-border': PAPER_THEMES[paperTheme].variables.sealBorder,
+              '--editor-seal-color': PAPER_THEMES[paperTheme].variables.sealColor,
+              '--editor-seal-bg': PAPER_THEMES[paperTheme].variables.sealBg,
+            } as React.CSSProperties}
+          >
+            {/* Top Right Tactile Watermark Pill */}
+            <div className="absolute top-4 right-6 flex items-center gap-2 select-none pointer-events-none opacity-60">
+              <span
+                className="text-[10px] font-serif tracking-widest uppercase"
+                style={{ color: PAPER_THEMES[paperTheme].variables.quoteColor }}
+              >
+                {PAPER_THEMES[paperTheme].desc}
+              </span>
+            </div>
+
             {/* Chapter Title Banner */}
-            <div className={`mb-8 pb-5 border-b ${PAPER_STYLES[paperTheme].border}`}>
-              <div className="text-xs font-bold text-amber-800 tracking-wider uppercase mb-2 flex items-center gap-2 font-mono">
-                <span className="w-2 h-2 rounded-full bg-amber-700" />
+            <div
+              className="mb-8 pb-5 border-b transition-colors duration-200"
+              style={{ borderColor: PAPER_THEMES[paperTheme].variables.borderColor }}
+            >
+              <div
+                className="text-xs font-bold tracking-wider uppercase mb-2 flex items-center gap-2 font-mono transition-colors duration-200"
+                style={{ color: PAPER_THEMES[paperTheme].variables.accentColor }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: PAPER_THEMES[paperTheme].variables.accentColor }}
+                />
                 第 {activeChapter.chapter_number} 章
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight leading-snug font-serif">
+              <h1
+                className="text-2xl md:text-3xl font-bold tracking-tight leading-snug font-serif transition-colors duration-200"
+                style={{ color: PAPER_THEMES[paperTheme].variables.headingColor }}
+              >
                 {activeChapter.title}
               </h1>
             </div>
 
             {/* Tiptap Editor Surface */}
             <div
-              className="min-h-[540px] editor-surface"
+              className={`min-h-[540px] editor-surface transition-colors duration-200 ${showRuledLines ? 'paper-ruled-active' : ''}`}
               style={{
                 '--editor-font-size': `${fontSize}px`,
                 '--editor-line-height': fontSize >= 24 ? '2.25' : fontSize <= 14 ? '1.9' : '2.15',
+                '--editor-text-color': PAPER_THEMES[paperTheme].variables.textColor,
+                '--editor-heading-color': PAPER_THEMES[paperTheme].variables.headingColor,
+                '--editor-accent-color': PAPER_THEMES[paperTheme].variables.accentColor,
+                '--editor-quote-color': PAPER_THEMES[paperTheme].variables.quoteColor,
+                '--editor-quote-bg': PAPER_THEMES[paperTheme].variables.quoteBg,
+                '--editor-border-color': PAPER_THEMES[paperTheme].variables.borderColor,
+                '--paper-ruled-color': PAPER_THEMES[paperTheme].variables.ruledColor,
               } as React.CSSProperties}
             >
               <EditorContent editor={editor} />
             </div>
 
+            {/* Physical Manuscript Bottom Seal Stamp */}
+            <div
+              className="mt-14 pt-6 border-t flex items-center justify-between opacity-85 select-none pointer-events-none transition-colors duration-200"
+              style={{ borderColor: PAPER_THEMES[paperTheme].variables.borderColor }}
+            >
+              <div
+                className="flex items-center gap-2 text-xs font-serif"
+                style={{ color: PAPER_THEMES[paperTheme].variables.quoteColor }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: PAPER_THEMES[paperTheme].variables.accentColor }}
+                />
+                <span>《{activeNovel.title}》 · 第 {activeChapter.chapter_number} 章原稿</span>
+              </div>
+              <div
+                className="px-2.5 py-1 rounded text-[11px] font-serif font-bold tracking-widest border shadow-xs"
+                style={{
+                  borderColor: PAPER_THEMES[paperTheme].variables.sealBorder,
+                  color: PAPER_THEMES[paperTheme].variables.sealColor,
+                  backgroundColor: PAPER_THEMES[paperTheme].variables.sealBg,
+                }}
+              >
+                {PAPER_THEMES[paperTheme].seal}
+              </div>
+            </div>
+
             {/* Stream preview box if actively generating */}
             {isGenerating && streamText && (
-              <div className="mt-8 p-6 rounded-xl border border-amber-800/30 bg-[#f9f4ea] shadow-md">
-                <div className="flex items-center gap-2.5 text-xs text-amber-800 font-semibold mb-3">
-                  <Sparkles className="w-4 h-4 animate-spin text-amber-700" />
+              <div
+                className="mt-8 p-6 rounded-xl border shadow-md transition-colors duration-200"
+                style={{
+                  borderColor: PAPER_THEMES[paperTheme].variables.accentColor,
+                  backgroundColor: PAPER_THEMES[paperTheme].variables.quoteBg,
+                }}
+              >
+                <div
+                  className="flex items-center gap-2.5 text-xs font-semibold mb-3"
+                  style={{ color: PAPER_THEMES[paperTheme].variables.accentColor }}
+                >
+                  <Sparkles className="w-4 h-4 animate-spin" />
                   <span>正文作家 Agent 正在实时流式创作中...</span>
                 </div>
                 <p
-                  className="text-[#2b2621] whitespace-pre-wrap font-serif leading-relaxed"
+                  className="whitespace-pre-wrap font-serif leading-relaxed"
                   style={{
                     fontSize: `${fontSize}px`,
                     lineHeight: fontSize >= 24 ? '2.25' : fontSize <= 14 ? '1.9' : '2.15',
+                    color: PAPER_THEMES[paperTheme].variables.textColor,
                   }}
                 >
                   {streamText}
@@ -672,28 +926,53 @@ export const NovelEditor: React.FC = () => {
 
         {/* Scratchpad Slide-in Board */}
         {showScratchpad && (
-          <aside className="w-72 md:w-80 border-l border-[#ded5c4] bg-[#f7f2e7] flex flex-col shrink-0 animate-in slide-in-from-right duration-200">
-            <div className="p-3.5 border-b border-[#ded5c4] flex items-center justify-between bg-[#efe9dc]">
-              <div className="flex items-center gap-2 text-xs font-serif font-bold text-[#854d0e]">
-                <Lightbulb className="w-4 h-4 text-amber-600" />
+          <aside
+            className="w-72 md:w-80 border-l flex flex-col shrink-0 animate-in slide-in-from-right duration-200 shadow-md"
+            style={{
+              backgroundColor: paperTheme === 'midnight' ? '#18181f' : paperTheme === 'kraft' ? '#ecdcb9' : paperTheme === 'bamboo' ? '#f0f5ee' : '#f7f2e7',
+              borderColor: PAPER_THEMES[paperTheme].variables.borderColor,
+            }}
+          >
+            <div
+              className="p-3.5 border-b flex items-center justify-between"
+              style={{
+                backgroundColor: paperTheme === 'midnight' ? '#141419' : paperTheme === 'kraft' ? '#dfcaa2' : paperTheme === 'bamboo' ? '#e4ece2' : '#efe9dc',
+                borderColor: PAPER_THEMES[paperTheme].variables.borderColor,
+              }}
+            >
+              <div
+                className="flex items-center gap-2 text-xs font-serif font-bold"
+                style={{ color: PAPER_THEMES[paperTheme].variables.accentColor }}
+              >
+                <Lightbulb className="w-4 h-4" />
                 <span>灵感与伏笔备忘便签</span>
               </div>
               <button
+                type="button"
                 onClick={() => setShowScratchpad(false)}
-                className="p-1 rounded text-[#786f65] hover:text-[#2b2621]"
+                className="p-1 rounded opacity-70 hover:opacity-100 transition cursor-pointer"
+                style={{ color: PAPER_THEMES[paperTheme].variables.textColor }}
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
             <div className="p-3 flex-1 flex flex-col">
-              <span className="text-[11px] text-[#786f65] font-serif mb-2">
+              <span
+                className="text-[11px] font-serif mb-2"
+                style={{ color: PAPER_THEMES[paperTheme].variables.quoteColor }}
+              >
                 随手记下剧情火花、伏笔备忘或读者心绪，自动持久化存储：
               </span>
               <textarea
                 value={scratchNotes}
                 onChange={(e) => handleNotesChange(e.target.value)}
                 placeholder="例如：\n- 下一章让反派在重力井提前埋伏\n- 李观棋的曲率钥匙还有第二重隐藏密码\n- 突出深空环境的压迫感与金属冷感..."
-                className="flex-1 w-full bg-[#fdfbf7] border border-[#ded5c4] rounded-xl p-3 text-xs text-[#2b2621] placeholder-[#a89f91] focus:outline-hidden focus:border-[#854d0e] resize-none font-serif leading-relaxed shadow-2xs"
+                className="flex-1 w-full border rounded-xl p-3 text-xs focus:outline-hidden resize-none font-serif leading-relaxed shadow-2xs"
+                style={{
+                  backgroundColor: paperTheme === 'midnight' ? '#202028' : paperTheme === 'kraft' ? '#f5ebd7' : paperTheme === 'bamboo' ? '#fbfdf9' : '#fdfbf7',
+                  borderColor: PAPER_THEMES[paperTheme].variables.borderColor,
+                  color: PAPER_THEMES[paperTheme].variables.textColor,
+                }}
               />
             </div>
           </aside>

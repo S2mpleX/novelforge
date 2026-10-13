@@ -28,6 +28,26 @@ import type {
   SerializationJob,
   StartSerializationJobInput,
   DatabaseHealthReport,
+  Series,
+  Part,
+  HierarchyConfig,
+  PlotBeat,
+  CreatePlotBeatInput,
+  CharacterArc,
+  CreateCharacterArcInput,
+  ParallelThread,
+  CreateParallelThreadInput,
+  PlotAssociation,
+  CreatePlotAssociationInput,
+  PlotAssociationView,
+  MoveNodeInput,
+  SplitChapterInput,
+  MergeChaptersInput,
+  SplitSceneInput,
+  MergeScenesInput,
+  RenumberHierarchyInput,
+  NovelContentTree,
+  HierarchicalCreationContext,
 } from '@/types';
 
 /**
@@ -325,6 +345,8 @@ export const api = {
   // Phase 5: Serialization Engine
   createSerializationJob: (input: StartSerializationJobInput) =>
     safeInvoke<SerializationJob>('create_serialization_job', { input }),
+  startSerializationJob: (input: StartSerializationJobInput) =>
+    safeInvoke<SerializationJob>('create_serialization_job', { input }),
   getSerializationJob: (jobId: string) =>
     safeInvoke<SerializationJob>('get_serialization_job', { jobId }),
   listSerializationJobs: (novelId: string) =>
@@ -347,4 +369,91 @@ export const api = {
     safeInvoke<string>('backup_database'),
   optimizeDatabase: () =>
     safeInvoke<DatabaseHealthReport>('optimize_database'),
+
+  // --- V2.0: Series & Parts ---
+  createSeries: (input: { title: string; description?: string; genre_profile?: string; world_definition?: string }) =>
+    safeInvoke<Series>('create_series', { input }),
+  listSeries: () =>
+    safeInvoke<Series[]>('list_series'),
+  getSeries: (id: string) =>
+    safeInvoke<Series>('get_series', { id }),
+  deleteSeries: (id: string) =>
+    safeInvoke<void>('delete_series', { id }),
+
+  createPart: (input: { novel_id: string; title: string; part_number?: number; summary?: string; order_index?: number }) =>
+    safeInvoke<Part>('create_part', { input }),
+  listParts: (novelId: string) =>
+    safeInvoke<Part[]>('list_parts', { novelId }),
+  getPart: (id: string) =>
+    safeInvoke<Part>('get_part', { id }),
+  deletePart: (id: string) =>
+    safeInvoke<void>('delete_part', { id }),
+
+  // --- V2.0: Hierarchy Config ---
+  getNovelHierarchyConfig: (novelId: string) =>
+    safeInvoke<HierarchyConfig>('get_novel_hierarchy_config', { novelId }),
+  updateNovelHierarchyConfig: (novelId: string, config: HierarchyConfig) =>
+    safeInvoke<HierarchyConfig>('update_novel_hierarchy_config', { novelId, config }),
+
+  // --- V2.0: Plot Beats ---
+  createPlotBeat: (input: CreatePlotBeatInput) =>
+    safeInvoke<PlotBeat>('create_plot_beat', { input }),
+  listPlotBeats: (sceneId: string) =>
+    safeInvoke<PlotBeat[]>('list_plot_beats', { sceneId }),
+  updatePlotBeatStatus: (beatId: string, status: string) =>
+    safeInvoke<void>('update_plot_beat_status', { beatId, status }),
+  deletePlotBeat: (id: string) =>
+    safeInvoke<void>('delete_plot_beat', { id }),
+
+  // --- V2.0: Character Arcs ---
+  createCharacterArc: (input: CreateCharacterArcInput) =>
+    safeInvoke<CharacterArc>('create_character_arc', { input }),
+  listCharacterArcs: (novelId: string) =>
+    safeInvoke<CharacterArc[]>('list_character_arcs', { novelId }),
+  updateCharacterArcStage: (arcId: string, currentStage: string, status?: string) =>
+    safeInvoke<void>('update_character_arc_stage', { arcId, currentStage, status }),
+  deleteCharacterArc: (id: string) =>
+    safeInvoke<void>('delete_character_arc', { id }),
+
+  // --- V2.0: Parallel Threads ---
+  createParallelThread: (input: CreateParallelThreadInput) =>
+    safeInvoke<ParallelThread>('create_parallel_thread', { input }),
+  listParallelThreads: (novelId: string) =>
+    safeInvoke<ParallelThread[]>('list_parallel_threads', { novelId }),
+  updateParallelThreadStatus: (threadId: string, status: string) =>
+    safeInvoke<void>('update_parallel_thread_status', { threadId, status }),
+  deleteParallelThread: (id: string) =>
+    safeInvoke<void>('delete_parallel_thread', { id }),
+
+  // --- V2.0: Independent Plot Associations (M:N) ---
+  createPlotAssociation: (input: CreatePlotAssociationInput) =>
+    safeInvoke<PlotAssociation>('create_plot_association', { input }),
+  deletePlotAssociation: (id: string) =>
+    safeInvoke<void>('delete_plot_association', { id }),
+  listPlotAssociationsForTarget: (targetType: string, targetId: string) =>
+    safeInvoke<PlotAssociationView[]>('list_plot_associations_for_target', { targetType, targetId }),
+  listPlotAssociationsForEntity: (entityType: string, entityId: string) =>
+    safeInvoke<PlotAssociationView[]>('list_plot_associations_for_entity', { entityType, entityId }),
+  listNovelPlotMatrix: (novelId: string) =>
+    safeInvoke<PlotAssociationView[]>('list_novel_plot_matrix', { novelId }),
+
+  // --- V2.0: Hierarchy Lifecycle Operations ---
+  moveNode: (input: MoveNodeInput) =>
+    safeInvoke<void>('move_node', { input }),
+  splitChapter: (input: SplitChapterInput) =>
+    safeInvoke<[Chapter, Chapter]>('split_chapter', { input }),
+  mergeChapters: (input: MergeChaptersInput) =>
+    safeInvoke<Chapter>('merge_chapters', { input }),
+  splitScene: (input: SplitSceneInput) =>
+    safeInvoke<[Scene, Scene]>('split_scene', { input }),
+  mergeScenes: (input: MergeScenesInput) =>
+    safeInvoke<Scene>('merge_scenes', { input }),
+  renumberHierarchy: (input: RenumberHierarchyInput) =>
+    safeInvoke<void>('renumber_hierarchy', { input }),
+
+  // --- V2.0: Content Tree & Hierarchical Creation Context ---
+  getNovelContentTree: (novelId: string) =>
+    safeInvoke<NovelContentTree>('get_novel_content_tree', { novelId }),
+  assembleHierarchicalCreationContext: (novelId: string, chapterId: string, sceneId?: string) =>
+    safeInvoke<HierarchicalCreationContext>('assemble_hierarchical_creation_context', { novelId, chapterId, sceneId }),
 };

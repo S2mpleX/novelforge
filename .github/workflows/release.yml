@@ -1,0 +1,91 @@
+name: Release NovelForge AI
+
+on:
+  push:
+    tags:
+      - 'v*' # 仅在推送正式版本标签 (如 v2.2.0) 时触发发布流水线
+
+permissions:
+  contents: write # 最小化权限：仅允许向 GitHub Releases 写入产物与元数据
+
+jobs:
+  build-and-release:
+    name: Build, Sign & Release Windows x64 NSIS
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: 1. 检出代码仓库
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 2. 安装 Node.js 运行环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 3. 安装 pnpm 包管理器
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: 4. 安装 Rust 稳定版工具链
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: 5. 缓存 Cargo 与 Node 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+            node_modules
+          key: ${{ runner.os }}-build-cache-${{ hashFiles('**/Cargo.lock', '**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-cache-
+
+      - name: 6. 安装前端依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 7. 执行 TypeScript 类型检查与前端编译
+        run: pnpm run build
+
+      - name: 8. 执行可停靠工作台与核心逻辑自动化测试
+        run: pnpm run test:docking
+
+      - name: 9. 验证 SQLite 数据库架构、迁移与 40 项核心业务测试
+        run: cargo run --manifest-path src-tauri/Cargo.toml --bin db_test
+
+      - name: 10. 提取当前版本更新日志 (Changelog)
+        id: extract_notes
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          $changelogFile = "CHANGELOG.md"
+          if (Test-Path $changelogFile) {
+            $content = Get-Content $changelogFile -Raw
+            Write-Output "Found CHANGELOG.md"
+          } else {
+            Write-Output "CHANGELOG.md not found, using default release body"
+          }
+
+      - name: 11. 构建 Windows 安装包、生成更新签名及 latest.json 清单
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'NovelForge AI ${{ github.ref_name }}'
+          releaseBody: 'NovelForge AI 生产环境发布。请核验更新签名与安装包哈希值。完整变更说明请浏览随附更新日志。'
+          releaseDraft: true # 先行创建草稿 Release，经人工确认与安装包验收后再正式公布
+          prerelease: false
+          includeUpdaterJson: true

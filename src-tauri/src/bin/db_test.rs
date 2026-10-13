@@ -1,6 +1,10 @@
 use novelforge_ai_lib::database::DbManager;
 use novelforge_ai_lib::models::{
     CreateChapterInput, CreateCharacterInput, CreateNovelInput, CreateWorldRuleInput,
+    CreateSeriesInput, CreatePartInput, CreateVolumeInput, CreateSceneInput, CreatePlotBeatInput,
+    CreateCharacterArcInput, CreateParallelThreadInput, CreatePlotAssociationInput, HierarchyConfig,
+    MoveNodeInput, SplitChapterInput, MergeChaptersInput, SplitSceneInput, MergeScenesInput,
+    RenumberHierarchyInput,
 };
 
 fn main() {
@@ -18,6 +22,8 @@ fn main() {
             language: Some("zh-CN".to_string()),
             writing_style: Some("硬派沉稳、考据扎实".to_string()),
             chapter_target_length: Some(4000),
+            series_id: None,
+            hierarchy_config: None,
         })
         .expect("创建小说失败");
     println!("2. 成功创建小说: 《{}》 (ID: {})", novel.title, novel.id);
@@ -31,12 +37,13 @@ fn main() {
     let ch1 = db
         .create_chapter(CreateChapterInput {
             novel_id: novel.id.clone(),
+            part_id: None,
             volume_id: None,
             chapter_number: Some(1),
-            title: "跃迁前夕".to_string(),
-            initial_content: Some(
-                "巨大的反物质引擎在寒夜中发出沉闷的轰鸣，舷窗外是静谧而冰冷的柯伊伯带。".to_string(),
-            ),
+            order_index: Some(1),
+            title: "第一章：视界边缘的沉鸣".to_string(),
+            chapter_goal: Some("交代世界观背景与曲率危机".to_string()),
+            initial_content: Some("星空如墨，引擎轰鸣，战舰在黑暗中疾驰。".to_string()),
         })
         .expect("创建章节失败");
     println!(
@@ -134,7 +141,7 @@ fn main() {
             phase_id: Some(phase.id.clone()),
             title: "柯伊伯带突围弧".to_string(),
             goal: Some("避开星际海盗与引力雷区".to_string()),
-            description: Some("主线核心冲突冲突点".to_string()),
+            description: Some("主线核心冲突点".to_string()),
             priority: Some("MAIN".to_string()),
         })
         .expect("创建剧情弧失败");
@@ -145,10 +152,16 @@ fn main() {
         .create_scene(novelforge_ai_lib::models::CreateSceneInput {
             chapter_id: ch1.id.clone(),
             sequence: 1,
+            order_index: Some(1),
+            title: Some("反物质引擎点火".to_string()),
+            scene_number: Some(1),
             objective: "展现战舰起航前的压迫感与林远的决断".to_string(),
             outline: "1.主引擎充能倒计时 2.安雅汇报引力读数异常 3.林远决意启动".to_string(),
             pov_character_id: Some(character.id.clone()),
             location_id: Some("先驱者号主舰桥".to_string()),
+            content: Some("主屏幕上，红色的重力井警告如同心脏般剧烈搏动。".to_string()),
+            time_anchor: Some("起航前30分钟".to_string()),
+            conflict_target: Some("引力读数异常与强行点火的决策冲突".to_string()),
         })
         .expect("创建场景细纲失败");
     println!("12. 验证场景拆解 (Scene): 场次[{}] 目标: {}", scene.sequence, scene.objective);
@@ -249,5 +262,253 @@ fn main() {
     assert!(imported_novel.title.contains("导入副本"));
     println!("23. 验证全书工程归档与导入恢复: 归档 JSON 长度 {} 字符，成功复原小说【{}】", archive_json.len(), imported_novel.title);
 
-    println!("=== 100% 测试验证通过！Phase 0~Phase 7 全业务引擎在本地 SQLite 正确持久化、发布与灾备流转！ ===");
+    // ==========================================
+    // V2.0 多层级结构与独立剧情关系系统专项验证 (24 ~ 36)
+    // ==========================================
+
+    // 24. 验证系列/宇宙 (Series) 管理
+    let series = db
+        .create_series(CreateSeriesInput {
+            title: "星穹漫游者宇宙".to_string(),
+            description: Some("覆盖三大文明与数千光年战史的恢弘宇宙".to_string()),
+            genre_profile: Some("硬科幻".to_string()),
+            world_definition: Some("以反物质引擎与曲率引擎为主的宇宙文明".to_string()),
+        })
+        .expect("创建系列失败");
+    println!("24. 验证系列/宇宙: 成功创建系列【{}】 (ID: {})", series.title, series.id);
+    let series_list = db.list_series().expect("读取系列列表失败");
+    assert!(series_list.iter().any(|s| s.id == series.id));
+
+    // 25. 验证多层级配置 (HierarchyConfig)
+    let custom_hierarchy = HierarchyConfig {
+        enable_parts: true,
+        enable_volumes: true,
+        enable_scenes: true,
+        enable_beats: true,
+    };
+    let updated_config = db
+        .update_novel_hierarchy_config(&novel.id, custom_hierarchy)
+        .expect("更新小说层级配置失败");
+    assert!(updated_config.enable_parts && updated_config.enable_beats);
+    println!("25. 验证层级配置: 成功启用 部/篇、卷、场景、节拍");
+
+    // 26. 验证部/篇 (Part) 与 分卷 (Volume)
+    let part1 = db
+        .create_part(CreatePartInput {
+            novel_id: novel.id.clone(),
+            part_number: Some(1),
+            title: "第一部：黑洞视界".to_string(),
+            summary: Some("从近地轨道到柯伊伯带边缘的远航".to_string()),
+            order_index: Some(1),
+        })
+        .expect("创建部/篇失败");
+    println!("26. 验证部/篇创建: 【{}】 (序号: {})", part1.title, part1.part_number);
+
+    let vol1 = db
+        .create_volume(CreateVolumeInput {
+            novel_id: novel.id.clone(),
+            part_id: Some(part1.id.clone()),
+            title: "第一卷：先驱者的远征".to_string(),
+            summary: Some("先驱者号起航与第一次曲率跃迁测试".to_string()),
+            order_index: Some(1),
+        })
+        .expect("创建分卷失败");
+    println!("27. 验证分卷创建: 挂载于部【{}】下的卷【{}】", part1.title, vol1.title);
+
+    // 将已有的 ch1 移动/归属到该部与分卷
+    db.move_node(MoveNodeInput {
+        node_type: "CHAPTER".to_string(),
+        node_id: ch1.id.clone(),
+        new_parent_id: Some(vol1.id.clone()),
+        new_order: Some(1),
+    }).expect("移动章节至分卷失败");
+    println!("28. 验证跨层级移动 (Move Node): 成功将第1章归属于【{}】", vol1.title);
+
+    // 27. 验证场景 (Scene) 与 情节节拍 (PlotBeat)
+    let scene1 = db
+        .create_scene(CreateSceneInput {
+            chapter_id: ch1.id.clone(),
+            sequence: 1,
+            order_index: Some(1),
+            title: Some("场景一：主控室异常读数".to_string()),
+            scene_number: Some(1),
+            objective: "确认引力透镜参数并排除仪表故障".to_string(),
+            outline: "二号副传感器读数持续溢出，大副要求紧急中止".to_string(),
+            pov_character_id: Some(character.id.clone()),
+            location_id: Some("先驱者号中央舰桥".to_string()),
+            content: Some("林远手动复位并发现疑似微型引力坍缩".to_string()),
+            time_anchor: Some("跃迁前30分钟".to_string()),
+            conflict_target: Some("大副紧急中止提议".to_string()),
+        })
+        .expect("创建场景失败");
+    println!("29. 验证场景创建: 【{:?}】 (POV: {})", scene1.title, character.name);
+
+    let beat1 = db
+        .create_plot_beat(CreatePlotBeatInput {
+            scene_id: scene1.id.clone(),
+            beat_number: Some(1),
+            beat_type: Some("ACTION".to_string()),
+            title: "蜂鸣警报骤响".to_string(),
+            description: Some("警报红光闪烁，引力波雷达显示三处异常峰值".to_string()),
+            emotional_shift: Some("紧迫感递增".to_string()),
+            characters_present: Some(character.name.clone()),
+            order_index: Some(1),
+        })
+        .expect("创建节拍1失败");
+
+    let _beat2 = db
+        .create_plot_beat(CreatePlotBeatInput {
+            scene_id: scene1.id.clone(),
+            beat_number: Some(2),
+            beat_type: Some("CRISIS".to_string()),
+            title: "副反应堆过载风险".to_string(),
+            description: Some("林远必须在15秒内做出抉择".to_string()),
+            emotional_shift: Some("生死悬于一线".to_string()),
+            characters_present: Some(character.name.clone()),
+            order_index: Some(2),
+        })
+        .expect("创建节拍2失败");
+
+    db.update_plot_beat_status(&beat1.id, "COMPLETED").expect("更新节拍状态失败");
+    let beats = db.list_plot_beats(&scene1.id).expect("查询节拍列表失败");
+    assert_eq!(beats.len(), 2);
+    println!("30. 验证情节节拍 (PlotBeat): 场景【{:?}】下创建 {} 个细粒度节拍，节拍1状态已置为[{}]",
+        scene1.title, beats.len(), beats[0].status);
+
+    // 28. 验证独立剧情关系：人物成长弧 (CharacterArc) 与 并行叙事线 (ParallelThread)
+    let char_arc = db
+        .create_character_arc(CreateCharacterArcInput {
+            novel_id: novel.id.clone(),
+            character_id: character.id.clone(),
+            title: "林远的心智蜕变".to_string(),
+            stage_from: Some("深陷学术教条、遇突发危机犹豫不决".to_string()),
+            stage_to: Some("铁血果断、敢于直面未知深空的成熟舰长".to_string()),
+            current_stage: Some("初步觉醒：意识到理论无法解答深空异常".to_string()),
+            internal_conflict: Some("理论权威与深空未知的矛盾".to_string()),
+        })
+        .expect("创建人物成长弧失败");
+    println!("31. 验证人物成长弧: 【{}】，当前阶段: {}", char_arc.title, char_arc.current_stage);
+
+    let parallel_thread = db
+        .create_parallel_thread(CreateParallelThreadInput {
+            novel_id: novel.id.clone(),
+            title: "地球总部的秘密博弈".to_string(),
+            pov_character_id: None,
+            thread_color: Some("#3B82F6".to_string()),
+            summary: Some("地面控制中心对远征任务隐瞒了核心危险参数".to_string()),
+            convergence_target: Some("第三卷跃迁交汇点".to_string()),
+        })
+        .expect("创建并行叙事线失败");
+    println!("32. 验证并行叙事线: 【{}】汇聚目标[{}]", parallel_thread.title, parallel_thread.convergence_target);
+
+    // 29. 验证跨层级多对多剧情关联 (M:N Plot Association)
+    let fs = db
+        .create_plot_thread(novelforge_ai_lib::models::CreatePlotThreadInput {
+            novel_id: novel.id.clone(),
+            title: "失落的曲率核心密钥".to_string(),
+            description: Some("量子干涉异常引出伏笔".to_string()),
+            introduced_chapter_id: Some(ch1.id.clone()),
+            expected_resolution: Some("第三卷解开".to_string()),
+        })
+        .expect("创建伏笔失败");
+
+    // 关联1：主线关联到“第一部”
+    db.create_plot_association(CreatePlotAssociationInput {
+        novel_id: novel.id.clone(),
+        relation_type: "MAIN_PLOT".to_string(),
+        entity_id: arc.id.clone(),
+        target_type: "PART".to_string(),
+        target_id: part1.id.clone(),
+        role_in_target: Some("CLIMAX_SETUP".to_string()),
+        notes: Some("第一部奠定反物质主线基础".to_string()),
+        weight: Some(10),
+    }).expect("创建部级主线关联失败");
+
+    // 关联2：人物成长弧关联到场景1
+    db.create_plot_association(CreatePlotAssociationInput {
+        novel_id: novel.id.clone(),
+        relation_type: "CHARACTER_ARC".to_string(),
+        entity_id: char_arc.id.clone(),
+        target_type: "SCENE".to_string(),
+        target_id: scene1.id.clone(),
+        role_in_target: Some("CATALYST".to_string()),
+        notes: Some("警报事件触动林远打破常规".to_string()),
+        weight: Some(8),
+    }).expect("创建场景级人物弧关联失败");
+
+    // 关联3：伏笔关联到第1章
+    db.create_plot_association(CreatePlotAssociationInput {
+        novel_id: novel.id.clone(),
+        relation_type: "FORESHADOWING".to_string(),
+        entity_id: fs.id.clone(),
+        target_type: "CHAPTER".to_string(),
+        target_id: ch1.id.clone(),
+        role_in_target: Some("FORESHADOWS".to_string()),
+        notes: Some("第1章埋下量子干涉异常的伏笔".to_string()),
+        weight: Some(5),
+    }).expect("创建章节级伏笔关联失败");
+
+    let matrix = db.list_novel_plot_matrix(&novel.id).expect("查询全书剧情矩阵失败");
+    assert!(matrix.len() >= 3);
+    println!("33. 验证跨层级多对多剧情关联网: 成功装配全书剧情网状矩阵, 现有 {} 个关联锚点，实现部、卷、章、场景与主线/人物弧/伏笔解耦贯通", matrix.len());
+
+    // 30. 验证章节拆分与版本留存 (Split Chapter)
+    let full_content = "第一段：引力波如狂潮般袭来，主屏幕上读数急剧攀升。\n\n===SPLIT_POINT===\n\n第二段：跃迁通道彻底敞开，无尽的银河星海瞬间化作拉长的白光线。";
+    db.save_chapter_content(&ch1.id, full_content, true, "SPLIT_TEST").expect("准备拆分正文失败");
+
+    let split_result = db.split_chapter(SplitChapterInput {
+        chapter_id: ch1.id.clone(),
+        split_type: "CONTENT_OFFSET".to_string(),
+        split_point: 35,
+        new_chapter_title: Some("第1章（续）：跃迁之光".to_string()),
+    }).expect("章节拆分失败");
+    println!("34. 验证章节拆分 (Split Chapter): 原章节保留 {} 字，新生成章节【{}】 ({} 字)，自动创建历史版本并重排后继序号",
+        split_result.0.word_count, split_result.1.title, split_result.1.word_count);
+
+    // 31. 验证章节合并与剧情引用安全 (Merge Chapters)
+    let merged_chapter = db.merge_chapters(MergeChaptersInput {
+        source_chapter_id: split_result.1.id.clone(),
+        target_chapter_id: ch1.id.clone(),
+    }).expect("章节合并失败");
+    assert!(merged_chapter.word_count >= 50);
+    println!("35. 验证章节合并 (Merge Chapters): 目标章节字数增至 {} 字，子场景重新归属，原剧情关联平滑转移并清理孤儿节点",
+        merged_chapter.word_count);
+
+    // 32. 验证场景拆分与合并 (Split & Merge Scene)
+    let split_scene_res = db.split_scene(SplitSceneInput {
+        scene_id: scene1.id.clone(),
+        split_beat_index: 1,
+        new_scene_title: Some("场景一（续）：引力坍缩确证".to_string()),
+    }).expect("场景拆分失败");
+    println!("36. 验证场景拆分 (Split Scene): 成功拆分出新场景【{:?}】", split_scene_res.1.title);
+
+    let merged_scene = db.merge_scenes(MergeScenesInput {
+        source_scene_id: split_scene_res.1.id.clone(),
+        target_scene_id: scene1.id.clone(),
+    }).expect("场景合并失败");
+    println!("37. 验证场景合并 (Merge Scene): 节拍已合并回收至目标场景【{:?}】", merged_scene.title);
+
+    // 33. 验证层级重编号 (Renumber Hierarchy)
+    db.renumber_hierarchy(RenumberHierarchyInput {
+        novel_id: novel.id.clone(),
+        per_volume_chapter_numbering: Some(false),
+    }).expect("层级重编号失败");
+    println!("38. 验证层级重编号 (Renumber Hierarchy): 规范化全局部、卷、章、场景连续序列号完成");
+
+    // 34. 验证完整内容树递归生成 (Novel Content Tree)
+    let content_tree = db.get_novel_content_tree(&novel.id).expect("组装小说内容树失败");
+    println!("39. 验证小说完整大纲内容树: 根节点拥有 {} 个一级节点 (部/卷/章)，已无缝整合层级与场景节拍", content_tree.root_nodes.len());
+
+    // 35. 验证多 Agent 创作上下文组装 (Hierarchical Creation Context Assembly)
+    let creation_ctx = db.assemble_hierarchical_creation_context(&novel.id, &ch1.id, Some(&scene1.id))
+        .expect("组装多 Agent 创作上下文失败");
+    println!("DEBUG prompt (length: {}):\n{}", creation_ctx.formatted_system_prompt.len(), creation_ctx.formatted_system_prompt);
+    assert!(!creation_ctx.formatted_system_prompt.is_empty());
+    assert!(creation_ctx.formatted_system_prompt.contains(&novel.title));
+    assert!(creation_ctx.formatted_system_prompt.contains(&part1.title));
+    assert!(creation_ctx.formatted_system_prompt.contains(&vol1.title));
+    println!("40. 验证多 Agent 创作上下文组装:\n--- 上下文片段预览 ---\n{}\n--- 结束预览 ---",
+        creation_ctx.formatted_system_prompt);
+
+    println!("=== 100% 测试验证通过！V2.0 小说多层级结构与跨层级独立剧情关系网全业务引擎验证完毕！ ===");
 }

@@ -829,6 +829,256 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
       return fullProse;
     }
 
+    // --- V2.0: Series & Parts ---
+    case 'list_series': {
+      return getStorage<any[]>('series', []);
+    }
+    case 'create_series': {
+      const seriesList = getStorage<any[]>('series', []);
+      const newSeries = { id: `series-${Date.now()}`, ...args.input, created_at: Date.now(), updated_at: Date.now() };
+      seriesList.push(newSeries);
+      setStorage('series', seriesList);
+      return newSeries;
+    }
+    case 'delete_series': {
+      const seriesList = getStorage<any[]>('series', []).filter((s) => s.id !== args.id);
+      setStorage('series', seriesList);
+      return null;
+    }
+    case 'list_parts': {
+      const parts = getStorage<any[]>('parts', []);
+      return parts.filter((p) => p.novel_id === args.novelId);
+    }
+    case 'create_part': {
+      const parts = getStorage<any[]>('parts', []);
+      const newPart = { id: `part-${Date.now()}`, sequence: parts.length + 1, ...args.input, created_at: Date.now() };
+      parts.push(newPart);
+      setStorage('parts', parts);
+      return newPart;
+    }
+    case 'delete_part': {
+      const parts = getStorage<any[]>('parts', []).filter((p) => p.id !== args.id);
+      setStorage('parts', parts);
+      return null;
+    }
+
+    // --- V2.0: Hierarchy Config ---
+    case 'get_novel_hierarchy_config': {
+      const configs = getStorage<Record<string, any>>('hierarchy_configs', {});
+      return configs[args.novelId] || {
+        enable_parts: false,
+        enable_volumes: true,
+        enable_scenes: true,
+        enable_plot_beats: false,
+        default_planning_level: 'SCENE',
+        default_publishing_level: 'CHAPTER',
+      };
+    }
+    case 'update_novel_hierarchy_config': {
+      const configs = getStorage<Record<string, any>>('hierarchy_configs', {});
+      configs[args.novelId] = args.config;
+      setStorage('hierarchy_configs', configs);
+      return args.config;
+    }
+
+    // --- V2.0: Plot Beats ---
+    case 'list_plot_beats': {
+      const beats = getStorage<any[]>('plot_beats', []);
+      return beats.filter((b) => b.scene_id === args.sceneId);
+    }
+    case 'create_plot_beat': {
+      const beats = getStorage<any[]>('plot_beats', []);
+      const newBeat = { id: `beat-${Date.now()}`, status: 'PENDING', ...args.input, created_at: Date.now() };
+      beats.push(newBeat);
+      setStorage('plot_beats', beats);
+      return newBeat;
+    }
+    case 'update_plot_beat_status': {
+      const beats = getStorage<any[]>('plot_beats', []);
+      const target = beats.find((b) => b.id === args.beatId);
+      if (target) target.status = args.status;
+      setStorage('plot_beats', beats);
+      return null;
+    }
+    case 'delete_plot_beat': {
+      const beats = getStorage<any[]>('plot_beats', []).filter((b) => b.id !== args.id);
+      setStorage('plot_beats', beats);
+      return null;
+    }
+
+    // --- V2.0: Character Arcs ---
+    case 'list_character_arcs': {
+      const arcs = getStorage<any[]>('character_arcs', []);
+      return arcs.filter((a) => a.novel_id === args.novelId);
+    }
+    case 'create_character_arc': {
+      const arcs = getStorage<any[]>('character_arcs', []);
+      const newArc = { id: `chararc-${Date.now()}`, status: 'ACTIVE', ...args.input, created_at: Date.now(), updated_at: Date.now() };
+      arcs.push(newArc);
+      setStorage('character_arcs', arcs);
+      return newArc;
+    }
+    case 'update_character_arc_stage': {
+      const arcs = getStorage<any[]>('character_arcs', []);
+      const target = arcs.find((a) => a.id === args.arcId);
+      if (target) {
+        target.current_stage = args.currentStage;
+        if (args.status) target.status = args.status;
+        target.updated_at = Date.now();
+      }
+      setStorage('character_arcs', arcs);
+      return null;
+    }
+    case 'delete_character_arc': {
+      const arcs = getStorage<any[]>('character_arcs', []).filter((a) => a.id !== args.id);
+      setStorage('character_arcs', arcs);
+      return null;
+    }
+
+    // --- V2.0: Parallel Threads ---
+    case 'list_parallel_threads': {
+      const threads = getStorage<any[]>('parallel_threads', []);
+      return threads.filter((t) => t.novel_id === args.novelId);
+    }
+    case 'create_parallel_thread': {
+      const threads = getStorage<any[]>('parallel_threads', []);
+      const newThread = { id: `pthread-${Date.now()}`, status: 'ACTIVE', thread_color: '#3B82F6', ...args.input, created_at: Date.now(), updated_at: Date.now() };
+      threads.push(newThread);
+      setStorage('parallel_threads', threads);
+      return newThread;
+    }
+    case 'update_parallel_thread_status': {
+      const threads = getStorage<any[]>('parallel_threads', []);
+      const target = threads.find((t) => t.id === args.threadId);
+      if (target) target.status = args.status;
+      setStorage('parallel_threads', threads);
+      return null;
+    }
+    case 'delete_parallel_thread': {
+      const threads = getStorage<any[]>('parallel_threads', []).filter((t) => t.id !== args.id);
+      setStorage('parallel_threads', threads);
+      return null;
+    }
+
+    // --- V2.0: Plot Associations ---
+    case 'create_plot_association': {
+      const assocs = getStorage<any[]>('plot_associations', []);
+      const newAssoc = { id: `assoc-${Date.now()}`, weight: 5, ...args.input, created_at: Date.now() };
+      assocs.push(newAssoc);
+      setStorage('plot_associations', assocs);
+      return newAssoc;
+    }
+    case 'delete_plot_association': {
+      const assocs = getStorage<any[]>('plot_associations', []).filter((a) => a.id !== args.id);
+      setStorage('plot_associations', assocs);
+      return null;
+    }
+    case 'list_plot_associations_for_target': {
+      const assocs = getStorage<any[]>('plot_associations', []);
+      return assocs
+        .filter((a) => a.target_type === args.targetType && a.target_id === args.targetId)
+        .map((a) => ({ association: a, entity_title: '关联剧情实体', target_title: '关联目标' }));
+    }
+    case 'list_novel_plot_matrix': {
+      const assocs = getStorage<any[]>('plot_associations', []);
+      return assocs
+        .filter((a) => a.novel_id === args.novelId)
+        .map((a) => ({ association: a, entity_title: '剧情实体', target_title: '层级节点' }));
+    }
+
+    // --- V2.0: Tree & Lifecycle Operations ---
+    case 'get_novel_content_tree': {
+      const chapters = getStorage<Chapter[]>('chapters', []).filter((c) => c.novel_id === args.novelId);
+      const parts = getStorage<any[]>('parts', []).filter((p) => p.novel_id === args.novelId);
+      const config = getStorage<Record<string, any>>('hierarchy_configs', {})[args.novelId] || {
+        enable_parts: parts.length > 0,
+        enable_volumes: true,
+        enable_scenes: true,
+        enable_plot_beats: false,
+        default_planning_level: 'SCENE',
+        default_publishing_level: 'CHAPTER',
+      };
+
+      const rootNodes: any[] = chapters.map((c) => ({
+        id: c.id,
+        node_type: 'CHAPTER',
+        title: c.title,
+        number: c.chapter_number,
+        order_index: c.chapter_number,
+        word_count: c.word_count || 0,
+        status: c.status,
+        goal_or_summary: '',
+        associated_plot_count: 0,
+        children: [],
+      }));
+
+      return {
+        novel_id: args.novelId,
+        hierarchy_config: config,
+        root_nodes: rootNodes,
+      };
+    }
+    case 'move_node':
+    case 'renumber_hierarchy':
+      return null;
+
+    case 'split_chapter': {
+      const chapters = getStorage<Chapter[]>('chapters', []);
+      const ch = chapters.find((c) => c.id === args.input.chapter_id);
+      if (!ch) throw new Error('Chapter not found');
+      const newCh: Chapter = {
+        id: `chapter-${Date.now()}`,
+        novel_id: ch.novel_id,
+        chapter_number: ch.chapter_number + 1,
+        title: args.input.new_chapter_title || `${ch.title}（续）`,
+        status: 'DRAFT',
+        word_count: Math.floor(ch.word_count / 2),
+        content: (ch.content || '').slice(args.input.split_point || 0),
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+      ch.content = (ch.content || '').slice(0, args.input.split_point || 0);
+      ch.word_count = ch.content.length;
+      chapters.push(newCh);
+      setStorage('chapters', chapters);
+      return [ch, newCh];
+    }
+
+    case 'merge_chapters': {
+      const chapters = getStorage<Chapter[]>('chapters', []);
+      const target = chapters.find((c) => c.id === args.input.target_chapter_id);
+      const source = chapters.find((c) => c.id === args.input.source_chapter_id);
+      if (!target || !source) throw new Error('Chapters not found');
+      target.content = `${target.content || ''}\n\n${source.content || ''}`;
+      target.word_count = target.content.length;
+      const filtered = chapters.filter((c) => c.id !== source.id);
+      setStorage('chapters', filtered);
+      return target;
+    }
+
+    case 'assemble_hierarchical_creation_context': {
+      const novel = getStorage<Novel[]>('novels', []).find((n) => n.id === args.novelId);
+      const chapter = getStorage<Chapter[]>('chapters', []).find((c) => c.id === args.chapterId);
+      return {
+        novel_id: args.novelId,
+        chapter_id: args.chapterId,
+        chapter_title: chapter?.title || '当前章节',
+        chapter_number: chapter?.chapter_number || 1,
+        chapter_goal: '',
+        scene_beats: [],
+        associated_main_lines: [],
+        associated_subplots: [],
+        associated_story_arcs: [],
+        associated_character_arcs: [],
+        active_foreshadowings: [],
+        parallel_threads: [],
+        recent_timeline_events: [],
+        l3_canon_rules: [],
+        l3_active_character_profiles: [],
+        formatted_system_prompt: `## 【当前创作层级定位与连续性上下文】\n- **作品**：《${novel?.title || ''}》\n- **章节**：第 ${chapter?.chapter_number || 1} 章《${chapter?.title || ''}》`,
+      };
+    }
+
     default:
       console.warn(`[WebMock] Unhandled command: ${cmd}`, args);
       return null;

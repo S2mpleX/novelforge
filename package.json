@@ -1,18 +1,23 @@
 {
   "name": "novelforge-ai",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "test:db": "cargo run --manifest-path src-tauri/Cargo.toml --bin db_test"
+    "tauri": "node scripts/tauri-runner.js",
+    "test:docking": "tsx tests/test-docking-workspace.ts",
+    "test:updater": "tsx tests/test-updater-system.ts",
+    "check:version": "tsx scripts/check-version-consistency.ts",
+    "test:db": "node scripts/tauri-runner.js -- cargo run --manifest-path src-tauri/Cargo.toml --bin db_test"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2",
+    "@tauri-apps/plugin-updater": "^2",
     "@tiptap/react": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
     "@xyflow/react": "^12.12.0",
@@ -33,6 +38,7 @@
     "autoprefixer": "^10.6.1",
     "postcss": "^8.5.30",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "vite": "^8.0.16"
   }

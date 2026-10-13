@@ -14,6 +14,11 @@ use crate::models::{
     CreateStoryEventInput, CreateStoryPhaseInput, CreateWorldRuleInput, MemoryContextPack, Novel,
     PlotThread, ReviewFinding, ReviewReport, SaveProviderInput, Scene, SerializationJob, StoryArc,
     StoryEvent, StoryPhase, Volume, WorldRule, DatabaseHealthReport, NovelArchive,
+    Series, CreateSeriesInput, Part, CreatePartInput, CreateVolumeInput, HierarchyConfig,
+    PlotBeat, CreatePlotBeatInput, CharacterArc, CreateCharacterArcInput,
+    ParallelThread, CreateParallelThreadInput, PlotAssociation, CreatePlotAssociationInput, PlotAssociationView,
+    MoveNodeInput, SplitChapterInput, SplitSceneInput, MergeChaptersInput, MergeScenesInput,
+    RenumberHierarchyInput, ContentTreeNode, NovelContentTree, HierarchicalCreationContext,
 };
 
 #[derive(Clone)]
@@ -44,6 +49,27 @@ impl DbManager {
 
         // Execute FTS5 schema
         let _ = conn.execute_batch(schema::FTS5_SCHEMA);
+
+        // Run idempotent migrations for V2.0 multi-level hierarchy & plot system
+        let migrations = [
+            "ALTER TABLE novels ADD COLUMN series_id TEXT",
+            "ALTER TABLE novels ADD COLUMN series_order INTEGER DEFAULT 1",
+            "ALTER TABLE novels ADD COLUMN hierarchy_config TEXT DEFAULT '{\"enable_parts\":false,\"enable_volumes\":true,\"enable_scenes\":true,\"enable_beats\":false}'",
+            "ALTER TABLE volumes ADD COLUMN part_id TEXT",
+            "ALTER TABLE chapters ADD COLUMN part_id TEXT",
+            "ALTER TABLE chapters ADD COLUMN order_index INTEGER DEFAULT 1",
+            "ALTER TABLE chapters ADD COLUMN chapter_goal TEXT DEFAULT ''",
+            "ALTER TABLE scenes ADD COLUMN title TEXT DEFAULT ''",
+            "ALTER TABLE scenes ADD COLUMN scene_number INTEGER DEFAULT 1",
+            "ALTER TABLE scenes ADD COLUMN order_index INTEGER DEFAULT 1",
+            "ALTER TABLE scenes ADD COLUMN content TEXT DEFAULT ''",
+            "ALTER TABLE scenes ADD COLUMN word_count INTEGER DEFAULT 0",
+            "ALTER TABLE scenes ADD COLUMN time_anchor TEXT DEFAULT ''",
+            "ALTER TABLE scenes ADD COLUMN conflict_target TEXT DEFAULT ''",
+        ];
+        for sql in migrations {
+            let _ = conn.execute(sql, []);
+        }
 
         // Seed default local CPA provider if no provider exists
         let provider_count: i64 = conn.query_row(
@@ -216,11 +242,29 @@ impl DbManager {
         let language = input.language.unwrap_or_else(|| "zh-CN".to_string());
         let writing_style = input.writing_style.unwrap_or_else(|| "通俗流畅、生动细腻".to_string());
         let chapter_target_length = input.chapter_target_length.unwrap_or(3000);
+        let series_id = input.series_id;
+        let hierarchy_config_str = input
+            .hierarchy_config
+            .map(|c| serde_json::to_string(&c).unwrap_or_default())
+            .unwrap_or_else(|| {
+                "{\"enable_parts\":false,\"enable_volumes\":true,\"enable_scenes\":true,\"enable_beats\":false}".to_string()
+            });
 
         conn.execute(
-            "INSERT INTO novels (id, title, description, genre_profile, language, writing_style, status, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'ACTIVE', ?7, ?8)",
-            params![&id, &title, &description, &genre_profile, &language, &writing_style, now, now],
+            "INSERT INTO novels (id, title, description, genre_profile, language, writing_style, status, series_id, series_order, hierarchy_config, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'ACTIVE', ?7, 1, ?8, ?9, ?10)",
+            params![
+                &id,
+                &title,
+                &description,
+                &genre_profile,
+                &language,
+                &writing_style,
+                &series_id,
+                &hierarchy_config_str,
+                now,
+                now
+            ],
         )?;
 
         conn.execute(
@@ -232,8 +276,8 @@ impl DbManager {
         // Create default Volume 1
         let volume_id = Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO volumes (id, novel_id, title, order_index, summary, status, created_at)
-             VALUES (?1, ?2, '第一卷：初入尘世', 1, '故事开端与核心矛盾引入', 'PLANNING', ?3)",
+            "INSERT INTO volumes (id, novel_id, part_id, title, order_index, summary, status, created_at)
+             VALUES (?1, ?2, NULL, '第一卷：初入尘世', 1, '故事开端与核心矛盾引入', 'PLANNING', ?3)",
             params![&volume_id, &id, now],
         )?;
 
@@ -245,6 +289,9 @@ impl DbManager {
             language,
             writing_style,
             status: "ACTIVE".to_string(),
+            series_id,
+            series_order: Some(1),
+            hierarchy_config: Some(hierarchy_config_str),
             created_at: now,
             updated_at: now,
             chapter_count: Some(0),
@@ -255,7 +302,8 @@ impl DbManager {
     pub fn list_novels(&self) -> Result<Vec<Novel>> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
-            "SELECT n.id, n.title, n.description, n.genre_profile, n.language, n.writing_style, n.status, n.created_at, n.updated_at,
+            "SELECT n.id, n.title, n.description, n.genre_profile, n.language, n.writing_style, n.status,
+                    n.series_id, n.series_order, n.hierarchy_config, n.created_at, n.updated_at,
                     COUNT(c.id) as chapter_count,
                     COALESCE(SUM(c.word_count), 0) as total_word_count
              FROM novels n
@@ -273,10 +321,13 @@ impl DbManager {
                 language: row.get(4)?,
                 writing_style: row.get(5)?,
                 status: row.get(6)?,
-                created_at: row.get(7)?,
-                updated_at: row.get(8)?,
-                chapter_count: Some(row.get(9)?),
-                total_word_count: Some(row.get(10)?),
+                series_id: row.get(7)?,
+                series_order: row.get(8)?,
+                hierarchy_config: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+                chapter_count: Some(row.get(12)?),
+                total_word_count: Some(row.get(13)?),
             })
         })?;
 
@@ -290,7 +341,8 @@ impl DbManager {
     pub fn get_novel(&self, id: &str) -> Result<Novel> {
         let conn = self.conn.lock();
         conn.query_row(
-            "SELECT n.id, n.title, n.description, n.genre_profile, n.language, n.writing_style, n.status, n.created_at, n.updated_at,
+            "SELECT n.id, n.title, n.description, n.genre_profile, n.language, n.writing_style, n.status,
+                    n.series_id, n.series_order, n.hierarchy_config, n.created_at, n.updated_at,
                     COUNT(c.id) as chapter_count,
                     COALESCE(SUM(c.word_count), 0) as total_word_count
              FROM novels n
@@ -307,10 +359,13 @@ impl DbManager {
                     language: row.get(4)?,
                     writing_style: row.get(5)?,
                     status: row.get(6)?,
-                    created_at: row.get(7)?,
-                    updated_at: row.get(8)?,
-                    chapter_count: Some(row.get(9)?),
-                    total_word_count: Some(row.get(10)?),
+                    series_id: row.get(7)?,
+                    series_order: row.get(8)?,
+                    hierarchy_config: row.get(9)?,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    chapter_count: Some(row.get(12)?),
+                    total_word_count: Some(row.get(13)?),
                 })
             },
         )
@@ -327,18 +382,19 @@ impl DbManager {
     pub fn list_volumes(&self, novel_id: &str) -> Result<Vec<Volume>> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, novel_id, title, order_index, summary, status, created_at
+            "SELECT id, novel_id, part_id, title, order_index, summary, status, created_at
              FROM volumes WHERE novel_id = ?1 ORDER BY order_index ASC",
         )?;
         let rows = stmt.query_map(params![novel_id], |row| {
             Ok(Volume {
                 id: row.get(0)?,
                 novel_id: row.get(1)?,
-                title: row.get(2)?,
-                order_index: row.get(3)?,
-                summary: row.get(4)?,
-                status: row.get(5)?,
-                created_at: row.get(6)?,
+                part_id: row.get(2)?,
+                title: row.get(3)?,
+                order_index: row.get(4)?,
+                summary: row.get(5)?,
+                status: row.get(6)?,
+                created_at: row.get(7)?,
             })
         })?;
         let mut vols = Vec::new();
@@ -353,8 +409,9 @@ impl DbManager {
     pub fn list_chapters(&self, novel_id: &str) -> Result<Vec<Chapter>> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
-            "SELECT c.id, c.novel_id, c.volume_id, c.chapter_number, c.title, c.status,
-                    c.active_version_id, c.word_count, v.content, c.created_at, c.updated_at
+            "SELECT c.id, c.novel_id, c.part_id, c.volume_id, c.chapter_number, c.order_index,
+                    c.title, c.chapter_goal, c.status, c.active_version_id, c.word_count,
+                    v.content, c.created_at, c.updated_at
              FROM chapters c
              LEFT JOIN chapter_versions v ON c.active_version_id = v.id
              WHERE c.novel_id = ?1
@@ -365,15 +422,18 @@ impl DbManager {
             Ok(Chapter {
                 id: row.get(0)?,
                 novel_id: row.get(1)?,
-                volume_id: row.get(2)?,
-                chapter_number: row.get(3)?,
-                title: row.get(4)?,
-                status: row.get(5)?,
-                active_version_id: row.get(6)?,
-                word_count: row.get(7)?,
-                content: row.get(8)?,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
+                part_id: row.get(2)?,
+                volume_id: row.get(3)?,
+                chapter_number: row.get(4)?,
+                order_index: row.get(5)?,
+                title: row.get(6)?,
+                chapter_goal: row.get(7)?,
+                status: row.get(8)?,
+                active_version_id: row.get(9)?,
+                word_count: row.get(10)?,
+                content: row.get(11)?,
+                created_at: row.get(12)?,
+                updated_at: row.get(13)?,
             })
         })?;
 
@@ -387,8 +447,9 @@ impl DbManager {
     pub fn get_chapter(&self, id: &str) -> Result<Chapter> {
         let conn = self.conn.lock();
         conn.query_row(
-            "SELECT c.id, c.novel_id, c.volume_id, c.chapter_number, c.title, c.status,
-                    c.active_version_id, c.word_count, v.content, c.created_at, c.updated_at
+            "SELECT c.id, c.novel_id, c.part_id, c.volume_id, c.chapter_number, c.order_index,
+                    c.title, c.chapter_goal, c.status, c.active_version_id, c.word_count,
+                    v.content, c.created_at, c.updated_at
              FROM chapters c
              LEFT JOIN chapter_versions v ON c.active_version_id = v.id
              WHERE c.id = ?1",
@@ -397,15 +458,18 @@ impl DbManager {
                 Ok(Chapter {
                     id: row.get(0)?,
                     novel_id: row.get(1)?,
-                    volume_id: row.get(2)?,
-                    chapter_number: row.get(3)?,
-                    title: row.get(4)?,
-                    status: row.get(5)?,
-                    active_version_id: row.get(6)?,
-                    word_count: row.get(7)?,
-                    content: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
+                    part_id: row.get(2)?,
+                    volume_id: row.get(3)?,
+                    chapter_number: row.get(4)?,
+                    order_index: row.get(5)?,
+                    title: row.get(6)?,
+                    chapter_goal: row.get(7)?,
+                    status: row.get(8)?,
+                    active_version_id: row.get(9)?,
+                    word_count: row.get(10)?,
+                    content: row.get(11)?,
+                    created_at: row.get(12)?,
+                    updated_at: row.get(13)?,
                 })
             },
         )
@@ -433,17 +497,22 @@ impl DbManager {
 
         let initial_content = input.initial_content.unwrap_or_default();
         let word_count = count_chinese_characters(&initial_content);
+        let order_index = input.order_index.unwrap_or(chapter_number);
+        let chapter_goal = input.chapter_goal.unwrap_or_default();
 
         // 1. Insert chapters record first to satisfy foreign key constraint on chapter_versions
         conn.execute(
-            "INSERT INTO chapters (id, novel_id, volume_id, chapter_number, title, status, active_version_id, word_count, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, 'DRAFT', NULL, ?6, ?7, ?8)",
+            "INSERT INTO chapters (id, novel_id, part_id, volume_id, chapter_number, order_index, title, chapter_goal, status, active_version_id, word_count, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'DRAFT', NULL, ?9, ?10, ?11)",
             params![
                 &id,
                 &input.novel_id,
+                &input.part_id,
                 &input.volume_id,
                 chapter_number,
+                order_index,
                 &input.title,
+                &chapter_goal,
                 word_count,
                 now,
                 now
@@ -479,9 +548,12 @@ impl DbManager {
         Ok(Chapter {
             id,
             novel_id: input.novel_id,
+            part_id: input.part_id,
             volume_id: input.volume_id,
             chapter_number,
+            order_index: Some(order_index),
             title: input.title,
+            chapter_goal: Some(chapter_goal),
             status: "DRAFT".to_string(),
             active_version_id: Some(version_id),
             word_count,
@@ -1195,7 +1267,9 @@ impl DbManager {
     pub fn list_scenes(&self, chapter_id: &str) -> Result<Vec<Scene>> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, chapter_id, sequence, objective, outline, pov_character_id, location_id, status, created_at
+            "SELECT id, chapter_id, sequence, order_index, title, scene_number,
+                    objective, outline, pov_character_id, location_id, content,
+                    word_count, time_anchor, conflict_target, status, created_at
              FROM scenes WHERE chapter_id = ?1 ORDER BY sequence ASC",
         )?;
 
@@ -1204,12 +1278,19 @@ impl DbManager {
                 id: row.get(0)?,
                 chapter_id: row.get(1)?,
                 sequence: row.get(2)?,
-                objective: row.get(3)?,
-                outline: row.get(4)?,
-                pov_character_id: row.get(5)?,
-                location_id: row.get(6)?,
-                status: row.get(7)?,
-                created_at: row.get(8)?,
+                order_index: row.get(3)?,
+                title: row.get(4)?,
+                scene_number: row.get(5)?,
+                objective: row.get(6)?,
+                outline: row.get(7)?,
+                pov_character_id: row.get(8)?,
+                location_id: row.get(9)?,
+                content: row.get(10)?,
+                word_count: row.get(11)?,
+                time_anchor: row.get(12)?,
+                conflict_target: row.get(13)?,
+                status: row.get(14)?,
+                created_at: row.get(15)?,
             })
         })?;
 
@@ -1225,18 +1306,32 @@ impl DbManager {
         let id = Uuid::new_v4().to_string();
         let now = chrono::Utc::now().timestamp_millis();
         let location_id = input.location_id.unwrap_or_default();
+        let title = input.title.unwrap_or_default();
+        let scene_number = input.scene_number.unwrap_or(input.sequence);
+        let order_index = input.order_index.unwrap_or(input.sequence);
+        let content = input.content.unwrap_or_default();
+        let word_count = count_chinese_characters(&content);
+        let time_anchor = input.time_anchor.unwrap_or_default();
+        let conflict_target = input.conflict_target.unwrap_or_default();
 
         conn.execute(
-            "INSERT INTO scenes (id, chapter_id, sequence, objective, outline, pov_character_id, location_id, status, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'PLANNED', ?8)",
+            "INSERT INTO scenes (id, chapter_id, sequence, order_index, title, scene_number, objective, outline, pov_character_id, location_id, content, word_count, time_anchor, conflict_target, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 'PLANNED', ?15)",
             params![
                 &id,
                 &input.chapter_id,
                 input.sequence,
+                order_index,
+                &title,
+                scene_number,
                 &input.objective,
                 &input.outline,
                 &input.pov_character_id,
                 &location_id,
+                &content,
+                word_count,
+                &time_anchor,
+                &conflict_target,
                 now
             ],
         )?;
@@ -1245,13 +1340,26 @@ impl DbManager {
             id,
             chapter_id: input.chapter_id,
             sequence: input.sequence,
+            order_index: Some(order_index),
+            title: Some(title),
+            scene_number: Some(scene_number),
             objective: input.objective,
             outline: input.outline,
             pov_character_id: input.pov_character_id,
             location_id,
+            content: Some(content),
+            word_count: Some(word_count),
+            time_anchor: Some(time_anchor),
+            conflict_target: Some(conflict_target),
             status: "PLANNED".to_string(),
             created_at: now,
         })
+    }
+
+    pub fn delete_scene(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM scenes WHERE id = ?1", params![id])?;
+        Ok(())
     }
 
     pub fn update_scene_status(&self, id: &str, status: &str) -> Result<()> {
@@ -2235,6 +2343,8 @@ impl DbManager {
             language: Some(archive.novel.language),
             writing_style: Some(archive.novel.writing_style),
             chapter_target_length: None,
+            series_id: None,
+            hierarchy_config: None,
         };
 
         let new_novel = self.create_novel(novel_input)?;
@@ -2256,9 +2366,12 @@ impl DbManager {
         for ch in archive.chapters {
             let _ = self.create_chapter(CreateChapterInput {
                 novel_id: new_novel.id.clone(),
+                part_id: None,
                 volume_id: None,
                 chapter_number: Some(ch.chapter_number),
+                order_index: ch.order_index,
                 title: ch.title,
+                chapter_goal: ch.chapter_goal,
                 initial_content: ch.content,
             });
         }
@@ -2287,6 +2400,1467 @@ impl DbManager {
         }
 
         Ok(new_novel)
+    }
+
+    // ==========================================
+    // V2.0 MULTI-LEVEL HIERARCHY & PLOT SYSTEM
+    // ==========================================
+
+    // --- SERIES / UNIVERSE (系列 / 宇宙) ---
+
+    pub fn create_series(&self, input: CreateSeriesInput) -> Result<Series> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let desc = input.description.unwrap_or_default();
+        let genre = input.genre_profile.unwrap_or_default();
+        let world_def = input.world_definition.unwrap_or_default();
+
+        conn.execute(
+            "INSERT INTO series (id, title, description, genre_profile, world_definition, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![&id, &input.title, &desc, &genre, &world_def, now, now],
+        )?;
+
+        Ok(Series {
+            id,
+            title: input.title,
+            description: desc,
+            genre_profile: genre,
+            world_definition: world_def,
+            created_at: now,
+            updated_at: now,
+        })
+    }
+
+    pub fn list_series(&self) -> Result<Vec<Series>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, title, description, genre_profile, world_definition, created_at, updated_at
+             FROM series ORDER BY updated_at DESC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(Series {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                description: row.get(2)?,
+                genre_profile: row.get(3)?,
+                world_definition: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn get_series(&self, id: &str) -> Result<Series> {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT id, title, description, genre_profile, world_definition, created_at, updated_at
+             FROM series WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(Series {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    description: row.get(2)?,
+                    genre_profile: row.get(3)?,
+                    world_definition: row.get(4)?,
+                    created_at: row.get(5)?,
+                    updated_at: row.get(6)?,
+                })
+            },
+        )
+    }
+
+    pub fn delete_series(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        let _ = conn.execute("UPDATE novels SET series_id = NULL WHERE series_id = ?1", params![id]);
+        conn.execute("DELETE FROM series WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // --- PARTS (部 / 篇) ---
+
+    pub fn create_part(&self, input: CreatePartInput) -> Result<Part> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let summary = input.summary.unwrap_or_default();
+        let order_index = input.order_index.unwrap_or_else(|| {
+            let max_idx: Option<i64> = conn
+                .query_row(
+                    "SELECT MAX(order_index) FROM parts WHERE novel_id = ?1",
+                    params![&input.novel_id],
+                    |r| r.get(0),
+                )
+                .ok();
+            max_idx.unwrap_or(0) + 1
+        });
+        let part_number = input.part_number.unwrap_or(order_index);
+
+        conn.execute(
+            "INSERT INTO parts (id, novel_id, part_number, title, summary, order_index, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'ACTIVE', ?7, ?8)",
+            params![&id, &input.novel_id, part_number, &input.title, &summary, order_index, now, now],
+        )?;
+
+        Ok(Part {
+            id,
+            novel_id: input.novel_id,
+            part_number,
+            title: input.title,
+            summary,
+            order_index,
+            status: "ACTIVE".to_string(),
+            created_at: now,
+            updated_at: now,
+        })
+    }
+
+    pub fn list_parts(&self, novel_id: &str) -> Result<Vec<Part>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, part_number, title, summary, order_index, status, created_at, updated_at
+             FROM parts WHERE novel_id = ?1 ORDER BY order_index ASC",
+        )?;
+        let rows = stmt.query_map(params![novel_id], |row| {
+            Ok(Part {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                part_number: row.get(2)?,
+                title: row.get(3)?,
+                summary: row.get(4)?,
+                order_index: row.get(5)?,
+                status: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn get_part(&self, id: &str) -> Result<Part> {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT id, novel_id, part_number, title, summary, order_index, status, created_at, updated_at
+             FROM parts WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(Part {
+                    id: row.get(0)?,
+                    novel_id: row.get(1)?,
+                    part_number: row.get(2)?,
+                    title: row.get(3)?,
+                    summary: row.get(4)?,
+                    order_index: row.get(5)?,
+                    status: row.get(6)?,
+                    created_at: row.get(7)?,
+                    updated_at: row.get(8)?,
+                })
+            },
+        )
+    }
+
+    pub fn delete_part(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM parts WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // --- HIERARCHY CONFIGURATION ---
+
+    pub fn get_novel_hierarchy_config(&self, novel_id: &str) -> Result<HierarchyConfig> {
+        let conn = self.conn.lock();
+        let raw: Option<String> = conn
+            .query_row(
+                "SELECT hierarchy_config FROM novels WHERE id = ?1",
+                params![novel_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(None);
+
+        if let Some(s) = raw {
+            if let Ok(cfg) = serde_json::from_str::<HierarchyConfig>(&s) {
+                return Ok(cfg);
+            }
+        }
+        Ok(HierarchyConfig::default())
+    }
+
+    pub fn update_novel_hierarchy_config(&self, novel_id: &str, config: HierarchyConfig) -> Result<HierarchyConfig> {
+        let conn = self.conn.lock();
+        let s = serde_json::to_string(&config).unwrap_or_default();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE novels SET hierarchy_config = ?1, updated_at = ?2 WHERE id = ?3",
+            params![&s, now, novel_id],
+        )?;
+        Ok(config)
+    }
+
+    // --- VOLUMES (CREATE & DELETE) ---
+
+    pub fn create_volume(&self, input: CreateVolumeInput) -> Result<Volume> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let summary = input.summary.unwrap_or_default();
+        let order_index = input.order_index.unwrap_or_else(|| {
+            let max_idx: Option<i64> = conn
+                .query_row(
+                    "SELECT MAX(order_index) FROM volumes WHERE novel_id = ?1",
+                    params![&input.novel_id],
+                    |r| r.get(0),
+                )
+                .ok();
+            max_idx.unwrap_or(0) + 1
+        });
+
+        conn.execute(
+            "INSERT INTO volumes (id, novel_id, part_id, title, order_index, summary, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'PLANNING', ?7)",
+            params![&id, &input.novel_id, &input.part_id, &input.title, order_index, &summary, now],
+        )?;
+
+        Ok(Volume {
+            id,
+            novel_id: input.novel_id,
+            part_id: input.part_id,
+            title: input.title,
+            order_index,
+            summary,
+            status: "PLANNING".to_string(),
+            created_at: now,
+        })
+    }
+
+    pub fn delete_volume(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        let _ = conn.execute("UPDATE chapters SET volume_id = NULL WHERE volume_id = ?1", params![id]);
+        conn.execute("DELETE FROM volumes WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // --- PLOT BEATS (情节节拍) ---
+
+    pub fn create_plot_beat(&self, input: CreatePlotBeatInput) -> Result<PlotBeat> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let order_index = input.order_index.unwrap_or_else(|| {
+            let max_idx: Option<i64> = conn
+                .query_row(
+                    "SELECT MAX(order_index) FROM plot_beats WHERE scene_id = ?1",
+                    params![&input.scene_id],
+                    |r| r.get(0),
+                )
+                .ok();
+            max_idx.unwrap_or(0) + 1
+        });
+        let beat_number = input.beat_number.unwrap_or(order_index);
+        let beat_type = input.beat_type.unwrap_or_else(|| "ACTION".to_string());
+        let desc = input.description.unwrap_or_default();
+        let emotional_shift = input.emotional_shift.unwrap_or_default();
+        let characters_present = input.characters_present.unwrap_or_default();
+
+        conn.execute(
+            "INSERT INTO plot_beats (id, scene_id, beat_number, beat_type, title, description, emotional_shift, characters_present, order_index, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'PENDING', ?10)",
+            params![&id, &input.scene_id, beat_number, &beat_type, &input.title, &desc, &emotional_shift, &characters_present, order_index, now],
+        )?;
+
+        Ok(PlotBeat {
+            id,
+            scene_id: input.scene_id,
+            beat_number,
+            beat_type,
+            title: input.title,
+            description: desc,
+            emotional_shift,
+            characters_present,
+            order_index,
+            status: "PENDING".to_string(),
+            created_at: now,
+        })
+    }
+
+    pub fn list_plot_beats(&self, scene_id: &str) -> Result<Vec<PlotBeat>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, scene_id, beat_number, beat_type, title, description, emotional_shift, characters_present, order_index, status, created_at
+             FROM plot_beats WHERE scene_id = ?1 ORDER BY order_index ASC, beat_number ASC",
+        )?;
+        let rows = stmt.query_map(params![scene_id], |row| {
+            Ok(PlotBeat {
+                id: row.get(0)?,
+                scene_id: row.get(1)?,
+                beat_number: row.get(2)?,
+                beat_type: row.get(3)?,
+                title: row.get(4)?,
+                description: row.get(5)?,
+                emotional_shift: row.get(6)?,
+                characters_present: row.get(7)?,
+                order_index: row.get(8)?,
+                status: row.get(9)?,
+                created_at: row.get(10)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn update_plot_beat_status(&self, id: &str, status: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("UPDATE plot_beats SET status = ?1 WHERE id = ?2", params![status, id])?;
+        Ok(())
+    }
+
+    pub fn delete_plot_beat(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM plot_beats WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // --- CHARACTER ARCS (人物成长弧) ---
+
+    pub fn create_character_arc(&self, input: CreateCharacterArcInput) -> Result<CharacterArc> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let stage_from = input.stage_from.unwrap_or_default();
+        let stage_to = input.stage_to.unwrap_or_default();
+        let current_stage = input.current_stage.unwrap_or_else(|| stage_from.clone());
+        let internal_conflict = input.internal_conflict.unwrap_or_default();
+
+        conn.execute(
+            "INSERT INTO character_arcs (id, novel_id, character_id, title, stage_from, stage_to, current_stage, internal_conflict, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'DEVELOPING', ?9, ?10)",
+            params![&id, &input.novel_id, &input.character_id, &input.title, &stage_from, &stage_to, &current_stage, &internal_conflict, now, now],
+        )?;
+
+        Ok(CharacterArc {
+            id,
+            novel_id: input.novel_id,
+            character_id: input.character_id,
+            title: input.title,
+            stage_from,
+            stage_to,
+            current_stage,
+            internal_conflict,
+            status: "DEVELOPING".to_string(),
+            created_at: now,
+            updated_at: now,
+        })
+    }
+
+    pub fn list_character_arcs(&self, novel_id: &str) -> Result<Vec<CharacterArc>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, character_id, title, stage_from, stage_to, current_stage, internal_conflict, status, created_at, updated_at
+             FROM character_arcs WHERE novel_id = ?1 ORDER BY created_at ASC",
+        )?;
+        let rows = stmt.query_map(params![novel_id], |row| {
+            Ok(CharacterArc {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                character_id: row.get(2)?,
+                title: row.get(3)?,
+                stage_from: row.get(4)?,
+                stage_to: row.get(5)?,
+                current_stage: row.get(6)?,
+                internal_conflict: row.get(7)?,
+                status: row.get(8)?,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn update_character_arc_stage(&self, id: &str, current_stage: &str, status: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE character_arcs SET current_stage = ?1, status = ?2, updated_at = ?3 WHERE id = ?4",
+            params![current_stage, status, now, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_character_arc(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM character_arcs WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // --- PARALLEL NARRATIVE THREADS (并行叙事线) ---
+
+    pub fn create_parallel_thread(&self, input: CreateParallelThreadInput) -> Result<ParallelThread> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let color = input.thread_color.unwrap_or_else(|| "#854d0e".to_string());
+        let summary = input.summary.unwrap_or_default();
+        let convergence = input.convergence_target.unwrap_or_default();
+
+        conn.execute(
+            "INSERT INTO parallel_threads (id, novel_id, title, pov_character_id, thread_color, summary, convergence_target, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'ACTIVE', ?8, ?9)",
+            params![&id, &input.novel_id, &input.title, &input.pov_character_id, &color, &summary, &convergence, now, now],
+        )?;
+
+        Ok(ParallelThread {
+            id,
+            novel_id: input.novel_id,
+            title: input.title,
+            pov_character_id: input.pov_character_id,
+            thread_color: color,
+            summary,
+            convergence_target: convergence,
+            status: "ACTIVE".to_string(),
+            created_at: now,
+            updated_at: now,
+        })
+    }
+
+    pub fn list_parallel_threads(&self, novel_id: &str) -> Result<Vec<ParallelThread>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, title, pov_character_id, thread_color, summary, convergence_target, status, created_at, updated_at
+             FROM parallel_threads WHERE novel_id = ?1 ORDER BY created_at ASC",
+        )?;
+        let rows = stmt.query_map(params![novel_id], |row| {
+            Ok(ParallelThread {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                title: row.get(2)?,
+                pov_character_id: row.get(3)?,
+                thread_color: row.get(4)?,
+                summary: row.get(5)?,
+                convergence_target: row.get(6)?,
+                status: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn update_parallel_thread_status(&self, id: &str, status: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE parallel_threads SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            params![status, now, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_parallel_thread(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM parallel_threads WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // --- PLOT ASSOCIATIONS (多对多剧情跨层关联 M:N) ---
+
+    pub fn create_plot_association(&self, input: CreatePlotAssociationInput) -> Result<PlotAssociation> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let role = input.role_in_target.unwrap_or_else(|| "PROGRESSION".to_string());
+        let notes = input.notes.unwrap_or_default();
+        let weight = input.weight.unwrap_or(1);
+
+        conn.execute(
+            "INSERT INTO plot_associations (id, novel_id, relation_type, entity_id, target_type, target_id, role_in_target, notes, weight, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+             ON CONFLICT(relation_type, entity_id, target_type, target_id)
+             DO UPDATE SET role_in_target = ?7, notes = ?8, weight = ?9",
+            params![&id, &input.novel_id, &input.relation_type, &input.entity_id, &input.target_type, &input.target_id, &role, &notes, weight, now],
+        )?;
+
+        Ok(PlotAssociation {
+            id,
+            novel_id: input.novel_id,
+            relation_type: input.relation_type,
+            entity_id: input.entity_id,
+            target_type: input.target_type,
+            target_id: input.target_id,
+            role_in_target: role,
+            notes,
+            weight,
+            created_at: now,
+        })
+    }
+
+    pub fn delete_plot_association(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM plot_associations WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn list_plot_associations_for_target(&self, target_type: &str, target_id: &str) -> Result<Vec<PlotAssociationView>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, relation_type, entity_id, target_type, target_id, role_in_target, notes, weight, created_at
+             FROM plot_associations WHERE target_type = ?1 AND target_id = ?2 ORDER BY weight DESC, created_at ASC",
+        )?;
+
+        let rows = stmt.query_map(params![target_type, target_id], |row| {
+            Ok(PlotAssociation {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                relation_type: row.get(2)?,
+                entity_id: row.get(3)?,
+                target_type: row.get(4)?,
+                target_id: row.get(5)?,
+                role_in_target: row.get(6)?,
+                notes: row.get(7)?,
+                weight: row.get(8)?,
+                created_at: row.get(9)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            let assoc = r?;
+            let entity_title = self.resolve_entity_title(&conn, &assoc.relation_type, &assoc.entity_id);
+            let target_title = self.resolve_target_title(&conn, &assoc.target_type, &assoc.target_id);
+            list.push(PlotAssociationView {
+                association: assoc,
+                entity_title,
+                target_title,
+            });
+        }
+        Ok(list)
+    }
+
+    pub fn list_plot_associations_for_entity(&self, relation_type: &str, entity_id: &str) -> Result<Vec<PlotAssociationView>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, relation_type, entity_id, target_type, target_id, role_in_target, notes, weight, created_at
+             FROM plot_associations WHERE relation_type = ?1 AND entity_id = ?2 ORDER BY created_at ASC",
+        )?;
+
+        let rows = stmt.query_map(params![relation_type, entity_id], |row| {
+            Ok(PlotAssociation {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                relation_type: row.get(2)?,
+                entity_id: row.get(3)?,
+                target_type: row.get(4)?,
+                target_id: row.get(5)?,
+                role_in_target: row.get(6)?,
+                notes: row.get(7)?,
+                weight: row.get(8)?,
+                created_at: row.get(9)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            let assoc = r?;
+            let entity_title = self.resolve_entity_title(&conn, &assoc.relation_type, &assoc.entity_id);
+            let target_title = self.resolve_target_title(&conn, &assoc.target_type, &assoc.target_id);
+            list.push(PlotAssociationView {
+                association: assoc,
+                entity_title,
+                target_title,
+            });
+        }
+        Ok(list)
+    }
+
+    pub fn list_novel_plot_matrix(&self, novel_id: &str) -> Result<Vec<PlotAssociationView>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, relation_type, entity_id, target_type, target_id, role_in_target, notes, weight, created_at
+             FROM plot_associations WHERE novel_id = ?1 ORDER BY relation_type, created_at ASC",
+        )?;
+
+        let rows = stmt.query_map(params![novel_id], |row| {
+            Ok(PlotAssociation {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                relation_type: row.get(2)?,
+                entity_id: row.get(3)?,
+                target_type: row.get(4)?,
+                target_id: row.get(5)?,
+                role_in_target: row.get(6)?,
+                notes: row.get(7)?,
+                weight: row.get(8)?,
+                created_at: row.get(9)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            let assoc = r?;
+            let entity_title = self.resolve_entity_title(&conn, &assoc.relation_type, &assoc.entity_id);
+            let target_title = self.resolve_target_title(&conn, &assoc.target_type, &assoc.target_id);
+            list.push(PlotAssociationView {
+                association: assoc,
+                entity_title,
+                target_title,
+            });
+        }
+        Ok(list)
+    }
+
+    fn resolve_entity_title(&self, conn: &Connection, relation_type: &str, entity_id: &str) -> String {
+        match relation_type {
+            "MAIN_PLOT" | "SUBPLOT" | "STORY_ARC" => {
+                conn.query_row("SELECT title FROM story_arcs WHERE id = ?1", params![entity_id], |r| r.get(0)).unwrap_or_else(|_| "未知故事弧".to_string())
+            }
+            "CHARACTER_ARC" => {
+                conn.query_row("SELECT title FROM character_arcs WHERE id = ?1", params![entity_id], |r| r.get(0)).unwrap_or_else(|_| "未知角色弧".to_string())
+            }
+            "FORESHADOWING" => {
+                conn.query_row("SELECT title FROM plot_threads WHERE id = ?1", params![entity_id], |r| r.get(0)).unwrap_or_else(|_| "未知伏笔".to_string())
+            }
+            "PARALLEL_THREAD" => {
+                conn.query_row("SELECT title FROM parallel_threads WHERE id = ?1", params![entity_id], |r| r.get(0)).unwrap_or_else(|_| "未知并行线".to_string())
+            }
+            "TIMELINE_EVENT" => {
+                conn.query_row("SELECT title FROM story_events WHERE id = ?1", params![entity_id], |r| r.get(0)).unwrap_or_else(|_| "未知事件".to_string())
+            }
+            _ => entity_id.to_string(),
+        }
+    }
+
+    fn resolve_target_title(&self, conn: &Connection, target_type: &str, target_id: &str) -> String {
+        match target_type {
+            "PART" => conn.query_row("SELECT title FROM parts WHERE id = ?1", params![target_id], |r| r.get(0)).unwrap_or_else(|_| "未知部/篇".to_string()),
+            "VOLUME" => conn.query_row("SELECT title FROM volumes WHERE id = ?1", params![target_id], |r| r.get(0)).unwrap_or_else(|_| "未知分卷".to_string()),
+            "CHAPTER" => conn.query_row("SELECT title FROM chapters WHERE id = ?1", params![target_id], |r| r.get(0)).unwrap_or_else(|_| "未知章节".to_string()),
+            "SCENE" => conn.query_row("SELECT COALESCE(NULLIF(title, ''), '场景 ' || sequence) FROM scenes WHERE id = ?1", params![target_id], |r| r.get(0)).unwrap_or_else(|_| "未知场景".to_string()),
+            "BEAT" => conn.query_row("SELECT title FROM plot_beats WHERE id = ?1", params![target_id], |r| r.get(0)).unwrap_or_else(|_| "未知节拍".to_string()),
+            _ => target_id.to_string(),
+        }
+    }
+
+    // --- STRUCTURAL & LIFECYCLE OPERATIONS ---
+
+    pub fn move_node(&self, input: MoveNodeInput) -> Result<()> {
+        let conn = self.conn.lock();
+        match input.node_type.as_str() {
+            "CHAPTER" => {
+                if let Some(parent_id) = &input.new_parent_id {
+                    let is_vol: bool = conn.query_row("SELECT 1 FROM volumes WHERE id = ?1", params![parent_id], |_| Ok(true)).unwrap_or(false);
+                    if is_vol {
+                        conn.execute("UPDATE chapters SET volume_id = ?1 WHERE id = ?2", params![parent_id, &input.node_id])?;
+                    } else {
+                        conn.execute("UPDATE chapters SET part_id = ?1, volume_id = NULL WHERE id = ?2", params![parent_id, &input.node_id])?;
+                    }
+                } else {
+                    conn.execute("UPDATE chapters SET volume_id = NULL, part_id = NULL WHERE id = ?1", params![&input.node_id])?;
+                }
+                if let Some(order) = input.new_order {
+                    conn.execute("UPDATE chapters SET order_index = ?1 WHERE id = ?2", params![order, &input.node_id])?;
+                }
+            }
+            "SCENE" => {
+                if let Some(parent_id) = &input.new_parent_id {
+                    conn.execute("UPDATE scenes SET chapter_id = ?1 WHERE id = ?2", params![parent_id, &input.node_id])?;
+                }
+                if let Some(order) = input.new_order {
+                    conn.execute("UPDATE scenes SET sequence = ?1, order_index = ?1 WHERE id = ?2", params![order, &input.node_id])?;
+                }
+            }
+            "BEAT" => {
+                if let Some(parent_id) = &input.new_parent_id {
+                    conn.execute("UPDATE plot_beats SET scene_id = ?1 WHERE id = ?2", params![parent_id, &input.node_id])?;
+                }
+                if let Some(order) = input.new_order {
+                    conn.execute("UPDATE plot_beats SET order_index = ?1, beat_number = ?1 WHERE id = ?2", params![order, &input.node_id])?;
+                }
+            }
+            "VOLUME" => {
+                if let Some(parent_id) = &input.new_parent_id {
+                    conn.execute("UPDATE volumes SET part_id = ?1 WHERE id = ?2", params![parent_id, &input.node_id])?;
+                }
+                if let Some(order) = input.new_order {
+                    conn.execute("UPDATE volumes SET order_index = ?1 WHERE id = ?2", params![order, &input.node_id])?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    pub fn split_chapter(&self, input: SplitChapterInput) -> Result<(Chapter, Chapter)> {
+        let orig = self.get_chapter(&input.chapter_id)?;
+        let content = orig.content.clone().unwrap_or_default();
+        let split_idx = input.split_point.max(0) as usize;
+
+        // Split text content safely
+        let (first_text, second_text) = if input.split_type == "SCENE_INDEX" {
+            (content.clone(), "".to_string())
+        } else {
+            let chars: Vec<char> = content.chars().collect();
+            if split_idx < chars.len() {
+                let p1: String = chars[..split_idx].iter().collect();
+                let p2: String = chars[split_idx..].iter().collect();
+                (p1, p2)
+            } else {
+                (content.clone(), "".to_string())
+            }
+        };
+
+        // 1. Shift existing chapters that come after orig
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE chapters SET chapter_number = chapter_number + 1, order_index = order_index + 1
+             WHERE novel_id = ?1 AND chapter_number > ?2",
+            params![&orig.novel_id, orig.chapter_number],
+        )?;
+
+        let new_ch_num = orig.chapter_number + 1;
+        let new_title = input.new_chapter_title.unwrap_or_else(|| format!("{} (下)", orig.title));
+        drop(conn);
+
+        // 2. Save original chapter with first_text
+        let updated_orig = self.save_chapter_content(&orig.id, &first_text, true, "SPLIT_REVISION")?;
+
+        // 3. Create new chapter with second_text
+        let new_ch = self.create_chapter(CreateChapterInput {
+            novel_id: orig.novel_id.clone(),
+            part_id: orig.part_id.clone(),
+            volume_id: orig.volume_id.clone(),
+            chapter_number: Some(new_ch_num),
+            order_index: Some(new_ch_num),
+            title: new_title,
+            chapter_goal: orig.chapter_goal.clone(),
+            initial_content: Some(second_text),
+        })?;
+
+        // 4. If split_type == "SCENE_INDEX", move scenes after split_point to new chapter
+        if input.split_type == "SCENE_INDEX" {
+            let conn = self.conn.lock();
+            let _ = conn.execute(
+                "UPDATE scenes SET chapter_id = ?1, sequence = sequence - ?2 WHERE chapter_id = ?3 AND sequence > ?2",
+                params![&new_ch.id, input.split_point, &orig.id],
+            );
+        }
+
+        Ok((updated_orig, new_ch))
+    }
+
+    pub fn merge_chapters(&self, input: MergeChaptersInput) -> Result<Chapter> {
+        let src = self.get_chapter(&input.source_chapter_id)?;
+        let tgt = self.get_chapter(&input.target_chapter_id)?;
+
+        let src_content = src.content.unwrap_or_default();
+        let tgt_content = tgt.content.unwrap_or_default();
+
+        let merged_content = if tgt_content.trim().is_empty() {
+            src_content
+        } else if src_content.trim().is_empty() {
+            tgt_content
+        } else {
+            format!("{}\n\n{}", tgt_content.trim(), src_content.trim())
+        };
+
+        // 1. Save merged content into target chapter
+        let updated_tgt = self.save_chapter_content(&tgt.id, &merged_content, true, "MERGE_CONTENT")?;
+
+        let conn = self.conn.lock();
+
+        // 2. Reparent scenes from source chapter to target chapter
+        let max_seq: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(sequence), 0) FROM scenes WHERE chapter_id = ?1",
+                params![&tgt.id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+
+        let _ = conn.execute(
+            "UPDATE scenes SET chapter_id = ?1, sequence = sequence + ?2 WHERE chapter_id = ?3",
+            params![&tgt.id, max_seq, &src.id],
+        );
+
+        // 3. Migrate plot associations from source chapter to target chapter
+        let _ = conn.execute(
+            "UPDATE OR IGNORE plot_associations SET target_id = ?1 WHERE target_type = 'CHAPTER' AND target_id = ?2",
+            params![&tgt.id, &src.id],
+        );
+        let _ = conn.execute(
+            "DELETE FROM plot_associations WHERE target_type = 'CHAPTER' AND target_id = ?1",
+            params![&src.id],
+        );
+
+        // 4. Delete source chapter (cascades versions)
+        conn.execute("DELETE FROM chapters WHERE id = ?1", params![&src.id])?;
+
+        // 5. Shift subsequent chapter numbers down
+        conn.execute(
+            "UPDATE chapters SET chapter_number = chapter_number - 1, order_index = order_index - 1
+             WHERE novel_id = ?1 AND chapter_number > ?2",
+            params![&src.novel_id, src.chapter_number],
+        )?;
+
+        Ok(updated_tgt)
+    }
+
+    pub fn split_scene(&self, input: SplitSceneInput) -> Result<(Scene, Scene)> {
+        let conn = self.conn.lock();
+        let orig: Scene = conn.query_row(
+            "SELECT id, chapter_id, sequence, order_index, title, scene_number, objective, outline, pov_character_id, location_id, content, word_count, time_anchor, conflict_target, status, created_at
+             FROM scenes WHERE id = ?1",
+            params![&input.scene_id],
+            |row| {
+                Ok(Scene {
+                    id: row.get(0)?,
+                    chapter_id: row.get(1)?,
+                    sequence: row.get(2)?,
+                    order_index: row.get(3)?,
+                    title: row.get(4)?,
+                    scene_number: row.get(5)?,
+                    objective: row.get(6)?,
+                    outline: row.get(7)?,
+                    pov_character_id: row.get(8)?,
+                    location_id: row.get(9)?,
+                    content: row.get(10)?,
+                    word_count: row.get(11)?,
+                    time_anchor: row.get(12)?,
+                    conflict_target: row.get(13)?,
+                    status: row.get(14)?,
+                    created_at: row.get(15)?,
+                })
+            },
+        )?;
+
+        conn.execute(
+            "UPDATE scenes SET sequence = sequence + 1, order_index = order_index + 1 WHERE chapter_id = ?1 AND sequence > ?2",
+            params![&orig.chapter_id, orig.sequence],
+        )?;
+
+        let new_scene_id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let new_title = input.new_scene_title.unwrap_or_else(|| {
+            format!("{} (后半段)", orig.title.as_deref().unwrap_or("场景"))
+        });
+
+        conn.execute(
+            "INSERT INTO scenes (id, chapter_id, sequence, order_index, title, scene_number, objective, outline, pov_character_id, location_id, content, word_count, time_anchor, conflict_target, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '', 0, ?11, ?12, 'PLANNED', ?13)",
+            params![
+                &new_scene_id,
+                &orig.chapter_id,
+                orig.sequence + 1,
+                orig.sequence + 1,
+                &new_title,
+                orig.sequence + 1,
+                &orig.objective,
+                &orig.outline,
+                &orig.pov_character_id,
+                &orig.location_id,
+                &orig.time_anchor,
+                &orig.conflict_target,
+                now
+            ],
+        )?;
+
+        let _ = conn.execute(
+            "UPDATE plot_beats SET scene_id = ?1, order_index = order_index - ?2 WHERE scene_id = ?3 AND order_index > ?2",
+            params![&new_scene_id, input.split_beat_index, &orig.id],
+        );
+
+        let new_scene = Scene {
+            id: new_scene_id,
+            chapter_id: orig.chapter_id.clone(),
+            sequence: orig.sequence + 1,
+            order_index: Some(orig.sequence + 1),
+            title: Some(new_title),
+            scene_number: Some(orig.sequence + 1),
+            objective: orig.objective.clone(),
+            outline: orig.outline.clone(),
+            pov_character_id: orig.pov_character_id.clone(),
+            location_id: orig.location_id.clone(),
+            content: Some("".to_string()),
+            word_count: Some(0),
+            time_anchor: orig.time_anchor.clone(),
+            conflict_target: orig.conflict_target.clone(),
+            status: "PLANNED".to_string(),
+            created_at: now,
+        };
+
+        Ok((orig, new_scene))
+    }
+
+    pub fn merge_scenes(&self, input: MergeScenesInput) -> Result<Scene> {
+        let conn = self.conn.lock();
+        let max_order: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(order_index), 0) FROM plot_beats WHERE scene_id = ?1",
+                params![&input.target_scene_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+
+        let _ = conn.execute(
+            "UPDATE plot_beats SET scene_id = ?1, order_index = order_index + ?2 WHERE scene_id = ?3",
+            params![&input.target_scene_id, max_order, &input.source_scene_id],
+        );
+
+        let _ = conn.execute(
+            "UPDATE OR IGNORE plot_associations SET target_id = ?1 WHERE target_type = 'SCENE' AND target_id = ?2",
+            params![&input.target_scene_id, &input.source_scene_id],
+        );
+        let _ = conn.execute(
+            "DELETE FROM plot_associations WHERE target_type = 'SCENE' AND target_id = ?1",
+            params![&input.source_scene_id],
+        );
+
+        conn.execute("DELETE FROM scenes WHERE id = ?1", params![&input.source_scene_id])?;
+
+        conn.query_row(
+            "SELECT id, chapter_id, sequence, order_index, title, scene_number, objective, outline, pov_character_id, location_id, content, word_count, time_anchor, conflict_target, status, created_at
+             FROM scenes WHERE id = ?1",
+            params![&input.target_scene_id],
+            |row| {
+                Ok(Scene {
+                    id: row.get(0)?,
+                    chapter_id: row.get(1)?,
+                    sequence: row.get(2)?,
+                    order_index: row.get(3)?,
+                    title: row.get(4)?,
+                    scene_number: row.get(5)?,
+                    objective: row.get(6)?,
+                    outline: row.get(7)?,
+                    pov_character_id: row.get(8)?,
+                    location_id: row.get(9)?,
+                    content: row.get(10)?,
+                    word_count: row.get(11)?,
+                    time_anchor: row.get(12)?,
+                    conflict_target: row.get(13)?,
+                    status: row.get(14)?,
+                    created_at: row.get(15)?,
+                })
+            },
+        )
+    }
+
+    pub fn renumber_hierarchy(&self, input: RenumberHierarchyInput) -> Result<()> {
+        let conn = self.conn.lock();
+
+        // 1. Renumber Parts
+        let mut p_stmt = conn.prepare("SELECT id FROM parts WHERE novel_id = ?1 ORDER BY order_index ASC, created_at ASC")?;
+        let p_ids: Vec<String> = p_stmt.query_map(params![&input.novel_id], |r| r.get(0))?.filter_map(|r| r.ok()).collect();
+        for (idx, pid) in p_ids.iter().enumerate() {
+            let num = (idx + 1) as i64;
+            let _ = conn.execute("UPDATE parts SET part_number = ?1, order_index = ?1 WHERE id = ?2", params![num, pid]);
+        }
+
+        // 2. Renumber Volumes
+        let mut v_stmt = conn.prepare("SELECT id FROM volumes WHERE novel_id = ?1 ORDER BY order_index ASC, created_at ASC")?;
+        let v_ids: Vec<String> = v_stmt.query_map(params![&input.novel_id], |r| r.get(0))?.filter_map(|r| r.ok()).collect();
+        for (idx, vid) in v_ids.iter().enumerate() {
+            let num = (idx + 1) as i64;
+            let _ = conn.execute("UPDATE volumes SET order_index = ?1 WHERE id = ?2", params![num, vid]);
+        }
+
+        // 3. Renumber Chapters
+        if input.per_volume_chapter_numbering.unwrap_or(false) {
+            for vid in &v_ids {
+                let mut c_stmt = conn.prepare("SELECT id FROM chapters WHERE volume_id = ?1 ORDER BY chapter_number ASC, created_at ASC")?;
+                let c_ids: Vec<String> = c_stmt.query_map(params![vid], |r| r.get(0))?.filter_map(|r| r.ok()).collect();
+                for (idx, cid) in c_ids.iter().enumerate() {
+                    let num = (idx + 1) as i64;
+                    let _ = conn.execute("UPDATE chapters SET chapter_number = ?1, order_index = ?1 WHERE id = ?2", params![num, cid]);
+                }
+            }
+        } else {
+            let mut c_stmt = conn.prepare("SELECT id FROM chapters WHERE novel_id = ?1 ORDER BY chapter_number ASC, created_at ASC")?;
+            let c_ids: Vec<String> = c_stmt.query_map(params![&input.novel_id], |r| r.get(0))?.filter_map(|r| r.ok()).collect();
+            for (idx, cid) in c_ids.iter().enumerate() {
+                let num = (idx + 1) as i64;
+                let _ = conn.execute("UPDATE chapters SET chapter_number = ?1, order_index = ?1 WHERE id = ?2", params![num, cid]);
+            }
+        }
+
+        // 4. Renumber Scenes per chapter
+        let mut all_c_stmt = conn.prepare("SELECT id FROM chapters WHERE novel_id = ?1")?;
+        let all_c_ids: Vec<String> = all_c_stmt.query_map(params![&input.novel_id], |r| r.get(0))?.filter_map(|r| r.ok()).collect();
+        for cid in all_c_ids {
+            let mut s_stmt = conn.prepare("SELECT id FROM scenes WHERE chapter_id = ?1 ORDER BY sequence ASC, created_at ASC")?;
+            let s_ids: Vec<String> = s_stmt.query_map(params![&cid], |r| r.get(0))?.filter_map(|r| r.ok()).collect();
+            for (s_idx, sid) in s_ids.iter().enumerate() {
+                let s_num = (s_idx + 1) as i64;
+                let _ = conn.execute("UPDATE scenes SET sequence = ?1, order_index = ?1, scene_number = ?1 WHERE id = ?2", params![s_num, &sid]);
+
+                // 5. Renumber Beats per scene
+                let mut b_stmt = conn.prepare("SELECT id FROM plot_beats WHERE scene_id = ?1 ORDER BY order_index ASC, created_at ASC")?;
+                let b_ids: Vec<String> = b_stmt.query_map(params![&sid], |r| r.get(0))?.filter_map(|r| r.ok()).collect();
+                for (b_idx, bid) in b_ids.iter().enumerate() {
+                    let b_num = (b_idx + 1) as i64;
+                    let _ = conn.execute("UPDATE plot_beats SET beat_number = ?1, order_index = ?1 WHERE id = ?2", params![b_num, &bid]);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    // --- NOVEL CONTENT TREE HIERARCHY ---
+
+    pub fn get_novel_content_tree(&self, novel_id: &str) -> Result<NovelContentTree> {
+        let config = self.get_novel_hierarchy_config(novel_id)?;
+        let parts = self.list_parts(novel_id)?;
+        let volumes = self.list_volumes(novel_id)?;
+        let chapters = self.list_chapters(novel_id)?;
+
+        let conn = self.conn.lock();
+
+        let get_plot_count = |target_type: &str, target_id: &str| -> i64 {
+            conn.query_row(
+                "SELECT COUNT(*) FROM plot_associations WHERE target_type = ?1 AND target_id = ?2",
+                params![target_type, target_id],
+                |r| r.get(0),
+            ).unwrap_or(0)
+        };
+
+        let mut chapter_nodes = Vec::new();
+        for ch in &chapters {
+            let mut scene_nodes = Vec::new();
+            if config.enable_scenes {
+                let mut s_stmt = conn.prepare(
+                    "SELECT id, sequence, title, objective, word_count, status FROM scenes WHERE chapter_id = ?1 ORDER BY sequence ASC",
+                )?;
+                let scenes = s_stmt.query_map(params![&ch.id], |r| {
+                    Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?, r.get::<_, Option<String>>(2)?, r.get::<_, String>(3)?, r.get::<_, Option<i64>>(4)?, r.get::<_, String>(5)?))
+                })?;
+
+                for s in scenes {
+                    if let Ok((sid, seq, stitle, sobj, sword, sstat)) = s {
+                        let mut beat_nodes = Vec::new();
+                        if config.enable_beats {
+                            let mut b_stmt = conn.prepare(
+                                "SELECT id, beat_number, title, description, status FROM plot_beats WHERE scene_id = ?1 ORDER BY order_index ASC",
+                            )?;
+                            let beats = b_stmt.query_map(params![&sid], |r| {
+                                Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?, r.get::<_, String>(4)?))
+                            })?;
+                            for b in beats {
+                                if let Ok((bid, bnum, btitle, bdesc, bstat)) = b {
+                                    beat_nodes.push(ContentTreeNode {
+                                        id: bid.clone(),
+                                        node_type: "BEAT".to_string(),
+                                        title: btitle,
+                                        number: bnum,
+                                        order_index: bnum,
+                                        parent_id: Some(sid.clone()),
+                                        word_count: 0,
+                                        status: bstat,
+                                        goal_or_summary: bdesc,
+                                        associated_plot_count: get_plot_count("BEAT", &bid),
+                                        children: vec![],
+                                    });
+                                }
+                            }
+                        }
+
+                        let title_display = stitle.filter(|t| !t.trim().is_empty()).unwrap_or_else(|| format!("场景 {}", seq));
+                        scene_nodes.push(ContentTreeNode {
+                            id: sid.clone(),
+                            node_type: "SCENE".to_string(),
+                            title: title_display,
+                            number: seq,
+                            order_index: seq,
+                            parent_id: Some(ch.id.clone()),
+                            word_count: sword.unwrap_or(0),
+                            status: sstat,
+                            goal_or_summary: sobj,
+                            associated_plot_count: get_plot_count("SCENE", &sid),
+                            children: beat_nodes,
+                        });
+                    }
+                }
+            }
+
+            chapter_nodes.push(ContentTreeNode {
+                id: ch.id.clone(),
+                node_type: "CHAPTER".to_string(),
+                title: ch.title.clone(),
+                number: ch.chapter_number,
+                order_index: ch.order_index.unwrap_or(ch.chapter_number),
+                parent_id: ch.volume_id.clone().or_else(|| ch.part_id.clone()),
+                word_count: ch.word_count,
+                status: ch.status.clone(),
+                goal_or_summary: ch.chapter_goal.clone().unwrap_or_default(),
+                associated_plot_count: get_plot_count("CHAPTER", &ch.id),
+                children: scene_nodes,
+            });
+        }
+
+        let root_nodes = if config.enable_parts && !parts.is_empty() {
+            let mut p_nodes = Vec::new();
+            for p in &parts {
+                let mut v_nodes = Vec::new();
+                let p_vols: Vec<&Volume> = volumes.iter().filter(|v| v.part_id.as_deref() == Some(&p.id)).collect();
+                for v in p_vols {
+                    let v_chaps: Vec<ContentTreeNode> = chapter_nodes
+                        .iter()
+                        .filter(|c| c.parent_id.as_deref() == Some(&v.id))
+                        .cloned()
+                        .collect();
+                    let v_words: i64 = v_chaps.iter().map(|c| c.word_count).sum();
+                    v_nodes.push(ContentTreeNode {
+                        id: v.id.clone(),
+                        node_type: "VOLUME".to_string(),
+                        title: v.title.clone(),
+                        number: v.order_index,
+                        order_index: v.order_index,
+                        parent_id: Some(p.id.clone()),
+                        word_count: v_words,
+                        status: v.status.clone(),
+                        goal_or_summary: v.summary.clone(),
+                        associated_plot_count: get_plot_count("VOLUME", &v.id),
+                        children: v_chaps,
+                    });
+                }
+                let direct_chaps: Vec<ContentTreeNode> = chapter_nodes
+                    .iter()
+                    .filter(|c| c.parent_id.as_deref() == Some(&p.id))
+                    .cloned()
+                    .collect();
+                for dc in direct_chaps {
+                    v_nodes.push(dc);
+                }
+
+                let p_words: i64 = v_nodes.iter().map(|n| n.word_count).sum();
+                p_nodes.push(ContentTreeNode {
+                    id: p.id.clone(),
+                    node_type: "PART".to_string(),
+                    title: p.title.clone(),
+                    number: p.part_number,
+                    order_index: p.order_index,
+                    parent_id: None,
+                    word_count: p_words,
+                    status: p.status.clone(),
+                    goal_or_summary: p.summary.clone(),
+                    associated_plot_count: get_plot_count("PART", &p.id),
+                    children: v_nodes,
+                });
+            }
+            p_nodes
+        } else if config.enable_volumes && !volumes.is_empty() {
+            let mut v_nodes = Vec::new();
+            for v in &volumes {
+                let v_chaps: Vec<ContentTreeNode> = chapter_nodes
+                    .iter()
+                    .filter(|c| c.parent_id.as_deref() == Some(&v.id))
+                    .cloned()
+                    .collect();
+                let v_words: i64 = v_chaps.iter().map(|c| c.word_count).sum();
+                v_nodes.push(ContentTreeNode {
+                    id: v.id.clone(),
+                    node_type: "VOLUME".to_string(),
+                    title: v.title.clone(),
+                    number: v.order_index,
+                    order_index: v.order_index,
+                    parent_id: None,
+                    word_count: v_words,
+                    status: v.status.clone(),
+                    goal_or_summary: v.summary.clone(),
+                    associated_plot_count: get_plot_count("VOLUME", &v.id),
+                    children: v_chaps,
+                });
+            }
+            let unassigned: Vec<ContentTreeNode> = chapter_nodes
+                .iter()
+                .filter(|c| c.parent_id.is_none())
+                .cloned()
+                .collect();
+            for u in unassigned {
+                v_nodes.push(u);
+            }
+            v_nodes
+        } else {
+            chapter_nodes
+        };
+
+        Ok(NovelContentTree {
+            novel_id: novel_id.to_string(),
+            hierarchy_config: config,
+            root_nodes,
+        })
+    }
+
+    // --- MULTI-AGENT HIERARCHICAL CREATION CONTEXT ASSEMBLY ---
+
+    pub fn assemble_hierarchical_creation_context(
+        &self,
+        novel_id: &str,
+        chapter_id: &str,
+        scene_id: Option<&str>,
+    ) -> Result<HierarchicalCreationContext> {
+        let novel = self.get_novel(novel_id)?;
+        let chapter = self.get_chapter(chapter_id)?;
+
+        let series_summary = if let Some(sid) = &novel.series_id {
+            self.get_series(sid).ok().map(|s| format!("《{}》: {}", s.title, s.description))
+        } else {
+            None
+        };
+
+        let volume = if let Some(vid) = &chapter.volume_id {
+            let conn = self.conn.lock();
+            conn.query_row(
+                "SELECT id, novel_id, part_id, title, order_index, summary, status, created_at FROM volumes WHERE id = ?1",
+                params![vid],
+                |r| Ok(Volume {
+                    id: r.get(0)?,
+                    novel_id: r.get(1)?,
+                    part_id: r.get(2)?,
+                    title: r.get(3)?,
+                    order_index: r.get(4)?,
+                    summary: r.get(5)?,
+                    status: r.get(6)?,
+                    created_at: r.get(7)?,
+                }),
+            ).ok()
+        } else {
+            None
+        };
+
+        let part = if let Some(pid) = &chapter.part_id {
+            self.get_part(pid).ok()
+        } else if let Some(ref v) = volume {
+            if let Some(ref pid) = v.part_id {
+                self.get_part(pid).ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let scenes = self.list_scenes(chapter_id)?;
+        let active_scene = if let Some(sid) = scene_id {
+            scenes.into_iter().find(|s| s.id == sid)
+        } else {
+            scenes.into_iter().next()
+        };
+
+        let scene_beats = if let Some(ref sc) = active_scene {
+            self.list_plot_beats(&sc.id)?
+        } else {
+            Vec::new()
+        };
+
+        let mut target_pairs: Vec<(&str, &str)> = Vec::new();
+        if let Some(p) = &part {
+            target_pairs.push(("PART", &p.id));
+        }
+        if let Some(v) = &volume {
+            target_pairs.push(("VOLUME", &v.id));
+        }
+        target_pairs.push(("CHAPTER", &chapter.id));
+        if let Some(sc) = &active_scene {
+            target_pairs.push(("SCENE", &sc.id));
+        }
+
+        let mut associated_main_lines = Vec::new();
+        let mut associated_subplots = Vec::new();
+        let mut associated_story_arcs = Vec::new();
+        let mut associated_character_arcs = Vec::new();
+        let mut active_foreshadowings = Vec::new();
+        let mut parallel_threads = Vec::new();
+        let mut recent_timeline_events = Vec::new();
+
+        let conn = self.conn.lock();
+        for (ttype, tid) in target_pairs {
+            let mut stmt = conn.prepare(
+                "SELECT relation_type, entity_id, role_in_target, notes FROM plot_associations WHERE target_type = ?1 AND target_id = ?2",
+            )?;
+            let rows = stmt.query_map(params![ttype, tid], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?))
+            })?;
+
+            for r in rows {
+                if let Ok((rel_type, ent_id, role, notes)) = r {
+                    match rel_type.as_str() {
+                        "MAIN_PLOT" => {
+                            if let Ok(arc) = conn.query_row("SELECT title, goal FROM story_arcs WHERE id = ?1", params![&ent_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))) {
+                                associated_main_lines.push(format!("【主线】{} (目标: {}) [角色: {}, 备忘: {}]", arc.0, arc.1, role, notes));
+                            }
+                        }
+                        "SUBPLOT" => {
+                            if let Ok(arc) = conn.query_row("SELECT title, goal FROM story_arcs WHERE id = ?1", params![&ent_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))) {
+                                associated_subplots.push(format!("【支线】{} (目标: {}) [角色: {}]", arc.0, arc.1, role));
+                            }
+                        }
+                        "STORY_ARC" => {
+                            if let Ok(arc) = conn.query_row("SELECT title, goal, priority FROM story_arcs WHERE id = ?1", params![&ent_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))) {
+                                associated_story_arcs.push(format!("【故事弧 ({})】{} (目标: {})", arc.2, arc.0, arc.1));
+                            }
+                        }
+                        "CHARACTER_ARC" => {
+                            if let Ok(ca) = conn.query_row(
+                                "SELECT ca.title, c.name, ca.stage_from, ca.stage_to, ca.current_stage, ca.internal_conflict
+                                 FROM character_arcs ca JOIN characters c ON ca.character_id = c.id WHERE ca.id = ?1",
+                                params![&ent_id],
+                                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?, row.get::<_, String>(4)?, row.get::<_, String>(5)?))
+                            ) {
+                                associated_character_arcs.push(format!("【角色蜕变弧】{} · 角色: {} [当前阶段: {} | 起点: {} -> 终点: {}] 内心矛盾: {}", ca.0, ca.1, ca.4, ca.2, ca.3, ca.5));
+                            }
+                        }
+                        "FORESHADOWING" => {
+                            if let Ok(pt) = conn.query_row("SELECT title, description, expected_resolution, status FROM plot_threads WHERE id = ?1", params![&ent_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?))) {
+                                active_foreshadowings.push(format!("【伏笔线索 ({})】{} (细节: {}) 预期回收: {} [本处作用: {}]", pt.3, pt.0, pt.1, pt.2, role));
+                            }
+                        }
+                        "PARALLEL_THREAD" => {
+                            if let Ok(th) = conn.query_row("SELECT title, summary, convergence_target FROM parallel_threads WHERE id = ?1", params![&ent_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))) {
+                                parallel_threads.push(format!("【并行线】{} (概要: {}) 预期汇合: {}", th.0, th.1, th.2));
+                            }
+                        }
+                        "TIMELINE_EVENT" => {
+                            if let Ok(ev) = conn.query_row("SELECT title, story_time, description FROM story_events WHERE id = ?1", params![&ent_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))) {
+                                recent_timeline_events.push(format!("【时间线】[{}] {} ({})", ev.1, ev.0, ev.2));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        let canon_rules: Vec<String> = {
+            let mut canon_stmt = conn.prepare("SELECT title, rule_content FROM world_rules WHERE novel_id = ?1 AND authority_level = 'CANON' LIMIT 8")?;
+            canon_stmt.query_map(params![novel_id], |r| Ok(format!("- 《{}》: {}", r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?.filter_map(|r| r.ok()).collect()
+        };
+
+        let char_profiles: Vec<String> = {
+            let mut char_stmt = conn.prepare("SELECT name, personality, motivation, status FROM characters WHERE novel_id = ?1 LIMIT 6")?;
+            char_stmt.query_map(params![novel_id], |r| Ok(format!("- {} (性格: {}, 动机: {})", r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)))?.filter_map(|r| r.ok()).collect()
+        };
+        drop(conn);
+
+        associated_main_lines.dedup();
+        associated_subplots.dedup();
+        associated_story_arcs.dedup();
+        associated_character_arcs.dedup();
+        active_foreshadowings.dedup();
+        parallel_threads.dedup();
+        recent_timeline_events.dedup();
+
+        let mut prompt = String::new();
+        prompt.push_str("## 【当前创作层级定位与连续性上下文】\n");
+        prompt.push_str(&format!("- **当前作品**：《{}》\n", novel.title));
+        if let Some(s) = &series_summary {
+            prompt.push_str(&format!("- **系列/宇宙体系**：{}\n", s));
+        }
+        if let Some(p) = &part {
+            prompt.push_str(&format!("- **所属部/篇**：第 {} 篇《{}》 (阶段目标: {})\n", p.part_number, p.title, p.summary));
+        }
+        if let Some(v) = &volume {
+            prompt.push_str(&format!("- **所属分卷**：第 {} 卷《{}》 (大纲总结: {})\n", v.order_index, v.title, v.summary));
+        }
+        prompt.push_str(&format!("- **当前章节**：第 {} 章《{}》 (章节目标: {})\n", chapter.chapter_number, chapter.title, chapter.chapter_goal.as_deref().unwrap_or("未设置")));
+        if let Some(sc) = &active_scene {
+            prompt.push_str(&format!("- **当前场景**：第 {} 幕《{}》 (场景目标: {})\n", sc.sequence, sc.title.as_deref().unwrap_or("未命名"), sc.objective));
+            if !sc.outline.is_empty() {
+                prompt.push_str(&format!("  * 场景细纲：{}\n", sc.outline));
+            }
+            if let Some(conflict) = &sc.conflict_target {
+                if !conflict.is_empty() {
+                    prompt.push_str(&format!("  * 冲突核心：{}\n", conflict));
+                }
+            }
+        }
+
+        if !scene_beats.is_empty() {
+            prompt.push_str("\n### 【当前场景情节节拍 (Plot Beats)】\n");
+            for beat in &scene_beats {
+                prompt.push_str(&format!("{}. [{}] {} - {}\n", beat.beat_number, beat.beat_type, beat.title, beat.description));
+                if !beat.emotional_shift.is_empty() {
+                    prompt.push_str(&format!("   * 情绪流向：{}\n", beat.emotional_shift));
+                }
+            }
+        }
+
+        prompt.push_str("\n### 【跨层级剧情关联 (M:N 因果矩阵)】\n");
+        if !associated_main_lines.is_empty() {
+            prompt.push_str(&format!("- **主线指引**：\n  {}\n", associated_main_lines.join("\n  ")));
+        }
+        if !associated_subplots.is_empty() {
+            prompt.push_str(&format!("- **支线交织**：\n  {}\n", associated_subplots.join("\n  ")));
+        }
+        if !associated_character_arcs.is_empty() {
+            prompt.push_str(&format!("- **人物成长弧线**：\n  {}\n", associated_character_arcs.join("\n  ")));
+        }
+        if !active_foreshadowings.is_empty() {
+            prompt.push_str(&format!("- **伏笔与悬念线索**：\n  {}\n", active_foreshadowings.join("\n  ")));
+        }
+        if !parallel_threads.is_empty() {
+            prompt.push_str(&format!("- **并行叙事线**：\n  {}\n", parallel_threads.join("\n  ")));
+        }
+        if !recent_timeline_events.is_empty() {
+            prompt.push_str(&format!("- **时间线锚点**：\n  {}\n", recent_timeline_events.join("\n  ")));
+        }
+
+        if !canon_rules.is_empty() {
+            prompt.push_str("\n### 【核心世界观公理 (Canon Rules)】\n");
+            prompt.push_str(&canon_rules.join("\n"));
+            prompt.push('\n');
+        }
+
+        if !char_profiles.is_empty() {
+            prompt.push_str("\n### 【核心登场角色】\n");
+            prompt.push_str(&char_profiles.join("\n"));
+            prompt.push('\n');
+        }
+
+        Ok(HierarchicalCreationContext {
+            novel_id: novel_id.to_string(),
+            chapter_id: chapter_id.to_string(),
+            scene_id: active_scene.as_ref().map(|s| s.id.clone()),
+            series_summary,
+            part_title: part.as_ref().map(|p| p.title.clone()),
+            part_goal: part.as_ref().map(|p| p.summary.clone()),
+            volume_title: volume.as_ref().map(|v| v.title.clone()),
+            volume_goal: volume.as_ref().map(|v| v.summary.clone()),
+            chapter_title: chapter.title,
+            chapter_number: chapter.chapter_number,
+            chapter_goal: chapter.chapter_goal.unwrap_or_default(),
+            scene_title: active_scene.as_ref().and_then(|s| s.title.clone()),
+            scene_objective: active_scene.as_ref().map(|s| s.objective.clone()),
+            scene_beats,
+            associated_main_lines,
+            associated_subplots,
+            associated_story_arcs,
+            associated_character_arcs,
+            active_foreshadowings,
+            parallel_threads,
+            recent_timeline_events,
+            l3_canon_rules: canon_rules,
+            l3_active_character_profiles: char_profiles,
+            formatted_system_prompt: prompt,
+        })
     }
 }
 
@@ -2337,6 +3911,8 @@ mod tests {
             language: Some("zh-CN".to_string()),
             writing_style: Some("硬派科幻、宏大叙事".to_string()),
             chapter_target_length: Some(4000),
+            series_id: None,
+            hierarchy_config: None,
         }).unwrap();
 
         assert_eq!(novel.title, "星穹之门");
@@ -2345,9 +3921,12 @@ mod tests {
         // 2. Create chapter
         let chapter = db.create_chapter(CreateChapterInput {
             novel_id: novel.id.clone(),
+            part_id: None,
             volume_id: None,
             chapter_number: Some(1),
+            order_index: Some(1),
             title: "启航日".to_string(),
+            chapter_goal: None,
             initial_content: Some("巨大的行星发动机在夜色中发出沉闷的低吼。".to_string()),
         }).unwrap();
 
@@ -2379,6 +3958,8 @@ mod tests {
             language: None,
             writing_style: None,
             chapter_target_length: None,
+            series_id: None,
+            hierarchy_config: None,
         }).unwrap();
 
         let chara = db.create_character(CreateCharacterInput {

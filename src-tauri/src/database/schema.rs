@@ -303,6 +303,116 @@ CREATE TABLE IF NOT EXISTS serialization_jobs (
     FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
 );
 
+-- ==========================================
+-- V2.0 MULTI-LEVEL HIERARCHY & PLOT SYSTEM
+-- ==========================================
+
+-- Series / Universe (系列 / 宇宙)
+CREATE TABLE IF NOT EXISTS series (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    genre_profile TEXT DEFAULT '',
+    world_definition TEXT DEFAULT '',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+-- Parts (部 / 篇)
+CREATE TABLE IF NOT EXISTS parts (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT NOT NULL,
+    part_number INTEGER NOT NULL DEFAULT 1,
+    title TEXT NOT NULL,
+    summary TEXT DEFAULT '',
+    order_index INTEGER NOT NULL DEFAULT 1,
+    status TEXT DEFAULT 'ACTIVE',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
+
+-- Plot Beats (情节节拍 - 细粒度规划单位)
+CREATE TABLE IF NOT EXISTS plot_beats (
+    id TEXT PRIMARY KEY,
+    scene_id TEXT NOT NULL,
+    beat_number INTEGER NOT NULL DEFAULT 1,
+    beat_type TEXT DEFAULT 'ACTION', -- ACTION, DIALOGUE, EMOTION, TWIST, REVELATION, HOOK, FORESHADOW
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    emotional_shift TEXT DEFAULT '',
+    characters_present TEXT DEFAULT '',
+    order_index INTEGER NOT NULL DEFAULT 1,
+    status TEXT DEFAULT 'PENDING', -- PENDING, COMPLETED, SKIPPED
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+);
+
+-- Paragraphs (正文段落)
+CREATE TABLE IF NOT EXISTS paragraphs (
+    id TEXT PRIMARY KEY,
+    chapter_id TEXT NOT NULL,
+    scene_id TEXT,
+    beat_id TEXT,
+    paragraph_index INTEGER NOT NULL,
+    paragraph_type TEXT DEFAULT 'NORMAL', -- NORMAL, DIALOGUE, MONOLOGUE, SCENERY, ACTION, PSYCHOLOGICAL
+    content TEXT NOT NULL,
+    character_speaker_id TEXT,
+    word_count INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
+    FOREIGN KEY(scene_id) REFERENCES scenes(id) ON DELETE SET NULL,
+    FOREIGN KEY(beat_id) REFERENCES plot_beats(id) ON DELETE SET NULL
+);
+
+-- Character Arcs (人物成长弧)
+CREATE TABLE IF NOT EXISTS character_arcs (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT NOT NULL,
+    character_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    stage_from TEXT DEFAULT '',
+    stage_to TEXT DEFAULT '',
+    current_stage TEXT DEFAULT '',
+    internal_conflict TEXT DEFAULT '',
+    status TEXT DEFAULT 'DEVELOPING', -- PLANNING, DEVELOPING, COMPLETED, FAILED
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE,
+    FOREIGN KEY(character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+
+-- Parallel Narrative Threads (并行叙事线)
+CREATE TABLE IF NOT EXISTS parallel_threads (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    pov_character_id TEXT,
+    thread_color TEXT DEFAULT '#854d0e',
+    summary TEXT DEFAULT '',
+    convergence_target TEXT DEFAULT '',
+    status TEXT DEFAULT 'ACTIVE', -- ACTIVE, PAUSED, MERGED, CLOSED
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
+
+-- Plot Associations (多对多剧情关联核心表: 跨部/卷/章/场景/节拍关联)
+CREATE TABLE IF NOT EXISTS plot_associations (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT NOT NULL,
+    relation_type TEXT NOT NULL, -- MAIN_PLOT, SUBPLOT, STORY_ARC, CHARACTER_ARC, FORESHADOWING, TIMELINE_EVENT, PARALLEL_THREAD
+    entity_id TEXT NOT NULL,
+    target_type TEXT NOT NULL, -- PART, VOLUME, CHAPTER, SCENE, BEAT
+    target_id TEXT NOT NULL,
+    role_in_target TEXT DEFAULT 'PROGRESSION', -- INTRODUCES, PROGRESSES, CLIMAX, RESOLVES, FORESHADOWS, MENTIONS
+    notes TEXT DEFAULT '',
+    weight INTEGER DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
+
 -- Create indexes for high performance
 CREATE INDEX IF NOT EXISTS idx_chapters_novel_id ON chapters(novel_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_volume_id ON chapters(volume_id);
@@ -316,6 +426,17 @@ CREATE INDEX IF NOT EXISTS idx_scenes_chapter_id ON scenes(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_story_events_novel_id ON story_events(novel_id);
 CREATE INDEX IF NOT EXISTS idx_review_findings_report_id ON review_findings(report_id);
 CREATE INDEX IF NOT EXISTS idx_serialization_jobs_novel_id ON serialization_jobs(novel_id);
+CREATE INDEX IF NOT EXISTS idx_parts_novel_id ON parts(novel_id);
+CREATE INDEX IF NOT EXISTS idx_plot_beats_scene_id ON plot_beats(scene_id);
+CREATE INDEX IF NOT EXISTS idx_paragraphs_chapter_id ON paragraphs(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_paragraphs_scene_id ON paragraphs(scene_id);
+CREATE INDEX IF NOT EXISTS idx_character_arcs_novel ON character_arcs(novel_id);
+CREATE INDEX IF NOT EXISTS idx_character_arcs_char ON character_arcs(character_id);
+CREATE INDEX IF NOT EXISTS idx_parallel_threads_novel ON parallel_threads(novel_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_plot_assoc_unique ON plot_associations(relation_type, entity_id, target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_plot_assoc_novel_rel ON plot_associations(novel_id, relation_type);
+CREATE INDEX IF NOT EXISTS idx_plot_assoc_target ON plot_associations(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_plot_assoc_entity ON plot_associations(entity_id);
 "#;
 
 pub const FTS5_SCHEMA: &str = r#"

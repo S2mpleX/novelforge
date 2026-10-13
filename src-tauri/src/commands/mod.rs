@@ -11,6 +11,11 @@ use crate::models::{
     GenerateStreamInput, MemoryContextPack, Novel, PlotThread, ReviewReport, SaveProviderInput,
     Scene, SerializationJob, StartSerializationJobInput, StoryArc, StoryEvent, StoryPhase,
     StreamChunkPayload, StylePolishResponse, Volume, WorldRule, DatabaseHealthReport,
+    Series, CreateSeriesInput, Part, CreatePartInput, CreateVolumeInput, HierarchyConfig,
+    PlotBeat, CreatePlotBeatInput, CharacterArc, CreateCharacterArcInput, ParallelThread,
+    CreateParallelThreadInput, PlotAssociation, CreatePlotAssociationInput, PlotAssociationView,
+    MoveNodeInput, SplitChapterInput, SplitSceneInput, MergeChaptersInput, MergeScenesInput,
+    RenumberHierarchyInput, NovelContentTree, HierarchicalCreationContext,
 };
 use crate::providers::{
     ChatMessage, ChatCompletionRequest, ConnectionTestResult, OpenAIClient,
@@ -799,10 +804,16 @@ pub async fn run_scene_planning(
         let sc = db.create_scene(CreateSceneInput {
             chapter_id: chapter_id.clone(),
             sequence: seq,
+            order_index: Some(seq),
+            title: Some(format!("场景 {}", seq)),
+            scene_number: Some(seq),
             objective: rs.objective,
             outline: rs.outline,
             pov_character_id: pov_char_id,
             location_id: rs.location,
+            content: None,
+            time_anchor: None,
+            conflict_target: None,
         }).map_err(|e| e.to_string())?;
 
         created_scenes.push(sc);
@@ -1258,9 +1269,12 @@ pub async fn advance_serialization_job_step(
 
     let new_chapter = db.create_chapter(CreateChapterInput {
         novel_id: job.novel_id.clone(),
+        part_id: None,
         volume_id: None,
         chapter_number: Some(next_number),
+        order_index: Some(next_number),
         title: next_title,
+        chapter_goal: Some("顺畅推进主线剧情，制造戏剧张力".to_string()),
         initial_content: None,
     }).map_err(|e| e.to_string())?;
 
@@ -1340,6 +1354,227 @@ pub fn optimize_database(
 ) -> Result<DatabaseHealthReport, String> {
     db.optimize_database().map_err(|e| e.to_string())
 }
+
+// ==========================================
+// V2.0 MULTI-LEVEL HIERARCHY & PLOT SYSTEM COMMANDS
+// ==========================================
+
+// --- SERIES ---
+
+#[tauri::command]
+pub fn create_series(db: State<DbManager>, input: CreateSeriesInput) -> Result<Series, String> {
+    db.create_series(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_series(db: State<DbManager>) -> Result<Vec<Series>, String> {
+    db.list_series().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_series(db: State<DbManager>, id: String) -> Result<Series, String> {
+    db.get_series(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_series(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_series(&id).map_err(|e| e.to_string())
+}
+
+// --- PARTS ---
+
+#[tauri::command]
+pub fn create_part(db: State<DbManager>, input: CreatePartInput) -> Result<Part, String> {
+    db.create_part(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_parts(db: State<DbManager>, novel_id: String) -> Result<Vec<Part>, String> {
+    db.list_parts(&novel_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_part(db: State<DbManager>, id: String) -> Result<Part, String> {
+    db.get_part(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_part(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_part(&id).map_err(|e| e.to_string())
+}
+
+// --- HIERARCHY CONFIG ---
+
+#[tauri::command]
+pub fn get_novel_hierarchy_config(db: State<DbManager>, novel_id: String) -> Result<HierarchyConfig, String> {
+    db.get_novel_hierarchy_config(&novel_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_novel_hierarchy_config(db: State<DbManager>, novel_id: String, config: HierarchyConfig) -> Result<HierarchyConfig, String> {
+    db.update_novel_hierarchy_config(&novel_id, config).map_err(|e| e.to_string())
+}
+
+// --- VOLUMES & SCENES (EXTRA CRUD) ---
+
+#[tauri::command]
+pub fn create_volume(db: State<DbManager>, input: CreateVolumeInput) -> Result<Volume, String> {
+    db.create_volume(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_volume(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_volume(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_scene(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_scene(&id).map_err(|e| e.to_string())
+}
+
+// --- PLOT BEATS ---
+
+#[tauri::command]
+pub fn create_plot_beat(db: State<DbManager>, input: CreatePlotBeatInput) -> Result<PlotBeat, String> {
+    db.create_plot_beat(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_plot_beats(db: State<DbManager>, scene_id: String) -> Result<Vec<PlotBeat>, String> {
+    db.list_plot_beats(&scene_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_plot_beat_status(db: State<DbManager>, id: String, status: String) -> Result<(), String> {
+    db.update_plot_beat_status(&id, &status).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_plot_beat(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_plot_beat(&id).map_err(|e| e.to_string())
+}
+
+// --- CHARACTER ARCS ---
+
+#[tauri::command]
+pub fn create_character_arc(db: State<DbManager>, input: CreateCharacterArcInput) -> Result<CharacterArc, String> {
+    db.create_character_arc(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_character_arcs(db: State<DbManager>, novel_id: String) -> Result<Vec<CharacterArc>, String> {
+    db.list_character_arcs(&novel_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_character_arc_stage(db: State<DbManager>, id: String, current_stage: String, status: String) -> Result<(), String> {
+    db.update_character_arc_stage(&id, &current_stage, &status).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_character_arc(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_character_arc(&id).map_err(|e| e.to_string())
+}
+
+// --- PARALLEL NARRATIVE THREADS ---
+
+#[tauri::command]
+pub fn create_parallel_thread(db: State<DbManager>, input: CreateParallelThreadInput) -> Result<ParallelThread, String> {
+    db.create_parallel_thread(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_parallel_threads(db: State<DbManager>, novel_id: String) -> Result<Vec<ParallelThread>, String> {
+    db.list_parallel_threads(&novel_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_parallel_thread_status(db: State<DbManager>, id: String, status: String) -> Result<(), String> {
+    db.update_parallel_thread_status(&id, &status).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_parallel_thread(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_parallel_thread(&id).map_err(|e| e.to_string())
+}
+
+// --- PLOT ASSOCIATIONS (M:N) ---
+
+#[tauri::command]
+pub fn create_plot_association(db: State<DbManager>, input: CreatePlotAssociationInput) -> Result<PlotAssociation, String> {
+    db.create_plot_association(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_plot_association(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_plot_association(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_plot_associations_for_target(db: State<DbManager>, target_type: String, target_id: String) -> Result<Vec<PlotAssociationView>, String> {
+    db.list_plot_associations_for_target(&target_type, &target_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_plot_associations_for_entity(db: State<DbManager>, relation_type: String, entity_id: String) -> Result<Vec<PlotAssociationView>, String> {
+    db.list_plot_associations_for_entity(&relation_type, &entity_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_novel_plot_matrix(db: State<DbManager>, novel_id: String) -> Result<Vec<PlotAssociationView>, String> {
+    db.list_novel_plot_matrix(&novel_id).map_err(|e| e.to_string())
+}
+
+// --- STRUCTURAL OPERATIONS ---
+
+#[tauri::command]
+pub fn move_node(db: State<DbManager>, input: MoveNodeInput) -> Result<(), String> {
+    db.move_node(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn split_chapter(db: State<DbManager>, input: SplitChapterInput) -> Result<(Chapter, Chapter), String> {
+    db.split_chapter(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn merge_chapters(db: State<DbManager>, input: MergeChaptersInput) -> Result<Chapter, String> {
+    db.merge_chapters(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn split_scene(db: State<DbManager>, input: SplitSceneInput) -> Result<(Scene, Scene), String> {
+    db.split_scene(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn merge_scenes(db: State<DbManager>, input: MergeScenesInput) -> Result<Scene, String> {
+    db.merge_scenes(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn renumber_hierarchy(db: State<DbManager>, input: RenumberHierarchyInput) -> Result<(), String> {
+    db.renumber_hierarchy(input).map_err(|e| e.to_string())
+}
+
+// --- NOVEL CONTENT TREE & CREATION CONTEXT ---
+
+#[tauri::command]
+pub fn get_novel_content_tree(db: State<DbManager>, novel_id: String) -> Result<NovelContentTree, String> {
+    db.get_novel_content_tree(&novel_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn assemble_hierarchical_creation_context(
+    db: State<DbManager>,
+    novel_id: String,
+    chapter_id: String,
+    scene_id: Option<String>,
+) -> Result<HierarchicalCreationContext, String> {
+    db.assemble_hierarchical_creation_context(&novel_id, &chapter_id, scene_id.as_deref())
+        .map_err(|e| e.to_string())
+}
+
 
 
 

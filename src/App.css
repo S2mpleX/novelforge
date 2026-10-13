@@ -21,13 +21,40 @@
     --input: 38 25% 82%;
     --ring: 28 80% 42%;
   }
+
+  :root.dark {
+    --background: 240 10% 7%;        /* #121216 深宵黑夜 */
+    --foreground: 40 15% 85%;        /* #dfdbd2 柔和月华白 */
+    --card: 240 10% 12%;             /* #1d1d24 冷砚卡片 */
+    --card-foreground: 40 15% 85%;
+    --popover: 240 10% 12%;
+    --popover-foreground: 40 15% 85%;
+    --primary: 38 92% 50%;           /* #f59e0b 沉水香金 */
+    --primary-foreground: 240 10% 8%;
+    --muted: 240 8% 18%;             /* #282833 */
+    --muted-foreground: 40 10% 60%;  /* #9c968a */
+    --accent: 240 8% 22%;            /* #323240 */
+    --accent-foreground: 40 15% 90%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 45 40% 98%;
+    --border: 240 8% 20%;            /* #2e2e3a */
+    --input: 240 8% 20%;
+    --ring: 38 92% 50%;
+  }
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
   user-select: none;
   background-color: #f4efe6;
   color: #2b2621;
@@ -127,6 +154,114 @@ body {
   background: rgba(140, 120, 95, 0.45);
 }
 
+/* ============================================================
+   Tactile Literary Paper System (物理纸张材质与书卷美学体系)
+   ============================================================ */
+
+/* 1. 温润宣纸 (Imperial Xuan Paper · 手工熟宣纸筋与松烟墨) */
+.paper-canvas-xuan {
+  background-color: #ede5d6;
+  background-image: 
+    radial-gradient(at 15% 15%, rgba(180, 83, 9, 0.06) 0px, transparent 55%),
+    radial-gradient(at 85% 85%, rgba(194, 65, 12, 0.04) 0px, transparent 60%);
+}
+
+.paper-sheet-xuan {
+  background-color: #fcf9f2;
+  background-image: 
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='xuanNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.5 0 0 0 0 0.38 0 0 0 0 0.25 0 0 0 0.055 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23xuanNoise)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.7) 0%, rgba(248, 242, 232, 0.9) 100%);
+  border: 1px solid #ded5c4;
+  box-shadow:
+    0 2px 4px rgba(120, 90, 50, 0.04),
+    0 8px 24px -4px rgba(110, 80, 45, 0.09),
+    0 20px 48px -12px rgba(80, 50, 20, 0.08),
+    0 0 0 1px rgba(220, 205, 180, 0.6),
+    2px 3px 0 0 rgba(232, 220, 200, 0.7),
+    4px 6px 0 0 rgba(220, 205, 185, 0.45);
+}
+
+/* 2. 澄心竹纸 (Serene Bamboo Paper · 清雅竹浆帘纹与竹墨绿) */
+.paper-canvas-bamboo {
+  background-color: #e4ebe2;
+  background-image: 
+    radial-gradient(at 15% 15%, rgba(4, 120, 87, 0.05) 0px, transparent 55%),
+    radial-gradient(at 85% 85%, rgba(22, 101, 52, 0.04) 0px, transparent 60%);
+}
+
+.paper-sheet-bamboo {
+  background-color: #fafdf9;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='bambooNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04 0.92' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.1 0 0 0 0 0.35 0 0 0 0 0.2 0 0 0 0.045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23bambooNoise)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(140, 175, 145, 0.05) 40px),
+    radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.8) 0%, rgba(240, 246, 238, 0.9) 100%);
+  border: 1px solid #d4ded1;
+  box-shadow:
+    0 2px 4px rgba(40, 60, 45, 0.04),
+    0 8px 24px -4px rgba(50, 80, 55, 0.08),
+    0 20px 48px -12px rgba(40, 70, 45, 0.06),
+    0 0 0 1px rgba(205, 218, 202, 0.7),
+    2px 3px 0 0 rgba(226, 235, 224, 0.75),
+    4px 6px 0 0 rgba(212, 223, 208, 0.45);
+}
+
+/* 3. 复古牛皮 (Vintage Kraft · 做旧原浆斑驳与沉香焦褐) */
+.paper-canvas-kraft {
+  background-color: #382618;
+  background-image: 
+    radial-gradient(at 50% 25%, rgba(180, 120, 60, 0.18) 0px, transparent 70%),
+    linear-gradient(180deg, #322215 0%, #20140a 100%);
+}
+
+.paper-sheet-kraft {
+  background-color: #ecdab9;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='kraftNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.68' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.5 0 0 0 0 0.32 0 0 0 0 0.15 0 0 0 0.11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23kraftNoise)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at center, rgba(246, 236, 214, 0.95) 0%, rgba(234, 214, 183, 0.8) 60%, rgba(198, 170, 126, 0.95) 100%);
+  border: 1px solid #b89b70;
+  box-shadow:
+    0 3px 6px rgba(40, 20, 5, 0.22),
+    0 12px 32px -4px rgba(50, 25, 8, 0.38),
+    0 28px 64px -12px rgba(40, 20, 5, 0.32),
+    0 0 0 1px rgba(184, 155, 112, 0.75),
+    2px 3px 0 0 rgba(195, 168, 128, 0.8),
+    4px 6px 0 0 rgba(175, 146, 105, 0.55);
+}
+
+/* 4. 水墨夜读 (Midnight Ink Wash · 歙砚深墨与柔和月华白) */
+.paper-canvas-midnight {
+  background-color: #111115;
+  background-image: 
+    radial-gradient(at 50% 15%, rgba(217, 119, 6, 0.05) 0px, transparent 55%),
+    linear-gradient(180deg, #131317 0%, #0d0d10 100%);
+}
+
+.paper-sheet-midnight {
+  background-color: #1a1a20;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='nightNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23nightNoise)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 50% 20%, #26262e 0%, #1c1c22 60%, #15151a 100%);
+  border: 1px solid #383842;
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.5),
+    0 16px 40px -4px rgba(0, 0, 0, 0.75),
+    0 32px 72px -12px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(70, 70, 82, 0.65),
+    2px 3px 0 0 rgba(42, 42, 50, 0.75),
+    4px 6px 0 0 rgba(30, 30, 36, 0.55);
+}
+
+/* 可选信笺稿纸行线 (Ruled manuscript lines pattern) */
+.paper-ruled-active {
+  background-image:
+    repeating-linear-gradient(
+      transparent,
+      transparent calc(var(--editor-font-size, 18px) * var(--editor-line-height, 2.15) - 1px),
+      var(--paper-ruled-color, rgba(180, 140, 90, 0.14)) calc(var(--editor-font-size, 18px) * var(--editor-line-height, 2.15))
+    ) !important;
+  background-attachment: local !important;
+}
+
 /* Tiptap Literary Paper Editor Styling */
 .ProseMirror {
   outline: none !important;
@@ -135,7 +270,7 @@ body {
   font-size: var(--editor-font-size, 18px);
   line-height: var(--editor-line-height, 2.15);
   letter-spacing: 0.03em;
-  color: #231f1a; /* 徽墨浓黑 */
+  color: var(--editor-text-color, #231f1a);
   user-select: text;
   padding-bottom: 140px;
 }
@@ -147,6 +282,23 @@ body {
 .editor-surface .ProseMirror {
   font-size: var(--editor-font-size, 18px) !important;
   line-height: var(--editor-line-height, 2.15) !important;
+  color: var(--editor-text-color, #231f1a) !important;
+}
+
+.editor-surface .ProseMirror h1,
+.editor-surface .ProseMirror h2,
+.editor-surface .ProseMirror h3 {
+  color: var(--editor-heading-color, #1a1612) !important;
+}
+
+.editor-surface .ProseMirror blockquote {
+  border-left-color: var(--editor-accent-color, #b45309) !important;
+  color: var(--editor-quote-color, #635749) !important;
+  background: var(--editor-quote-bg, rgba(180, 83, 9, 0.05)) !important;
+}
+
+.editor-surface .ProseMirror hr {
+  border-top-color: var(--editor-border-color, #d5c8b2) !important;
 }
 
 .ProseMirror p {
@@ -212,4 +364,233 @@ body {
 
 .animate-pulse-subtle {
   animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ============================================================
+   Global Dark Mode System (全站水墨夜读 / 曜夜暗色系统)
+   ============================================================ */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #121216 !important;
+  color: #dfdbd2 !important;
+}
+
+.dark .ambient-bg {
+  background-color: #121216 !important;
+  background-image: 
+    radial-gradient(at 15% 15%, rgba(217, 119, 6, 0.05) 0px, transparent 55%),
+    radial-gradient(at 85% 20%, rgba(180, 83, 9, 0.04) 0px, transparent 50%),
+    radial-gradient(at 50% 90%, rgba(60, 60, 75, 0.06) 0px, transparent 60%) !important;
+}
+
+/* Desk canvas surrounding paper in Dark Mode */
+.dark .paper-canvas-xuan,
+.dark .paper-canvas-bamboo,
+.dark .paper-canvas-kraft,
+.dark .paper-canvas-midnight {
+  background-color: #111115 !important;
+  background-image: 
+    radial-gradient(at 50% 15%, rgba(217, 119, 6, 0.05) 0px, transparent 55%),
+    linear-gradient(180deg, #131317 0%, #0d0d10 100%) !important;
+}
+
+/* Glass Panels & Cards in Dark Mode */
+.dark .glass-panel {
+  background: rgba(22, 22, 28, 0.95) !important;
+  border-color: #2e2e3a !important;
+}
+
+.dark .glass-panel-subtle {
+  background: rgba(26, 26, 34, 0.8) !important;
+  border-color: #343442 !important;
+}
+
+.dark .glass-card {
+  background: linear-gradient(145deg, #1d1d25 0%, #16161e 100%) !important;
+  border-color: #2e2e3a !important;
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.45) !important;
+}
+
+.dark .glass-card:hover {
+  border-color: #d97706 !important;
+  box-shadow: 0 6px 20px -3px rgba(217, 119, 6, 0.18) !important;
+}
+
+/* Background Color Mappings in Dark Mode */
+.dark [class*="bg-[#f4efe6]"] {
+  background-color: #121216 !important;
+}
+
+.dark [class*="bg-[#efe9dc]"],
+.dark [class*="bg-[#f3ede1]"],
+.dark [class*="bg-[#eadecb]"],
+.dark [class*="bg-[#eae2d3]"],
+.dark [class*="bg-[#f6f1e8]"],
+.dark [class*="bg-[#ede5d6]"],
+.dark [class*="bg-[#fbf8f2]"],
+.dark [class*="bg-[#f0e9dc]"],
+.dark [class*="bg-[#f8f4ec]"],
+.dark [class*="bg-[#ede8dc]"] {
+  background-color: #171720 !important;
+}
+
+.dark [class*="bg-[#fdfbf7]"],
+.dark [class*="bg-[#f7f2e7]"],
+.dark [class*="bg-[#fafdf9]"],
+.dark [class*="bg-[#fbf7ee]"],
+.dark [class*="bg-[#edf5eb]"] {
+  background-color: #1d1d28 !important;
+}
+
+.dark [class*="bg-[#e4dcce]"],
+.dark [class*="bg-[#e8e0d0]"],
+.dark [class*="bg-[#e8e0d1]"],
+.dark [class*="bg-[#e6dece]"],
+.dark [class*="bg-[#e8dfcf]"],
+.dark [class*="bg-[#f0e8d9]"],
+.dark [class*="bg-[#f6efe1]"],
+.dark [class*="bg-[#ded4c3]"] {
+  background-color: #282835 !important;
+}
+
+/* Hover States in Dark Mode */
+.dark [class*="hover:bg-[#e4dcce]"]:hover,
+.dark [class*="hover:bg-[#dfd5c4]"]:hover,
+.dark [class*="hover:bg-[#dfd4c0]"]:hover,
+.dark [class*="hover:bg-[#dad0c0]"]:hover,
+.dark [class*="hover:bg-[#e5ded0]"]:hover,
+.dark [class*="hover:bg-[#eae2d3]"]:hover,
+.dark [class*="hover:bg-[#f2ece0]"]:hover,
+.dark [class*="hover:bg-[#ede5d6]"]:hover,
+.dark [class*="hover:bg-[#ded4c3]"]:hover,
+.dark [class*="hover:bg-[#f6efe1]"]:hover,
+.dark [class*="hover:bg-[#f0e8d9]"]:hover {
+  background-color: #323244 !important;
+}
+
+/* Border Color Mappings in Dark Mode */
+.dark [class*="border-[#ded5c4]"],
+.dark [class*="border-[#ded4c1]"],
+.dark [class*="border-[#d5cbb8]"],
+.dark [class*="border-[#d5c9b4]"],
+.dark [class*="border-[#dcd1be]"],
+.dark [class*="border-[#eee6d8]"],
+.dark [class*="border-[#d8cca8]"],
+.dark [class*="border-[#cdd9ca]"],
+.dark [class*="border-[#ba9e74]"],
+.dark [class*="border-[#dad0c0]"],
+.dark [class*="border-[#b89b70]"],
+.dark [class*="border-[#a9c2a5]"],
+.dark [class*="border-[#c8b496]"] {
+  border-color: #2e2e3c !important;
+}
+
+/* Text Colors in Dark Mode */
+.dark [class*="text-[#2b2621]"],
+.dark [class*="text-[#231f1a]"],
+.dark [class*="text-[#1f1d1a]"],
+.dark [class*="text-[#1a1612]"],
+.dark [class*="text-[#2c2825]"],
+.dark [class*="text-[#3d362e]"],
+.dark [class*="text-[#2a1b10]"],
+.dark [class*="text-[#17241a]"] {
+  color: #dfdbd2 !important;
+}
+
+.dark [class*="text-[#685f54]"],
+.dark [class*="text-[#786f65]"],
+.dark [class*="text-[#6b6255]"],
+.dark [class*="text-[#5e5549]"],
+.dark [class*="text-[#5f564a]"],
+.dark [class*="text-[#6b583f]"],
+.dark [class*="text-[#8c8273]"],
+.dark [class*="text-[#8e8476]"],
+.dark [class*="text-[#9e917f]"],
+.dark [class*="text-[#435447]"],
+.dark [class*="text-[#5c432d]"] {
+  color: #a49e93 !important;
+}
+
+/* Amber / Gold Text & Accents in Dark Mode (High Contrast Water-Ink Gold) */
+.dark [class*="text-[#854d0e]"],
+.dark [class*="text-[#92400e]"],
+.dark [class*="text-[#b45309]"],
+.dark [class*="text-[#c2410c]"],
+.dark [class*="text-[#a16207]"],
+.dark .text-amber-800,
+.dark .text-amber-900 {
+  color: #f59e0b !important;
+}
+
+.dark .text-amber-700 {
+  color: #fbbf24 !important;
+}
+
+/* Amber / Brown Badges & Active Borders in Dark Mode */
+.dark [class*="bg-amber-800/10"],
+.dark [class*="bg-amber-800/15"],
+.dark [class*="bg-amber-800/20"] {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  color: #f59e0b !important;
+}
+
+.dark [class*="border-amber-800/20"],
+.dark [class*="border-amber-800/25"],
+.dark [class*="border-amber-800/30"] {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+.dark .border-t-amber-800 {
+  border-top-color: #f59e0b !important;
+}
+
+.dark [class*="bg-[#854d0e]"] {
+  background-color: #b45309 !important;
+  color: #ffffff !important;
+}
+
+.dark [class*="hover:bg-[#713f12]"]:hover {
+  background-color: #92400e !important;
+}
+
+/* Form Elements in Dark Mode */
+.dark input,
+.dark textarea,
+.dark select {
+  color: #dfdbd2 !important;
+  background-color: #23232e !important;
+  border-color: #333344 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #6e685f !important;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: #f59e0b !important;
+}
+
+/* Dialog / Modal Overlays & Menus in Dark Mode */
+.dark .bg-black\/40 {
+  background-color: rgba(0, 0, 0, 0.65) !important;
+}
+
+.dark .shadow-xl,
+.dark .shadow-2xl {
+  box-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Custom Scrollbars in Dark Mode */
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(180, 180, 200, 0.2);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(180, 180, 200, 0.35);
 }

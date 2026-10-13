@@ -1,5 +1,80 @@
 use serde::{Deserialize, Serialize};
 
+// ==========================================
+// V2.0 MULTI-LEVEL HIERARCHY MODELS
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HierarchyConfig {
+    #[serde(default = "default_false")]
+    pub enable_parts: bool,
+    #[serde(default = "default_true")]
+    pub enable_volumes: bool,
+    #[serde(default = "default_true")]
+    pub enable_scenes: bool,
+    #[serde(default = "default_false")]
+    pub enable_beats: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+fn default_false() -> bool {
+    false
+}
+
+impl Default for HierarchyConfig {
+    fn default() -> Self {
+        Self {
+            enable_parts: false,
+            enable_volumes: true,
+            enable_scenes: true,
+            enable_beats: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Series {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub genre_profile: String,
+    pub world_definition: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateSeriesInput {
+    pub title: String,
+    pub description: Option<String>,
+    pub genre_profile: Option<String>,
+    pub world_definition: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Part {
+    pub id: String,
+    pub novel_id: String,
+    pub part_number: i64,
+    pub title: String,
+    pub summary: String,
+    pub order_index: i64,
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatePartInput {
+    pub novel_id: String,
+    pub part_number: Option<i64>,
+    pub title: String,
+    pub summary: Option<String>,
+    pub order_index: Option<i64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Novel {
     pub id: String,
@@ -9,6 +84,9 @@ pub struct Novel {
     pub language: String,
     pub writing_style: String,
     pub status: String,
+    pub series_id: Option<String>,
+    pub series_order: Option<i64>,
+    pub hierarchy_config: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
     pub chapter_count: Option<i64>,
@@ -23,12 +101,15 @@ pub struct CreateNovelInput {
     pub language: Option<String>,
     pub writing_style: Option<String>,
     pub chapter_target_length: Option<i64>,
+    pub series_id: Option<String>,
+    pub hierarchy_config: Option<HierarchyConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Volume {
     pub id: String,
     pub novel_id: String,
+    pub part_id: Option<String>,
     pub title: String,
     pub order_index: i64,
     pub summary: String,
@@ -37,12 +118,24 @@ pub struct Volume {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateVolumeInput {
+    pub novel_id: String,
+    pub part_id: Option<String>,
+    pub title: String,
+    pub summary: Option<String>,
+    pub order_index: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chapter {
     pub id: String,
     pub novel_id: String,
+    pub part_id: Option<String>,
     pub volume_id: Option<String>,
     pub chapter_number: i64,
+    pub order_index: Option<i64>,
     pub title: String,
+    pub chapter_goal: Option<String>,
     pub status: String,
     pub active_version_id: Option<String>,
     pub word_count: i64,
@@ -54,9 +147,12 @@ pub struct Chapter {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateChapterInput {
     pub novel_id: String,
+    pub part_id: Option<String>,
     pub volume_id: Option<String>,
     pub chapter_number: Option<i64>,
+    pub order_index: Option<i64>,
     pub title: String,
+    pub chapter_goal: Option<String>,
     pub initial_content: Option<String>,
 }
 
@@ -277,10 +373,17 @@ pub struct Scene {
     pub id: String,
     pub chapter_id: String,
     pub sequence: i64,
+    pub order_index: Option<i64>,
+    pub title: Option<String>,
+    pub scene_number: Option<i64>,
     pub objective: String,
     pub outline: String,
     pub pov_character_id: Option<String>,
     pub location_id: String,
+    pub content: Option<String>,
+    pub word_count: Option<i64>,
+    pub time_anchor: Option<String>,
+    pub conflict_target: Option<String>,
     pub status: String,
     pub created_at: i64,
 }
@@ -289,10 +392,16 @@ pub struct Scene {
 pub struct CreateSceneInput {
     pub chapter_id: String,
     pub sequence: i64,
+    pub order_index: Option<i64>,
+    pub title: Option<String>,
+    pub scene_number: Option<i64>,
     pub objective: String,
     pub outline: String,
     pub pov_character_id: Option<String>,
     pub location_id: Option<String>,
+    pub content: Option<String>,
+    pub time_anchor: Option<String>,
+    pub conflict_target: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -527,6 +636,239 @@ pub struct NovelArchive {
     pub exported_at: i64,
     pub version: String,
 }
+
+// ==========================================
+// V2.0 INDEPENDENT PLOT SYSTEM & HIERARCHY OPERATIONS
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlotBeat {
+    pub id: String,
+    pub scene_id: String,
+    pub beat_number: i64,
+    pub beat_type: String, // ACTION, DIALOGUE, EMOTION, TWIST, REVELATION, HOOK, FORESHADOW
+    pub title: String,
+    pub description: String,
+    pub emotional_shift: String,
+    pub characters_present: String,
+    pub order_index: i64,
+    pub status: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatePlotBeatInput {
+    pub scene_id: String,
+    pub beat_number: Option<i64>,
+    pub beat_type: Option<String>,
+    pub title: String,
+    pub description: Option<String>,
+    pub emotional_shift: Option<String>,
+    pub characters_present: Option<String>,
+    pub order_index: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Paragraph {
+    pub id: String,
+    pub chapter_id: String,
+    pub scene_id: Option<String>,
+    pub beat_id: Option<String>,
+    pub paragraph_index: i64,
+    pub paragraph_type: String,
+    pub content: String,
+    pub character_speaker_id: Option<String>,
+    pub word_count: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateParagraphInput {
+    pub chapter_id: String,
+    pub scene_id: Option<String>,
+    pub beat_id: Option<String>,
+    pub paragraph_index: i64,
+    pub paragraph_type: Option<String>,
+    pub content: String,
+    pub character_speaker_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterArc {
+    pub id: String,
+    pub novel_id: String,
+    pub character_id: String,
+    pub title: String,
+    pub stage_from: String,
+    pub stage_to: String,
+    pub current_stage: String,
+    pub internal_conflict: String,
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateCharacterArcInput {
+    pub novel_id: String,
+    pub character_id: String,
+    pub title: String,
+    pub stage_from: Option<String>,
+    pub stage_to: Option<String>,
+    pub current_stage: Option<String>,
+    pub internal_conflict: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParallelThread {
+    pub id: String,
+    pub novel_id: String,
+    pub title: String,
+    pub pov_character_id: Option<String>,
+    pub thread_color: String,
+    pub summary: String,
+    pub convergence_target: String,
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateParallelThreadInput {
+    pub novel_id: String,
+    pub title: String,
+    pub pov_character_id: Option<String>,
+    pub thread_color: Option<String>,
+    pub summary: Option<String>,
+    pub convergence_target: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlotAssociation {
+    pub id: String,
+    pub novel_id: String,
+    pub relation_type: String, // MAIN_PLOT, SUBPLOT, STORY_ARC, CHARACTER_ARC, FORESHADOWING, TIMELINE_EVENT, PARALLEL_THREAD
+    pub entity_id: String,
+    pub target_type: String, // PART, VOLUME, CHAPTER, SCENE, BEAT
+    pub target_id: String,
+    pub role_in_target: String, // INTRODUCES, PROGRESSES, CLIMAX, RESOLVES, FORESHADOWS, MENTIONS
+    pub notes: String,
+    pub weight: i64,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatePlotAssociationInput {
+    pub novel_id: String,
+    pub relation_type: String,
+    pub entity_id: String,
+    pub target_type: String,
+    pub target_id: String,
+    pub role_in_target: Option<String>,
+    pub notes: Option<String>,
+    pub weight: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlotAssociationView {
+    pub association: PlotAssociation,
+    pub entity_title: String,
+    pub target_title: String,
+}
+
+// Lifecycle and Structure Operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MoveNodeInput {
+    pub node_type: String, // 'CHAPTER' | 'SCENE' | 'BEAT' | 'VOLUME'
+    pub node_id: String,
+    pub new_parent_id: Option<String>,
+    pub new_order: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SplitChapterInput {
+    pub chapter_id: String,
+    pub split_type: String, // 'CONTENT_OFFSET' | 'SCENE_INDEX' | 'PARAGRAPH_INDEX'
+    pub split_point: i64,
+    pub new_chapter_title: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SplitSceneInput {
+    pub scene_id: String,
+    pub split_beat_index: i64,
+    pub new_scene_title: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MergeChaptersInput {
+    pub source_chapter_id: String,
+    pub target_chapter_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MergeScenesInput {
+    pub source_scene_id: String,
+    pub target_scene_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RenumberHierarchyInput {
+    pub novel_id: String,
+    pub per_volume_chapter_numbering: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentTreeNode {
+    pub id: String,
+    pub node_type: String, // SERIES, NOVEL, PART, VOLUME, CHAPTER, SCENE, BEAT
+    pub title: String,
+    pub number: i64,
+    pub order_index: i64,
+    pub parent_id: Option<String>,
+    pub word_count: i64,
+    pub status: String,
+    pub goal_or_summary: String,
+    pub associated_plot_count: i64,
+    pub children: Vec<ContentTreeNode>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NovelContentTree {
+    pub novel_id: String,
+    pub hierarchy_config: HierarchyConfig,
+    pub root_nodes: Vec<ContentTreeNode>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HierarchicalCreationContext {
+    pub novel_id: String,
+    pub chapter_id: String,
+    pub scene_id: Option<String>,
+    pub series_summary: Option<String>,
+    pub part_title: Option<String>,
+    pub part_goal: Option<String>,
+    pub volume_title: Option<String>,
+    pub volume_goal: Option<String>,
+    pub chapter_title: String,
+    pub chapter_number: i64,
+    pub chapter_goal: String,
+    pub scene_title: Option<String>,
+    pub scene_objective: Option<String>,
+    pub scene_beats: Vec<PlotBeat>,
+    pub associated_main_lines: Vec<String>,
+    pub associated_subplots: Vec<String>,
+    pub associated_story_arcs: Vec<String>,
+    pub associated_character_arcs: Vec<String>,
+    pub active_foreshadowings: Vec<String>,
+    pub parallel_threads: Vec<String>,
+    pub recent_timeline_events: Vec<String>,
+    pub l3_canon_rules: Vec<String>,
+    pub l3_active_character_profiles: Vec<String>,
+    pub formatted_system_prompt: String,
+}
+
 
 
 

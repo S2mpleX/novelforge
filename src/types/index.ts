@@ -1,3 +1,12 @@
+export interface HierarchyConfig {
+  enable_parts: boolean;
+  enable_volumes: boolean;
+  enable_scenes: boolean;
+  enable_plot_beats: boolean;
+  default_planning_level: 'CHAPTER' | 'SCENE' | 'PLOT_BEAT';
+  default_publishing_level: 'VOLUME' | 'CHAPTER';
+}
+
 export interface Novel {
   id: string;
   title: string;
@@ -6,6 +15,8 @@ export interface Novel {
   language: string;
   writing_style: string;
   status: string;
+  series_id?: string;
+  hierarchy_config?: HierarchyConfig;
   created_at: number;
   updated_at: number;
   chapter_count?: number;
@@ -13,12 +24,33 @@ export interface Novel {
   chapter_target_length?: number;
 }
 
-export interface Volume {
+export interface Series {
+  id: string;
+  title: string;
+  description?: string;
+  genre?: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface Part {
   id: string;
   novel_id: string;
   title: string;
-  order_index: number;
-  summary: string;
+  description?: string;
+  sequence: number;
+  created_at: number;
+}
+
+export interface Volume {
+  id: string;
+  novel_id: string;
+  part_id?: string;
+  title: string;
+  description?: string;
+  summary?: string;
+  sequence?: number;
+  order_index?: number;
   status: string;
   created_at: number;
 }
@@ -26,8 +58,10 @@ export interface Volume {
 export interface Chapter {
   id: string;
   novel_id: string;
+  part_id?: string;
   volume_id?: string;
   chapter_number: number;
+  sequence?: number;
   title: string;
   status: string;
   active_version_id?: string;
@@ -316,6 +350,207 @@ export interface DatabaseHealthReport {
   total_characters: number;
   total_world_rules: number;
   total_canon_facts: number;
+}
+
+// --- V2.0 Independent Plot Relations & Hierarchy Lifecycle ---
+
+export interface PlotBeat {
+  id: string;
+  scene_id: string;
+  beat_number: number;
+  beat_type: 'ACTION' | 'DIALOGUE' | 'EMOTION' | 'TWIST' | 'REVELATION' | 'HOOK' | 'FORESHADOW' | 'CRISIS';
+  title: string;
+  description: string;
+  emotional_shift: string;
+  characters_present: string;
+  order_index: number;
+  status: 'PENDING' | 'DRAFTED' | 'COMPLETED' | 'CANCELLED';
+  created_at: number;
+}
+
+export interface CreatePlotBeatInput {
+  scene_id: string;
+  beat_number?: number;
+  beat_type?: string;
+  title: string;
+  description?: string;
+  emotional_shift?: string;
+  characters_present?: string;
+  order_index?: number;
+}
+
+export interface CharacterArc {
+  id: string;
+  novel_id: string;
+  character_id: string;
+  title: string;
+  stage_from: string;
+  stage_to: string;
+  current_stage: string;
+  internal_conflict: string;
+  status: 'ACTIVE' | 'RESOLVED' | 'PAUSED';
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CreateCharacterArcInput {
+  novel_id: string;
+  character_id: string;
+  title: string;
+  stage_from?: string;
+  stage_to?: string;
+  current_stage?: string;
+  internal_conflict?: string;
+}
+
+export interface ParallelThread {
+  id: string;
+  novel_id: string;
+  title: string;
+  pov_character_id?: string;
+  thread_color: string;
+  summary: string;
+  convergence_target: string;
+  status: 'ACTIVE' | 'CONVERGED' | 'ABANDONED';
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CreateParallelThreadInput {
+  novel_id: string;
+  title: string;
+  pov_character_id?: string;
+  thread_color?: string;
+  summary?: string;
+  convergence_target?: string;
+}
+
+export type PlotRelationType =
+  | 'MAIN_PLOT'
+  | 'SUBPLOT'
+  | 'STORY_ARC'
+  | 'CHARACTER_ARC'
+  | 'FORESHADOWING'
+  | 'TIMELINE_EVENT'
+  | 'PARALLEL_THREAD';
+
+export type HierarchyTargetType =
+  | 'PART'
+  | 'VOLUME'
+  | 'CHAPTER'
+  | 'SCENE'
+  | 'BEAT';
+
+export interface PlotAssociation {
+  id: string;
+  novel_id: string;
+  relation_type: PlotRelationType;
+  entity_id: string;
+  target_type: HierarchyTargetType;
+  target_id: string;
+  role_in_target: string;
+  notes: string;
+  weight: number;
+  created_at: number;
+}
+
+export interface CreatePlotAssociationInput {
+  novel_id: string;
+  relation_type: string;
+  entity_id: string;
+  target_type: string;
+  target_id: string;
+  role_in_target?: string;
+  notes?: string;
+  weight?: number;
+}
+
+export interface PlotAssociationView {
+  association: PlotAssociation;
+  entity_title: string;
+  target_title: string;
+}
+
+export interface MoveNodeInput {
+  node_type: 'PART' | 'VOLUME' | 'CHAPTER' | 'SCENE' | 'BEAT';
+  node_id: string;
+  new_parent_id?: string;
+  new_order?: number;
+}
+
+export interface SplitChapterInput {
+  chapter_id: string;
+  split_type: 'CONTENT_OFFSET' | 'SCENE_INDEX' | 'PARAGRAPH_INDEX';
+  split_point: number;
+  new_chapter_title?: string;
+}
+
+export interface MergeChaptersInput {
+  source_chapter_id: string;
+  target_chapter_id: string;
+}
+
+export interface SplitSceneInput {
+  scene_id: string;
+  split_beat_index: number;
+  new_scene_title?: string;
+}
+
+export interface MergeScenesInput {
+  source_scene_id: string;
+  target_scene_id: string;
+}
+
+export interface RenumberHierarchyInput {
+  novel_id: string;
+  per_volume_chapter_numbering?: boolean;
+}
+
+export interface ContentTreeNode {
+  id: string;
+  node_type: 'SERIES' | 'NOVEL' | 'PART' | 'VOLUME' | 'CHAPTER' | 'SCENE' | 'BEAT';
+  title: string;
+  number: number;
+  order_index: number;
+  parent_id?: string;
+  word_count: number;
+  status: string;
+  goal_or_summary: string;
+  associated_plot_count: number;
+  children: ContentTreeNode[];
+}
+
+export interface NovelContentTree {
+  novel_id: string;
+  hierarchy_config: HierarchyConfig;
+  root_nodes: ContentTreeNode[];
+}
+
+export interface HierarchicalCreationContext {
+  novel_id: string;
+  chapter_id: string;
+  scene_id?: string;
+  series_summary?: string;
+  part_title?: string;
+  part_goal?: string;
+  volume_title?: string;
+  volume_goal?: string;
+  chapter_title: string;
+  chapter_number: number;
+  chapter_goal: string;
+  scene_title?: string;
+  scene_objective?: string;
+  scene_beats: PlotBeat[];
+  associated_main_lines: string[];
+  associated_subplots: string[];
+  associated_story_arcs: string[];
+  associated_character_arcs: string[];
+  active_foreshadowings: string[];
+  parallel_threads: string[];
+  recent_timeline_events: string[];
+  l3_canon_rules: string[];
+  l3_active_character_profiles: string[];
+  formatted_system_prompt: string;
 }
 
 

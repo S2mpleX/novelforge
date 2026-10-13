@@ -15,12 +15,18 @@ import {
   Sparkles,
   AlignLeft,
   X,
+  Sun,
+  Moon,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
 } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onOpenSettings: () => void;
+  onOpenUpdater?: () => void;
   onOpenSerialization: () => void;
   onOpenPublishing: () => void;
   onOpenCreateChapter: () => void;
@@ -31,6 +37,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
   isOpen,
   onClose,
   onOpenSettings,
+  onOpenUpdater,
   onOpenSerialization,
   onOpenPublishing,
   onOpenCreateChapter,
@@ -41,6 +48,12 @@ export const CommandPaletteModal: React.FC<Props> = ({
     selectChapter,
     setActiveTab,
     saveCurrentChapter,
+    themeMode,
+    toggleThemeMode,
+    uiScale,
+    increaseUiScale,
+    decreaseUiScale,
+    resetUiScale,
   } = useNovelStore();
 
   const [query, setQuery] = useState('');
@@ -167,6 +180,57 @@ export const CommandPaletteModal: React.FC<Props> = ({
       action: () => {
         onClose();
         onOpenSettings();
+      },
+    },
+    {
+      id: 'cmd-updater',
+      icon: <Sparkles className="w-4 h-4 text-[#854d0e]" />,
+      title: '检查软件更新 · 软件更新中心 (Update Center)',
+      category: '系统工具',
+      action: () => {
+        onClose();
+        if (onOpenUpdater) {
+          onOpenUpdater();
+        } else {
+          onOpenSettings();
+        }
+      },
+    },
+    {
+      id: 'cmd-theme-toggle',
+      icon: themeMode === 'dark' ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-400" />,
+      title: themeMode === 'dark' ? '切换全站外观 ➔ 白天明亮雅致模式 (Light Mode)' : '切换全站外观 ➔ 黑夜水墨护眼模式 (Dark Mode)',
+      category: '外观与界面',
+      action: () => {
+        onClose();
+        toggleThemeMode();
+      },
+    },
+    {
+      id: 'cmd-zoom-in',
+      icon: <ZoomIn className="w-4 h-4 text-[#854d0e]" />,
+      title: `放大全局界面与文字尺寸 (+5%，当前 ${uiScale}%)`,
+      category: '外观与界面',
+      action: () => {
+        increaseUiScale();
+      },
+    },
+    {
+      id: 'cmd-zoom-out',
+      icon: <ZoomOut className="w-4 h-4 text-[#854d0e]" />,
+      title: `缩小全局界面与文字尺寸 (-5%，当前 ${uiScale}%)`,
+      category: '外观与界面',
+      action: () => {
+        decreaseUiScale();
+      },
+    },
+    {
+      id: 'cmd-zoom-reset',
+      icon: <RotateCcw className="w-4 h-4 text-[#854d0e]" />,
+      title: '重置全局界面与文字尺寸为 100% 默认大小',
+      category: '外观与界面',
+      action: () => {
+        resetUiScale();
       },
     },
   ];

@@ -62,9 +62,11 @@ export const AiAssistantPanel: React.FC = () => {
     rightPanelOpen,
     activeProvider,
     loadProviders,
+    creationContext,
   } = useNovelStore();
 
   const [activeTab, setActiveTab] = useState<'STREAM_WRITE' | 'COLLABORATE' | 'CONTINUITY' | 'STYLE_POLISH' | 'TOOLBOX'>('STREAM_WRITE');
+  const [showHierarchyContext, setShowHierarchyContext] = useState(false);
 
   // --- TYPEWRITER STREAMING ENGINE ---
   const {
@@ -422,9 +424,9 @@ export const AiAssistantPanel: React.FC = () => {
   };
 
   return (
-    <aside className="w-96 border-l border-[#ded5c4] bg-[#f3ede1]/95 backdrop-blur-xl flex flex-col shrink-0 select-none h-[calc(100vh-3.5rem)] shadow-sm">
+    <div className="w-full h-full flex-1 min-w-0 bg-[#f3ede1]/95 backdrop-blur-xl flex flex-col select-none overflow-hidden">
       {/* Top Header & Model Info */}
-      <div className="p-3.5 border-b border-[#ded5c4] flex items-center justify-between bg-[#eae2d3]/50">
+      <div className="p-3.5 border-b border-[#ded5c4] flex items-center justify-between bg-[#eae2d3]/50 shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-amber-700 to-orange-700 flex items-center justify-center text-white shadow-sm">
             <Bot className="w-3.5 h-3.5" />
@@ -435,7 +437,7 @@ export const AiAssistantPanel: React.FC = () => {
         </div>
         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#fdfbf7] border border-[#d5cbb8] text-[11px] text-[#6b6255]">
           <Zap className="w-3 h-3 text-amber-700" />
-          <span className="max-w-[130px] truncate font-medium" title={activeProvider?.name}>
+          <span className="max-w-[130px] sm:max-w-[200px] md:max-w-xs truncate font-medium" title={activeProvider?.name}>
             {activeProvider ? activeProvider.name : '未配置模型'}
           </span>
         </div>
@@ -506,6 +508,92 @@ export const AiAssistantPanel: React.FC = () => {
       {/* TAB 1: STREAM WRITE */}
       {activeTab === 'STREAM_WRITE' && (
         <div className="flex-1 flex flex-col min-h-0 p-3 overflow-hidden bg-[#f3ede1]/40">
+          {/* V2.0 Hierarchical Continuity Context Card */}
+          {creationContext && (
+            <div className="mb-2 bg-[#fdfbf7] border border-[#ded5c4] rounded-xl overflow-hidden shadow-2xs font-serif">
+              <div
+                onClick={() => setShowHierarchyContext((v) => !v)}
+                className="px-2.5 py-1.5 bg-[#eae2d3]/50 flex items-center justify-between cursor-pointer hover:bg-[#eae2d3]/80 transition select-none text-[11px]"
+              >
+                <div className="flex items-center gap-1.5 text-[#5a5247]">
+                  <Layers className="w-3.5 h-3.5 text-amber-800" />
+                  <span className="font-semibold text-[#1f1d1a]">
+                    创作层级定位：
+                    {creationContext.part_title ? `${creationContext.part_title} · ` : ''}
+                    {creationContext.volume_title ? `${creationContext.volume_title} · ` : ''}
+                    第 {creationContext.chapter_number} 章
+                    {creationContext.scene_title ? ` · 幕: ${creationContext.scene_title}` : ''}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const snippet = `\n【当前层级规划目标与因果约束】\n- 章节目标：${creationContext.chapter_goal || '顺承推进'}\n${creationContext.scene_objective ? `- 当前场景目标：${creationContext.scene_objective}\n` : ''}${creationContext.associated_main_lines.length > 0 ? `- 主线因果：${creationContext.associated_main_lines.join('；')}\n` : ''}`;
+                      setInstruction((prev) => prev ? `${prev}\n${snippet}` : snippet.trim());
+                      setStatusMessage('已将当前层级目标与剧情因果注入写作指令！');
+                    }}
+                    className="text-[10px] text-amber-800 hover:text-amber-900 font-bold bg-amber-800/10 px-1.5 py-0.5 rounded border border-amber-800/20"
+                    title="将本场景与大纲剧情因果一键插入写作指令输入框"
+                  >
+                    + 注入上下文
+                  </button>
+                  <span className="text-[10px] text-[#8e8476]">
+                    {showHierarchyContext ? '收起' : '展开'}
+                  </span>
+                </div>
+              </div>
+
+              {showHierarchyContext && (
+                <div className="p-2.5 text-[11px] text-[#5a5247] space-y-2 bg-[#fdfbf7] border-t border-[#ded5c4] max-h-48 overflow-y-auto">
+                  {creationContext.scene_title && (
+                    <div className="bg-[#f7f2e7] p-2 rounded-lg border border-[#e3d9c7]">
+                      <strong className="text-emerald-900 block mb-0.5">当前场景细纲目标：</strong>
+                      <p className="text-[#2b2621]">{creationContext.scene_objective || '未设定具体场景目标'}</p>
+                    </div>
+                  )}
+
+                  {creationContext.scene_beats && creationContext.scene_beats.length > 0 && (
+                    <div>
+                      <strong className="text-amber-900 block mb-1">细粒度节拍进展 ({creationContext.scene_beats.length})：</strong>
+                      <div className="space-y-1">
+                        {creationContext.scene_beats.map((b) => (
+                          <div key={b.id} className="flex items-center justify-between text-[10px] bg-[#f2ebe0] px-2 py-1 rounded border border-[#ded5c4]">
+                            <span>[{b.beat_type}] {b.title}</span>
+                            <span className="text-[#8e8476]">{b.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {creationContext.associated_main_lines.length > 0 && (
+                    <div>
+                      <strong className="text-rose-900 block mb-0.5">关联主线因果：</strong>
+                      <ul className="list-disc list-inside text-[10px] text-[#786f65] space-y-0.5">
+                        {creationContext.associated_main_lines.map((m, idx) => (
+                          <li key={idx}>{m}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {creationContext.associated_character_arcs.length > 0 && (
+                    <div>
+                      <strong className="text-emerald-900 block mb-0.5">关联人物成长弧：</strong>
+                      <ul className="list-disc list-inside text-[10px] text-[#786f65] space-y-0.5">
+                        {creationContext.associated_character_arcs.map((ca, idx) => (
+                          <li key={idx}>{ca}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Quick Action Presets */}
           <div className="mb-2">
             <div className="flex items-center justify-between mb-1">
@@ -522,7 +610,7 @@ export const AiAssistantPanel: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-1">
               {PROMPT_PRESETS.map((p) => (
                 <button
                   key={p.label}
@@ -976,7 +1064,7 @@ export const AiAssistantPanel: React.FC = () => {
                     {reviewReport.score} <span className="text-xs font-normal text-[#9e9383]">/ 100</span>
                   </div>
                 </div>
-                <div className="text-right max-w-[170px]">
+                <div className="text-right max-w-[170px] sm:max-w-sm md:max-w-xl">
                   <span className="text-[11px] text-amber-900 font-medium line-clamp-2">
                     {reviewReport.summary}
                   </span>
@@ -1271,6 +1359,6 @@ export const AiAssistantPanel: React.FC = () => {
           </div>
         </div>
       )}
-    </aside>
+    </div>
   );
 };
