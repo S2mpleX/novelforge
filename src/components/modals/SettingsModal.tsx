@@ -103,32 +103,37 @@ export const SettingsModal: React.FC<Props> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-      <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+      <div className="w-full max-w-xl bg-[#0d1117]/95 border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
-          <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-sm font-bold text-slate-100">
-              模型与网关设置 (Model Gateway)
-            </h2>
+        <div className="p-4.5 border-b border-white/[0.06] flex items-center justify-between bg-slate-900/30">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/25 border border-indigo-400/30">
+              <Settings className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-100">
+                模型网关配置 (Model Gateway)
+              </h2>
+              <span className="text-[11px] text-slate-400">支持 OpenAI 兼容协议、Gemini 与本地 CPA 端点</span>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/[0.06] transition"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4.5 h-4.5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-5 overflow-y-auto space-y-5">
+        <div className="p-6 overflow-y-auto space-y-5">
           {/* Privacy Note */}
-          <div className="p-3 rounded-lg bg-indigo-950/20 border border-indigo-500/20 text-xs text-slate-300 flex items-start gap-2.5">
+          <div className="p-3.5 rounded-xl bg-indigo-950/25 border border-indigo-500/25 text-xs text-slate-300 flex items-start gap-3">
             <Lock className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
             <div className="leading-relaxed">
-              <strong className="text-indigo-300">本地优先与密钥安全：</strong>
-              所有作品正文、人物档案与设定均存放在本地 SQLite。API Key 仅用于向您配置的模型网关发起请求，不在普通日志中记录明文，绝不上传第三方服务器。
+              <strong className="text-indigo-300">本地优先与密钥安全保障：</strong>
+              所有小说正文、人物档案与长期设定默认保存在本地 SQLite 数据库中。API Key 仅在调用受控 Tauri 命令时于 Rust 本地进程向配置网关发起 HTTP 请求，绝不打印到普通日志中。
             </div>
           </div>
 

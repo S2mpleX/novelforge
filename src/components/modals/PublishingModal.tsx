@@ -191,39 +191,39 @@ export const PublishingModal: React.FC<PublishingModalProps> = ({ onClose }) => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+      <div className="bg-[#0d1117]/95 border border-white/[0.1] rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/60">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-white/[0.06] bg-slate-900/40">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 border border-emerald-400/30">
               <Archive className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-slate-100">发布交付与系统灾备 (Publishing & Diagnostics)</h2>
-                <span className="px-2 py-0.5 text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded">
-                  Phase 6 & 7
+                <span className="px-2 py-0.5 text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-full">
+                  出版交付
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-400 mt-0.5">
                 多格式出版排版导出、全书工程数据快照、SQLite 数据库热备份与健康度诊断
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/[0.06] transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-2 px-6 pt-4 border-b border-slate-800 bg-slate-950/30">
+        <div className="flex items-center gap-2 px-6 pt-3.5 border-b border-white/[0.06] bg-slate-900/20">
           <button
             onClick={() => setActiveTab('EXPORT')}
-            className={`pb-3 px-3 text-xs font-semibold border-b-2 transition flex items-center gap-1.5 ${
+            className={`pb-3 px-3.5 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
               activeTab === 'EXPORT'
                 ? 'border-emerald-500 text-emerald-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -234,7 +234,7 @@ export const PublishingModal: React.FC<PublishingModalProps> = ({ onClose }) => 
           </button>
           <button
             onClick={() => setActiveTab('IMPORT')}
-            className={`pb-3 px-3 text-xs font-semibold border-b-2 transition flex items-center gap-1.5 ${
+            className={`pb-3 px-3.5 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
               activeTab === 'IMPORT'
                 ? 'border-emerald-500 text-emerald-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -245,7 +245,7 @@ export const PublishingModal: React.FC<PublishingModalProps> = ({ onClose }) => 
           </button>
           <button
             onClick={() => setActiveTab('DIAGNOSTICS')}
-            className={`pb-3 px-3 text-xs font-semibold border-b-2 transition flex items-center gap-1.5 ${
+            className={`pb-3 px-3.5 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
               activeTab === 'DIAGNOSTICS'
                 ? 'border-emerald-500 text-emerald-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'

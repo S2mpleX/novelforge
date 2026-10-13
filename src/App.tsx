@@ -17,7 +17,7 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#090c10] ambient-bg text-slate-100 font-sans">
       <Header />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />

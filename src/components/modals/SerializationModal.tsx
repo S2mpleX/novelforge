@@ -203,29 +203,29 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
     : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+      <div className="bg-[#0d1117]/95 border border-white/[0.1] rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/60">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-white/[0.06] bg-slate-900/40">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30">
               <TrendingUp className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-slate-100">自动连载控制台 (Serialization Engine)</h2>
-                <span className="px-2 py-0.5 text-[11px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded">
-                  Phase 5
+                <span className="px-2 py-0.5 text-[11px] font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 rounded-full">
+                  多 Agent 连载
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                多 Agent 串联连载流：从剧情弧与伏笔提取 ➔ 分解场景细纲 ➔ 结合五层记忆写作 ➔ 严密逻辑审稿 ➔ 权威记忆沉淀
+              <p className="text-xs text-slate-400 mt-0.5">
+                主编宏观大纲 ➔ 编剧场景节拍 ➔ 正文作家结合五层记忆写作 ➔ 逻辑严密审稿 ➔ 长期记忆沉淀
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/[0.06] transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -235,19 +235,19 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Active Novel Summary */}
           {activeNovel ? (
-            <div className="bg-slate-950/60 p-4 rounded-lg border border-slate-800/80 flex items-center justify-between">
+            <div className="bg-slate-900/40 p-4 rounded-xl border border-white/[0.06] flex items-center justify-between">
               <div>
-                <span className="text-xs text-slate-500">当前连载作品</span>
-                <div className="text-sm font-semibold text-slate-200 flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-slate-400 font-medium">当前连载作品</span>
+                <div className="text-sm font-bold text-slate-200 flex items-center gap-2 mt-1">
                   <span>{activeNovel.title}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-indigo-300 border border-slate-700">
-                    {activeNovel.genre_profile}
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-indigo-300 border border-indigo-500/20 font-medium">
+                    {activeNovel.genre_profile || '长篇'}
                   </span>
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-xs text-slate-500">现有已建章节</span>
-                <div className="text-sm font-bold text-slate-300 mt-0.5">{chapters.length} 章</div>
+                <span className="text-xs text-slate-400 font-medium">现有已建章节</span>
+                <div className="text-base font-bold text-slate-200 font-mono mt-0.5">{chapters.length} 章</div>
               </div>
             </div>
           ) : (
