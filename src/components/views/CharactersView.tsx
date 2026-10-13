@@ -15,7 +15,6 @@ export const CharactersView: React.FC = () => {
 
   const [subTab, setSubTab] = useState<'LIST' | 'RELATIONSHIPS'>('LIST');
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Character form state
   const [showAddChar, setShowAddChar] = useState(false);
@@ -27,14 +26,11 @@ export const CharactersView: React.FC = () => {
 
   const loadCharacters = async () => {
     if (!activeNovel) return;
-    setIsLoading(true);
     try {
       const chars = await api.listCharacters(activeNovel.id);
       setCharacters(chars);
     } catch (e) {
       console.error('加载人物档案失败:', e);
-    } finally {
-      setIsLoading(false);
     }
   };
 
