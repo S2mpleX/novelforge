@@ -2,13 +2,15 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::database::DbManager;
 use crate::models::{
-    AiModel, AiProvider, Chapter, ChapterVersion, Character, CharacterRelationship,
-    CollaborativeWorkflowInput, CollaborativeWorkflowResult, ContinuityAuditFinding,
-    ContinuityAuditResponse, CreateChapterInput, CreateCharacterInput,
-    CreateCharacterRelationshipInput, CreateNovelInput, CreatePlotThreadInput, CreateSceneInput,
-    CreateStoryArcInput, CreateStoryEventInput, CreateStoryPhaseInput, CreateWorldRuleInput,
-    GenerateStreamInput, Novel, PlotThread, ReviewReport, SaveProviderInput, Scene,
-    StoryArc, StoryEvent, StoryPhase, StreamChunkPayload, StylePolishResponse, Volume, WorldRule,
+    AiModel, AiProvider, CanonFact, Chapter, ChapterVersion, Character, CharacterRelationship,
+    CharacterStateEvent, CollaborativeWorkflowInput, CollaborativeWorkflowResult,
+    ContinuityAuditFinding, ContinuityAuditResponse, CreateCanonFactInput, CreateChapterInput,
+    CreateCharacterInput, CreateCharacterRelationshipInput, CreateCharacterStateEventInput,
+    CreateNovelInput, CreatePlotThreadInput, CreateSceneInput, CreateStoryArcInput,
+    CreateStoryEventInput, CreateStoryPhaseInput, CreateWorldRuleInput, ExtractChapterMemoryResult,
+    GenerateStreamInput, MemoryContextPack, Novel, PlotThread, ReviewReport, SaveProviderInput,
+    Scene, SerializationJob, StartSerializationJobInput, StoryArc, StoryEvent, StoryPhase,
+    StreamChunkPayload, StylePolishResponse, Volume, WorldRule,
 };
 use crate::providers::{
     ChatMessage, ChatCompletionRequest, ConnectionTestResult, OpenAIClient,
@@ -902,4 +904,401 @@ pub async fn run_collaborative_workflow(
         message: "多 Agent 协作工作流顺利完成！已生成场景细纲、正文初稿及审稿报告。".to_string(),
     })
 }
+
+// --- PHASE 4: LAYERED MEMORY ENGINE COMMANDS ---
+
+#[tauri::command]
+pub fn list_canon_facts(
+    db: State<DbManager>,
+    novel_id: String,
+    query: Option<String>,
+) -> Result<Vec<CanonFact>, String> {
+    db.list_canon_facts(&novel_id, query.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_canon_fact(
+    db: State<DbManager>,
+    input: CreateCanonFactInput,
+) -> Result<CanonFact, String> {
+    db.create_canon_fact(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_canon_fact(
+    db: State<DbManager>,
+    id: String,
+) -> Result<(), String> {
+    db.delete_canon_fact(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_character_state_events(
+    db: State<DbManager>,
+    character_id: String,
+) -> Result<Vec<CharacterStateEvent>, String> {
+    db.list_character_state_events(&character_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_character_state_event(
+    db: State<DbManager>,
+    input: CreateCharacterStateEventInput,
+) -> Result<CharacterStateEvent, String> {
+    db.create_character_state_event(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn search_chapters_fts(
+    db: State<DbManager>,
+    novel_id: String,
+    query: String,
+) -> Result<Vec<(String, String, String)>, String> {
+    db.search_chapters_fts(&novel_id, &query).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn assemble_memory_context_pack(
+    db: State<DbManager>,
+    novel_id: String,
+    chapter_id: String,
+    prompt_intent: String,
+    target_character_ids: Option<Vec<String>>,
+) -> Result<MemoryContextPack, String> {
+    db.assemble_memory_context_pack(
+        &novel_id,
+        &chapter_id,
+        &prompt_intent,
+        target_character_ids.as_deref(),
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn extract_chapter_memory(
+    db: State<'_, DbManager>,
+    chapter_id: String,
+) -> Result<ExtractChapterMemoryResult, String> {
+    let (provider, model) = db
+        .get_active_provider_and_model()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "未激活任何 AI 模型网关".to_string())?;
+
+    let chapter = db.get_chapter(&chapter_id).map_err(|e| e.to_string())?;
+    let content = chapter.content.unwrap_or_default();
+    if content.trim().is_empty() {
+        return Err("章节正文为空，无法提炼记忆".to_string());
+    }
+
+    let all_characters = db.list_characters(&chapter.novel_id).unwrap_or_default();
+
+    let system_prompt = String::from(
+        "你是长篇小说长期记忆提取专家 Memory Curator Agent。\n\
+         【职责】研读最新完成的章节正文，提炼值得沉淀为长期记忆的事实、人物状态变迁与伏笔线索。\n\
+         【输出格式】必须直接输出纯 JSON：\n\
+         {\n\
+           \"chapter_summary\": \"本章剧情核心概括 (80字内)\",\n\
+           \"character_state_updates\": [\n\
+             {\n\
+               \"character_name\": \"人物姓名\",\n\
+               \"field_name\": \"心理状态/境界修为/重要道具/已知秘密\",\n\
+               \"previous_value\": \"先前状态\",\n\
+               \"new_value\": \"新状态\"\n\
+             }\n\
+           ],\n\
+           \"timeline_events\": [\n\
+             {\n\
+               \"title\": \"核心事件标题\",\n\
+               \"description\": \"事件因果简述\",\n\
+               \"story_time\": \"发生时间\"\n\
+             }\n\
+           ],\n\
+           \"plot_threads_identified\": [\n\
+             {\n\
+               \"title\": \"伏笔名称\",\n\
+               \"description\": \"细节线索\",\n\
+               \"status\": \"PLANTED\"\n\
+             }\n\
+           ],\n\
+           \"new_facts\": [\n\
+             {\n\
+               \"subject\": \"主体\",\n\
+               \"predicate\": \"关系/行为\",\n\
+               \"object_value\": \"客体/状态\"\n\
+             }\n\
+           ]\n\
+         }",
+    );
+
+    let user_prompt = format!(
+        "请为第 {} 章《{}》提炼长期记忆与事实变更：\n\n【正文文本】：\n{}",
+        chapter.chapter_number, chapter.title, content
+    );
+
+    let client = OpenAIClient::new();
+    let req = ChatCompletionRequest {
+        model: model.model_name,
+        messages: vec![
+            ChatMessage { role: "system".to_string(), content: system_prompt },
+            ChatMessage { role: "user".to_string(), content: user_prompt },
+        ],
+        temperature: Some(0.3),
+        max_tokens: Some(2500),
+        stream: false,
+    };
+
+    let raw_reply = client.chat_completion(&provider.base_url, &provider.api_key, req).await?;
+    let json_str = extract_json_block(&raw_reply);
+
+    #[derive(serde::Deserialize)]
+    struct RawMemoryPayload {
+        chapter_summary: String,
+        character_state_updates: Vec<RawStateUpdate>,
+        timeline_events: Vec<RawTimelineEvent>,
+        plot_threads_identified: Vec<RawThreadEvent>,
+        new_facts: Vec<RawFactEvent>,
+    }
+    #[derive(serde::Deserialize)]
+    struct RawStateUpdate {
+        character_name: String,
+        field_name: String,
+        previous_value: Option<String>,
+        new_value: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct RawTimelineEvent {
+        title: String,
+        description: String,
+        story_time: Option<String>,
+    }
+    #[derive(serde::Deserialize)]
+    struct RawThreadEvent {
+        title: String,
+        description: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct RawFactEvent {
+        subject: String,
+        predicate: String,
+        object_value: String,
+    }
+
+    let parsed: RawMemoryPayload = serde_json::from_str(json_str).map_err(|e| {
+        format!("解析记忆提取 JSON 失败: {} (模型原始内容: {})", e, raw_reply)
+    })?;
+
+    // Persist extracted memories into SQLite
+    let mut saved_state_events = Vec::new();
+    for u in parsed.character_state_updates {
+        if let Some(ch) = all_characters.iter().find(|c| c.name == u.character_name) {
+            if let Ok(ev) = db.create_character_state_event(CreateCharacterStateEventInput {
+                character_id: ch.id.clone(),
+                source_chapter_id: Some(chapter_id.clone()),
+                effective_time: None,
+                field_name: u.field_name,
+                previous_value: u.previous_value,
+                new_value: u.new_value,
+            }) {
+                saved_state_events.push(ev);
+            }
+        }
+    }
+
+    let mut saved_timeline = Vec::new();
+    for t in parsed.timeline_events {
+        if let Ok(ev) = db.create_story_event(CreateStoryEventInput {
+            novel_id: chapter.novel_id.clone(),
+            title: t.title,
+            description: Some(t.description),
+            story_time: t.story_time,
+            source_chapter_id: Some(chapter_id.clone()),
+        }) {
+            saved_timeline.push(ev);
+        }
+    }
+
+    let mut saved_threads = Vec::new();
+    for th in parsed.plot_threads_identified {
+        if let Ok(pt) = db.create_plot_thread(CreatePlotThreadInput {
+            novel_id: chapter.novel_id.clone(),
+            title: th.title,
+            description: Some(th.description),
+            introduced_chapter_id: Some(chapter_id.clone()),
+            expected_resolution: None,
+        }) {
+            saved_threads.push(pt);
+        }
+    }
+
+    let mut saved_facts = Vec::new();
+    for f in parsed.new_facts {
+        if let Ok(cf) = db.create_canon_fact(CreateCanonFactInput {
+            novel_id: chapter.novel_id.clone(),
+            subject_id: Some(f.subject),
+            predicate: f.predicate,
+            object_value: f.object_value,
+            truth_scope: Some("GLOBAL".to_string()),
+            authority_level: Some("CONFIRMED_PLOT".to_string()),
+            source_chapter_id: Some(chapter_id.clone()),
+        }) {
+            saved_facts.push(cf);
+        }
+    }
+
+    Ok(ExtractChapterMemoryResult {
+        chapter_id,
+        chapter_summary: parsed.chapter_summary,
+        character_state_events: saved_state_events,
+        timeline_events: saved_timeline,
+        identified_threads: saved_threads,
+        new_canon_facts: saved_facts,
+        message: "长期记忆提炼完成，事实与状态已成功沉淀至 SQLite 记忆引擎！".to_string(),
+    })
+}
+
+// --- PHASE 5: SERIALIZATION ENGINE COMMANDS ---
+
+#[tauri::command]
+pub fn create_serialization_job(
+    db: State<DbManager>,
+    input: StartSerializationJobInput,
+) -> Result<SerializationJob, String> {
+    db.create_serialization_job(
+        &input.novel_id,
+        input.chapters_count,
+        input.auto_approve.unwrap_or(false),
+        input.budget_tokens.unwrap_or(50000),
+        "{}",
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_serialization_job(
+    db: State<DbManager>,
+    job_id: String,
+) -> Result<SerializationJob, String> {
+    db.get_serialization_job(&job_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_serialization_jobs(
+    db: State<DbManager>,
+    novel_id: String,
+) -> Result<Vec<SerializationJob>, String> {
+    db.list_serialization_jobs(&novel_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn pause_serialization_job(
+    db: State<DbManager>,
+    job_id: String,
+) -> Result<(), String> {
+    let job = db.get_serialization_job(&job_id).map_err(|e| e.to_string())?;
+    db.update_serialization_job_progress(
+        &job_id,
+        job.completed_chapters_count,
+        job.current_chapter_id.as_deref(),
+        job.used_tokens,
+        "PAUSED",
+        None,
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn cancel_serialization_job(
+    db: State<DbManager>,
+    job_id: String,
+) -> Result<(), String> {
+    let job = db.get_serialization_job(&job_id).map_err(|e| e.to_string())?;
+    db.update_serialization_job_progress(
+        &job_id,
+        job.completed_chapters_count,
+        job.current_chapter_id.as_deref(),
+        job.used_tokens,
+        "CANCELLED",
+        None,
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn advance_serialization_job_step(
+    db: State<'_, DbManager>,
+    job_id: String,
+) -> Result<SerializationJob, String> {
+    let job = db.get_serialization_job(&job_id).map_err(|e| e.to_string())?;
+    if job.status == "CANCELLED" || job.status == "COMPLETED" {
+        return Ok(job);
+    }
+
+    if job.completed_chapters_count >= job.target_chapters_count {
+        db.update_serialization_job_progress(
+            &job_id,
+            job.completed_chapters_count,
+            job.current_chapter_id.as_deref(),
+            job.used_tokens,
+            "COMPLETED",
+            None,
+        ).map_err(|e| e.to_string())?;
+        return db.get_serialization_job(&job_id).map_err(|e| e.to_string());
+    }
+
+    // Mark RUNNING
+    db.update_serialization_job_progress(
+        &job_id,
+        job.completed_chapters_count,
+        job.current_chapter_id.as_deref(),
+        job.used_tokens,
+        "RUNNING",
+        None,
+    ).map_err(|e| e.to_string())?;
+
+    // 1. Determine next chapter number & title
+    let chapters = db.list_chapters(&job.novel_id).map_err(|e| e.to_string())?;
+    let next_number = (chapters.len() + 1) as i64;
+    let next_title = format!("第 {} 章 连载推进", next_number);
+
+    let new_chapter = db.create_chapter(CreateChapterInput {
+        novel_id: job.novel_id.clone(),
+        volume_id: None,
+        chapter_number: Some(next_number),
+        title: next_title,
+        initial_content: None,
+    }).map_err(|e| e.to_string())?;
+
+    // 2. Run Collaborative Workflow for this chapter
+    let workflow_input = CollaborativeWorkflowInput {
+        novel_id: job.novel_id.clone(),
+        chapter_id: new_chapter.id.clone(),
+        chapter_goal: format!("顺畅推进主线剧情，制造戏剧张力，深化人物动机与世界探索"),
+        target_word_count: Some(3000),
+        skip_audit: Some(false),
+    };
+
+    let _workflow_result = run_collaborative_workflow(db.clone(), workflow_input).await?;
+
+    // 3. Extract Memory automatically
+    let _ = extract_chapter_memory(db.clone(), new_chapter.id.clone()).await;
+
+    // 4. Update job status
+    let completed = job.completed_chapters_count + 1;
+    let used_tokens = job.used_tokens + 4000;
+    let final_status = if completed >= job.target_chapters_count {
+        "COMPLETED"
+    } else if job.auto_approve {
+        "RUNNING"
+    } else {
+        "WAITING_REVIEW"
+    };
+
+    db.update_serialization_job_progress(
+        &job_id,
+        completed,
+        Some(&new_chapter.id),
+        used_tokens,
+        final_status,
+        None,
+    ).map_err(|e| e.to_string())?;
+
+    db.get_serialization_job(&job_id).map_err(|e| e.to_string())
+}
+
 

@@ -393,3 +393,107 @@ pub struct CollaborativeWorkflowResult {
     pub message: String,
 }
 
+// --- PHASE 4: LAYERED MEMORY ENGINE (L0~L4) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanonFact {
+    pub id: String,
+    pub novel_id: String,
+    pub subject_id: String,
+    pub predicate: String,
+    pub object_value: String,
+    pub truth_scope: String, // GLOBAL, LOCAL, CONTINGENT
+    pub authority_level: String, // CONFIRMED_PLOT, CANON, HYPOTHESIS
+    pub status: String,
+    pub effective_from: String,
+    pub effective_until: String,
+    pub source_chapter_id: Option<String>,
+    pub version: i64,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateCanonFactInput {
+    pub novel_id: String,
+    pub subject_id: Option<String>,
+    pub predicate: String,
+    pub object_value: String,
+    pub truth_scope: Option<String>,
+    pub authority_level: Option<String>,
+    pub source_chapter_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterStateEvent {
+    pub id: String,
+    pub character_id: String,
+    pub source_chapter_id: Option<String>,
+    pub effective_time: String,
+    pub field_name: String, // 境界/法宝/伤病/心理状态/已知秘密
+    pub previous_value: String,
+    pub new_value: String,
+    pub status: String, // CONFIRMED, REVERTED
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateCharacterStateEventInput {
+    pub character_id: String,
+    pub source_chapter_id: Option<String>,
+    pub effective_time: Option<String>,
+    pub field_name: String,
+    pub previous_value: Option<String>,
+    pub new_value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryContextPack {
+    pub working_memory_l0: String,
+    pub short_term_l1: Vec<String>,
+    pub arc_memory_l2: Vec<String>,
+    pub canon_rules_l3: Vec<String>,
+    pub character_profiles_l3: Vec<String>,
+    pub retrieved_history_l4: Vec<String>,
+    pub assembled_system_prompt: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtractChapterMemoryResult {
+    pub chapter_id: String,
+    pub chapter_summary: String,
+    pub character_state_events: Vec<CharacterStateEvent>,
+    pub timeline_events: Vec<StoryEvent>,
+    pub identified_threads: Vec<PlotThread>,
+    pub new_canon_facts: Vec<CanonFact>,
+    pub message: String,
+}
+
+// --- PHASE 5: SERIALIZATION ENGINE ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializationJob {
+    pub id: String,
+    pub novel_id: String,
+    pub status: String, // PENDING, RUNNING, PAUSED, COMPLETED, CANCELLED, FAILED
+    pub target_chapters_count: i64,
+    pub completed_chapters_count: i64,
+    pub current_chapter_id: Option<String>,
+    pub auto_approve: bool,
+    pub budget_tokens: i64,
+    pub used_tokens: i64,
+    pub config: String,
+    pub error_message: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StartSerializationJobInput {
+    pub novel_id: String,
+    pub chapters_count: i64,
+    pub chapter_target_words: Option<i64>,
+    pub auto_approve: Option<bool>,
+    pub budget_tokens: Option<i64>,
+}
+
+

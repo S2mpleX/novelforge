@@ -20,6 +20,12 @@ import type {
   ReviewReport,
   StylePolishResponse,
   CollaborativeWorkflowResult,
+  CanonFact,
+  CharacterStateEvent,
+  MemoryContextPack,
+  ExtractChapterMemoryResult,
+  SerializationJob,
+  StartSerializationJobInput,
 } from '@/types';
 
 export const api = {
@@ -229,4 +235,63 @@ export const api = {
     invoke<string>('export_novel_text', { novelId, format }),
 
   getDbStats: () => invoke<{ db_path: string; total_novels: number; total_providers: number }>('get_db_stats'),
+
+  // Phase 4: Layered Memory Engine (L0~L4)
+  listCanonFacts: (novelId: string, query?: string) =>
+    invoke<CanonFact[]>('list_canon_facts', { novelId, query }),
+  createCanonFact: (input: {
+    novel_id: string;
+    subject_id?: string;
+    predicate: string;
+    object_value: string;
+    truth_scope?: string;
+    authority_level?: string;
+    source_chapter_id?: string;
+  }) => invoke<CanonFact>('create_canon_fact', { input }),
+  deleteCanonFact: (id: string) =>
+    invoke<void>('delete_canon_fact', { id }),
+
+  listCharacterStateEvents: (characterId: string) =>
+    invoke<CharacterStateEvent[]>('list_character_state_events', { characterId }),
+  createCharacterStateEvent: (input: {
+    character_id: string;
+    source_chapter_id?: string;
+    effective_time?: string;
+    field_name: string;
+    previous_value?: string;
+    new_value: string;
+  }) => invoke<CharacterStateEvent>('create_character_state_event', { input }),
+
+  searchChaptersFts: (novelId: string, query: string) =>
+    invoke<Array<[string, string, string]>>('search_chapters_fts', { novelId, query }),
+
+  assembleMemoryContextPack: (
+    novelId: string,
+    chapterId: string,
+    promptIntent: string,
+    targetCharacterIds?: string[]
+  ) =>
+    invoke<MemoryContextPack>('assemble_memory_context_pack', {
+      novelId,
+      chapterId,
+      promptIntent,
+      targetCharacterIds,
+    }),
+
+  extractChapterMemory: (chapterId: string) =>
+    invoke<ExtractChapterMemoryResult>('extract_chapter_memory', { chapterId }),
+
+  // Phase 5: Serialization Engine
+  createSerializationJob: (input: StartSerializationJobInput) =>
+    invoke<SerializationJob>('create_serialization_job', { input }),
+  getSerializationJob: (jobId: string) =>
+    invoke<SerializationJob>('get_serialization_job', { jobId }),
+  listSerializationJobs: (novelId: string) =>
+    invoke<SerializationJob[]>('list_serialization_jobs', { novelId }),
+  pauseSerializationJob: (jobId: string) =>
+    invoke<void>('pause_serialization_job', { jobId }),
+  cancelSerializationJob: (jobId: string) =>
+    invoke<void>('cancel_serialization_job', { jobId }),
+  advanceSerializationJobStep: (jobId: string) =>
+    invoke<SerializationJob>('advance_serialization_job_step', { jobId }),
 };

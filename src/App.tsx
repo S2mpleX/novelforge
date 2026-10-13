@@ -6,6 +6,7 @@ import { NovelEditor } from '@/components/editor/NovelEditor';
 import { AiAssistantPanel } from '@/components/editor/AiAssistantPanel';
 import { DashboardView } from '@/components/views/DashboardView';
 import { StoryBibleView } from '@/components/views/StoryBibleView';
+import { MemoryEngineView } from '@/components/views/MemoryEngineView';
 
 export const App: React.FC = () => {
   const { loadNovels, loadProviders, activeTab } = useNovelStore();
@@ -31,6 +32,7 @@ export const App: React.FC = () => {
           {(activeTab === 'CHARACTERS' || activeTab === 'WORLD' || activeTab === 'PLOTS') && (
             <StoryBibleView />
           )}
+          {activeTab === 'MEMORY' && <MemoryEngineView />}
         </main>
       </div>
     </div>

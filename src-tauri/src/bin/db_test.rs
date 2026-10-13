@@ -174,5 +174,56 @@ fn main() {
         .expect("创建审稿报告失败");
     println!("13. 验证逻辑审稿报告: 得分[{}]，发现[{}]项建议，总结: {}", report.score, report.findings.len(), report.summary);
 
-    println!("=== 100% 测试验证通过！Phase 0/1/2/3 全部业务模型在本地 SQLite 正确持久化！ ===");
+    // 12. 验证权威事实库与 FTS5 全文检索 (Phase 4)
+    let fact = db
+        .create_canon_fact(novelforge_ai_lib::models::CreateCanonFactInput {
+            novel_id: novel.id.clone(),
+            subject_id: Some("先驱者号".to_string()),
+            predicate: "搭载了绝密实验性".to_string(),
+            object_value: "反物质曲率核心二号机".to_string(),
+            truth_scope: Some("GLOBAL".to_string()),
+            authority_level: Some("CANON".to_string()),
+            source_chapter_id: Some(ch1.id.clone()),
+        })
+        .expect("创建权威事实失败");
+    println!("14. 验证权威事实 (Canon Fact): 【{}】{}【{}】", fact.subject_id, fact.predicate, fact.object_value);
+
+    let search_facts = db.list_canon_facts(&novel.id, Some("曲率")).expect("搜索事实失败");
+    assert!(!search_facts.is_empty());
+    println!("15. 验证 FTS5 事实全文检索: 成功检索到 {} 条包含'曲率'的事实", search_facts.len());
+
+    // 13. 验证角色动态状态追踪 (Phase 4)
+    let state_ev = db
+        .create_character_state_event(novelforge_ai_lib::models::CreateCharacterStateEventInput {
+            character_id: character.id.clone(),
+            source_chapter_id: Some(ch1.id.clone()),
+            effective_time: Some("跃迁纪元01日".to_string()),
+            field_name: "心理状态".to_string(),
+            previous_value: Some("忐忑与警惕".to_string()),
+            new_value: "决然决断，破釜沉舟".to_string(),
+        })
+        .expect("创建角色状态变更失败");
+    println!("16. 验证动态角色状态追踪: 【{}】变更维度[{}] -> {}", character.name, state_ev.field_name, state_ev.new_value);
+
+    // 14. 验证五层记忆 Context Pack 组装 (Phase 4)
+    let context_pack = db
+        .assemble_memory_context_pack(&novel.id, &ch1.id, "调查引擎读数异常并准备跃迁", Some(&[character.id.clone()]))
+        .expect("组装五层记忆 Context Pack 失败");
+    assert!(!context_pack.assembled_system_prompt.is_empty());
+    println!("17. 验证五层记忆 (L0~L4 Context Pack) 组装: 生成提示词包 {} 字符，成功注入 L3 Canon 规则与 L1 前情", context_pack.assembled_system_prompt.len());
+
+    // 15. 验证自动连载任务队列 (Phase 5)
+    let job = db
+        .create_serialization_job(&novel.id, 3, false, 50000, "{\"style\":\"hard-sf\"}")
+        .expect("创建自动连载任务失败");
+    println!("18. 验证自动连载引擎 (Job ID: {}): 目标章节[{}]，状态[{}]", job.id, job.target_chapters_count, job.status);
+
+    db.update_serialization_job_progress(&job.id, 1, Some(&ch1.id), 2500, "WAITING_REVIEW", None)
+        .expect("更新连载任务进度失败");
+    let updated_job = db.get_serialization_job(&job.id).expect("获取连载任务失败");
+    assert_eq!(updated_job.completed_chapters_count, 1);
+    assert_eq!(updated_job.status, "WAITING_REVIEW");
+    println!("19. 验证连载任务状态流转: 已完成[{}]章，当前状态[{}]，消耗Token[{}]", updated_job.completed_chapters_count, updated_job.status, updated_job.used_tokens);
+
+    println!("=== 100% 测试验证通过！Phase 0/1/2/3/4/5 全业务引擎在本地 SQLite 正确持久化与流转！ ===");
 }

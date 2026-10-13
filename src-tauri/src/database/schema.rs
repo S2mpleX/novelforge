@@ -285,6 +285,24 @@ CREATE TABLE IF NOT EXISTS review_findings (
     FOREIGN KEY(report_id) REFERENCES review_reports(id) ON DELETE CASCADE
 );
 
+-- Serialization Jobs (Phase 5: 自动连载任务队列)
+CREATE TABLE IF NOT EXISTS serialization_jobs (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT NOT NULL,
+    status TEXT DEFAULT 'PENDING', -- PENDING, RUNNING, PAUSED, COMPLETED, CANCELLED, FAILED
+    target_chapters_count INTEGER DEFAULT 1,
+    completed_chapters_count INTEGER DEFAULT 0,
+    current_chapter_id TEXT,
+    auto_approve INTEGER DEFAULT 0,
+    budget_tokens INTEGER DEFAULT 50000,
+    used_tokens INTEGER DEFAULT 0,
+    config TEXT DEFAULT '{}',
+    error_message TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
+
 -- Create indexes for high performance
 CREATE INDEX IF NOT EXISTS idx_chapters_novel_id ON chapters(novel_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_volume_id ON chapters(volume_id);
@@ -297,6 +315,7 @@ CREATE INDEX IF NOT EXISTS idx_story_arcs_novel_id ON story_arcs(novel_id);
 CREATE INDEX IF NOT EXISTS idx_scenes_chapter_id ON scenes(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_story_events_novel_id ON story_events(novel_id);
 CREATE INDEX IF NOT EXISTS idx_review_findings_report_id ON review_findings(report_id);
+CREATE INDEX IF NOT EXISTS idx_serialization_jobs_novel_id ON serialization_jobs(novel_id);
 "#;
 
 pub const FTS5_SCHEMA: &str = r#"

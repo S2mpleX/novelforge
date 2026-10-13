@@ -7,12 +7,13 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::models::{
-    AiModel, AiProvider, Chapter, ChapterVersion, Character, CharacterRelationship,
-    ContinuityAuditFinding, CreateChapterInput, CreateCharacterInput,
-    CreateCharacterRelationshipInput, CreateNovelInput, CreatePlotThreadInput, CreateSceneInput,
-    CreateStoryArcInput, CreateStoryEventInput, CreateStoryPhaseInput, CreateWorldRuleInput, Novel,
-    PlotThread, ReviewFinding, ReviewReport, SaveProviderInput, Scene, StoryArc, StoryEvent,
-    StoryPhase, Volume, WorldRule,
+    AiModel, AiProvider, CanonFact, Chapter, ChapterVersion, Character, CharacterRelationship,
+    CharacterStateEvent, ContinuityAuditFinding, CreateCanonFactInput, CreateChapterInput,
+    CreateCharacterInput, CreateCharacterRelationshipInput, CreateCharacterStateEventInput,
+    CreateNovelInput, CreatePlotThreadInput, CreateSceneInput, CreateStoryArcInput,
+    CreateStoryEventInput, CreateStoryPhaseInput, CreateWorldRuleInput, MemoryContextPack, Novel,
+    PlotThread, ReviewFinding, ReviewReport, SaveProviderInput, Scene, SerializationJob, StoryArc,
+    StoryEvent, StoryPhase, Volume, WorldRule,
 };
 
 #[derive(Clone)]
@@ -1354,6 +1355,511 @@ impl DbManager {
             params![status, finding_id],
         )?;
         Ok(())
+    }
+
+    // --- PHASE 4: CANON FACTS & LAYERED MEMORY ---
+
+    pub fn list_canon_facts(&self, novel_id: &str, query: Option<&str>) -> Result<Vec<CanonFact>> {
+        let conn = self.conn.lock();
+        if let Some(q) = query {
+            let trimmed = q.trim();
+            if !trimmed.is_empty() {
+                let fts_res = conn.prepare(
+                    "SELECT f.id, f.novel_id, f.subject_id, f.predicate, f.object_value, f.truth_scope, f.authority_level, f.status, f.effective_from, f.effective_until, f.source_chapter_id, f.version, f.created_at
+                     FROM canon_facts f
+                     JOIN canon_facts_fts ON canon_facts_fts.fact_id = f.id
+                     WHERE f.novel_id = ?1 AND canon_facts_fts MATCH ?2
+                     ORDER BY f.created_at DESC",
+                );
+
+                if let Ok(mut stmt) = fts_res {
+                    let rows = stmt.query_map(params![novel_id, trimmed], |row| {
+                        Ok(CanonFact {
+                            id: row.get(0)?,
+                            novel_id: row.get(1)?,
+                            subject_id: row.get(2)?,
+                            predicate: row.get(3)?,
+                            object_value: row.get(4)?,
+                            truth_scope: row.get(5)?,
+                            authority_level: row.get(6)?,
+                            status: row.get(7)?,
+                            effective_from: row.get(8)?,
+                            effective_until: row.get(9)?,
+                            source_chapter_id: row.get(10)?,
+                            version: row.get(11)?,
+                            created_at: row.get(12)?,
+                        })
+                    })?;
+
+                    let mut list = Vec::new();
+                    for r in rows {
+                        if let Ok(item) = r {
+                            list.push(item);
+                        }
+                    }
+                    if !list.is_empty() {
+                        return Ok(list);
+                    }
+                }
+            }
+        }
+
+        // Fallback or full list
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, subject_id, predicate, object_value, truth_scope, authority_level, status, effective_from, effective_until, source_chapter_id, version, created_at
+             FROM canon_facts WHERE novel_id = ?1 ORDER BY created_at DESC",
+        )?;
+
+        let rows = stmt.query_map(params![novel_id], |row| {
+            Ok(CanonFact {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                subject_id: row.get(2)?,
+                predicate: row.get(3)?,
+                object_value: row.get(4)?,
+                truth_scope: row.get(5)?,
+                authority_level: row.get(6)?,
+                status: row.get(7)?,
+                effective_from: row.get(8)?,
+                effective_until: row.get(9)?,
+                source_chapter_id: row.get(10)?,
+                version: row.get(11)?,
+                created_at: row.get(12)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn create_canon_fact(&self, input: CreateCanonFactInput) -> Result<CanonFact> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let sub = input.subject_id.unwrap_or_default();
+        let scope = input.truth_scope.unwrap_or_else(|| "GLOBAL".to_string());
+        let authority = input.authority_level.unwrap_or_else(|| "CONFIRMED_PLOT".to_string());
+
+        conn.execute(
+            "INSERT INTO canon_facts (id, novel_id, subject_id, predicate, object_value, truth_scope, authority_level, status, source_chapter_id, version, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'ACTIVE', ?8, 1, ?9)",
+            params![
+                &id,
+                &input.novel_id,
+                &sub,
+                &input.predicate,
+                &input.object_value,
+                &scope,
+                &authority,
+                &input.source_chapter_id,
+                now
+            ],
+        )?;
+
+        let _ = conn.execute(
+            "INSERT INTO canon_facts_fts (fact_id, novel_id, subject_id, predicate, object_value)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![&id, &input.novel_id, &sub, &input.predicate, &input.object_value],
+        );
+
+        Ok(CanonFact {
+            id,
+            novel_id: input.novel_id,
+            subject_id: sub,
+            predicate: input.predicate,
+            object_value: input.object_value,
+            truth_scope: scope,
+            authority_level: authority,
+            status: "ACTIVE".to_string(),
+            effective_from: "".to_string(),
+            effective_until: "".to_string(),
+            source_chapter_id: input.source_chapter_id,
+            version: 1,
+            created_at: now,
+        })
+    }
+
+    pub fn delete_canon_fact(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM canon_facts WHERE id = ?1", params![id])?;
+        let _ = conn.execute("DELETE FROM canon_facts_fts WHERE fact_id = ?1", params![id]);
+        Ok(())
+    }
+
+    // --- CHARACTER DYNAMIC STATE EVENTS ---
+
+    pub fn list_character_state_events(&self, character_id: &str) -> Result<Vec<CharacterStateEvent>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, character_id, source_chapter_id, effective_time, field_name, previous_value, new_value, status, created_at
+             FROM character_state_events WHERE character_id = ?1 ORDER BY created_at ASC",
+        )?;
+
+        let rows = stmt.query_map(params![character_id], |row| {
+            Ok(CharacterStateEvent {
+                id: row.get(0)?,
+                character_id: row.get(1)?,
+                source_chapter_id: row.get(2)?,
+                effective_time: row.get(3)?,
+                field_name: row.get(4)?,
+                previous_value: row.get(5)?,
+                new_value: row.get(6)?,
+                status: row.get(7)?,
+                created_at: row.get(8)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn create_character_state_event(&self, input: CreateCharacterStateEventInput) -> Result<CharacterStateEvent> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let eff_time = input.effective_time.unwrap_or_default();
+        let prev = input.previous_value.unwrap_or_default();
+
+        conn.execute(
+            "INSERT INTO character_state_events (id, character_id, source_chapter_id, effective_time, field_name, previous_value, new_value, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'CONFIRMED', ?8)",
+            params![
+                &id,
+                &input.character_id,
+                &input.source_chapter_id,
+                &eff_time,
+                &input.field_name,
+                &prev,
+                &input.new_value,
+                now
+            ],
+        )?;
+
+        Ok(CharacterStateEvent {
+            id,
+            character_id: input.character_id,
+            source_chapter_id: input.source_chapter_id,
+            effective_time: eff_time,
+            field_name: input.field_name,
+            previous_value: prev,
+            new_value: input.new_value,
+            status: "CONFIRMED".to_string(),
+            created_at: now,
+        })
+    }
+
+    // --- FTS5 CHAPTERS SEARCH ---
+
+    pub fn search_chapters_fts(&self, novel_id: &str, query: &str) -> Result<Vec<(String, String, String)>> {
+        let conn = self.conn.lock();
+        let trimmed = query.trim();
+        if trimmed.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut stmt = conn.prepare(
+            "SELECT chapter_id, title, snippet(chapters_fts, 3, '【', '】', '...', 15)
+             FROM chapters_fts
+             WHERE novel_id = ?1 AND chapters_fts MATCH ?2
+             LIMIT 5",
+        )?;
+
+        let rows = stmt.query_map(params![novel_id, trimmed], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?;
+
+        let mut results = Vec::new();
+        for r in rows {
+            if let Ok(item) = r {
+                results.push(item);
+            }
+        }
+        Ok(results)
+    }
+
+    // --- FIVE-LAYER MEMORY CONTEXT PACK ASSEMBLER ---
+
+    pub fn assemble_memory_context_pack(
+        &self,
+        novel_id: &str,
+        chapter_id: &str,
+        prompt_intent: &str,
+        target_character_ids: Option<&[String]>,
+    ) -> Result<MemoryContextPack> {
+        let novel = self.get_novel(novel_id)?;
+        let current_chapter = self.get_chapter(chapter_id)?;
+        let all_characters = self.list_characters(novel_id).unwrap_or_default();
+        let world_rules = self.list_world_rules(novel_id).unwrap_or_default();
+        let canon_facts = self.list_canon_facts(novel_id, None).unwrap_or_default();
+        let story_arcs = self.list_story_arcs(novel_id).unwrap_or_default();
+        let phases = self.list_story_phases(novel_id).unwrap_or_default();
+        let chapters = self.list_chapters(novel_id).unwrap_or_default();
+
+        // 1. L0: Working Memory
+        let l0 = format!(
+            "当前创作目标：第 {} 章《{}》\n创作意图指令：{}",
+            current_chapter.chapter_number, current_chapter.title, prompt_intent
+        );
+
+        // 2. L1: Short-term Narrative Memory (Previous 1~2 chapters summary or tail)
+        let mut l1 = Vec::new();
+        let prev_chapters: Vec<_> = chapters
+            .iter()
+            .filter(|c| c.chapter_number < current_chapter.chapter_number)
+            .collect();
+
+        if let Some(prev) = prev_chapters.last() {
+            if let Some(content) = prev.content.as_ref() {
+                let tail: String = content.chars().rev().take(600).collect::<Vec<_>>().into_iter().rev().collect();
+                l1.push(format!("前一章《{}》衔接线索：\n……{}", prev.title, tail));
+            }
+        }
+
+        // Active characters recent state events
+        for char in all_characters.iter().take(4) {
+            if let Ok(events) = self.list_character_state_events(&char.id) {
+                if let Some(latest) = events.last() {
+                    l1.push(format!("{}: 最新状态[{}] -> {}", char.name, latest.field_name, latest.new_value));
+                }
+            }
+        }
+
+        // 3. L2: Arc Memory (Active Story Arcs & Phases)
+        let mut l2 = Vec::new();
+        if let Some(active_phase) = phases.first() {
+            l2.push(format!("当前所处大纲阶段：【{}】(战略目标: {})", active_phase.title, active_phase.goal));
+        }
+        for arc in story_arcs.iter().filter(|a| a.status == "DEVELOPING").take(2) {
+            l2.push(format!("当前推进中剧情弧：【{}】(冲突焦点: {})", arc.title, arc.goal));
+        }
+
+        // 4. L3: Long-term Canon Memory (World rules & character core profiles & facts)
+        let mut l3_rules = Vec::new();
+        for r in world_rules.iter().filter(|r| r.authority_level == "CANON").take(5) {
+            l3_rules.push(format!("{}: {}", r.title, r.rule_content));
+        }
+
+        let mut l3_profiles = Vec::new();
+        let filter_ids = target_character_ids.unwrap_or(&[]);
+        for char in all_characters.iter() {
+            if filter_ids.is_empty() || filter_ids.contains(&char.id) {
+                l3_profiles.push(format!(
+                    "{} (别名:{}): 性格[{}], 动机[{}], 背景[{}]",
+                    char.name, char.aliases, char.personality, char.motivation, char.background
+                ));
+            }
+        }
+
+        // 5. L4: Retrieval Memory (FTS5 search for prompt keywords)
+        let mut l4 = Vec::new();
+        let query_sample = prompt_intent.chars().take(20).collect::<String>();
+        if let Ok(snippets) = self.search_chapters_fts(novel_id, &query_sample) {
+            for (ch_id, title, snippet) in snippets {
+                if ch_id != current_chapter.id {
+                    l4.push(format!("历史章节《{}》相关记录: {}", title, snippet));
+                }
+            }
+        }
+
+        for fact in canon_facts.iter().take(5) {
+            l4.push(format!("因果事实：【{}】{}【{}】", fact.subject_id, fact.predicate, fact.object_value));
+        }
+
+        // Assemble unified system prompt
+        let mut prompt = format!(
+            "你是 NovelForge AI 专业长篇小说创作系统的核心叙事 Agent。\n\
+             作品名：《{}》，题材：{}，文风：{}\n\
+             【系统长期记忆引擎 (L0~L4 Context Pack)】已装载：\n\n",
+            novel.title, novel.genre_profile, novel.writing_style
+        );
+
+        prompt.push_str("=== [L3 长期权威法则与人物档案] ===\n");
+        for rule in &l3_rules {
+            prompt.push_str(&format!("- [Canon 法则] {}\n", rule));
+        }
+        for prof in &l3_profiles {
+            prompt.push_str(&format!("- [人物档案] {}\n", prof));
+        }
+        prompt.push('\n');
+
+        if !l2.is_empty() {
+            prompt.push_str("=== [L2 中期剧情弧与阶段目标] ===\n");
+            for arc in &l2 {
+                prompt.push_str(&format!("- {}\n", arc));
+            }
+            prompt.push('\n');
+        }
+
+        if !l1.is_empty() {
+            prompt.push_str("=== [L1 近期剧情脉络与人物动态] ===\n");
+            for item in &l1 {
+                prompt.push_str(&format!("- {}\n", item));
+            }
+            prompt.push('\n');
+        }
+
+        if !l4.is_empty() {
+            prompt.push_str("=== [L4 历史因果与检索事实] ===\n");
+            for item in &l4 {
+                prompt.push_str(&format!("- {}\n", item));
+            }
+            prompt.push('\n');
+        }
+
+        prompt.push_str("=== [L0 当前工作任务目标] ===\n");
+        prompt.push_str(&l0);
+        prompt.push_str("\n\n【创作准则】：严格遵守权威世界观法则与人物已知动态，前后呼应，严禁前后矛盾与降智冲突。");
+
+        Ok(MemoryContextPack {
+            working_memory_l0: l0,
+            short_term_l1: l1,
+            arc_memory_l2: l2,
+            canon_rules_l3: l3_rules,
+            character_profiles_l3: l3_profiles,
+            retrieved_history_l4: l4,
+            assembled_system_prompt: prompt,
+        })
+    }
+
+    // --- PHASE 5: SERIALIZATION JOBS ---
+
+    pub fn create_serialization_job(
+        &self,
+        novel_id: &str,
+        target_chapters_count: i64,
+        auto_approve: bool,
+        budget_tokens: i64,
+        config: &str,
+    ) -> Result<SerializationJob> {
+        let conn = self.conn.lock();
+        let id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp_millis();
+        let auto_int = if auto_approve { 1 } else { 0 };
+
+        conn.execute(
+            "INSERT INTO serialization_jobs (id, novel_id, status, target_chapters_count, completed_chapters_count, auto_approve, budget_tokens, used_tokens, config, created_at, updated_at)
+             VALUES (?1, ?2, 'PENDING', ?3, 0, ?4, ?5, 0, ?6, ?7, ?8)",
+            params![
+                &id,
+                novel_id,
+                target_chapters_count,
+                auto_int,
+                budget_tokens,
+                config,
+                now,
+                now
+            ],
+        )?;
+
+        Ok(SerializationJob {
+            id,
+            novel_id: novel_id.to_string(),
+            status: "PENDING".to_string(),
+            target_chapters_count,
+            completed_chapters_count: 0,
+            current_chapter_id: None,
+            auto_approve,
+            budget_tokens,
+            used_tokens: 0,
+            config: config.to_string(),
+            error_message: None,
+            created_at: now,
+            updated_at: now,
+        })
+    }
+
+    pub fn get_serialization_job(&self, job_id: &str) -> Result<SerializationJob> {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT id, novel_id, status, target_chapters_count, completed_chapters_count, current_chapter_id, auto_approve, budget_tokens, used_tokens, config, error_message, created_at, updated_at
+             FROM serialization_jobs WHERE id = ?1",
+            params![job_id],
+            |row| {
+                let auto_int: i64 = row.get(6)?;
+                Ok(SerializationJob {
+                    id: row.get(0)?,
+                    novel_id: row.get(1)?,
+                    status: row.get(2)?,
+                    target_chapters_count: row.get(3)?,
+                    completed_chapters_count: row.get(4)?,
+                    current_chapter_id: row.get(5)?,
+                    auto_approve: auto_int == 1,
+                    budget_tokens: row.get(7)?,
+                    used_tokens: row.get(8)?,
+                    config: row.get(9)?,
+                    error_message: row.get(10)?,
+                    created_at: row.get(11)?,
+                    updated_at: row.get(12)?,
+                })
+            },
+        )
+    }
+
+    pub fn update_serialization_job_progress(
+        &self,
+        job_id: &str,
+        completed_chapters: i64,
+        current_chapter_id: Option<&str>,
+        used_tokens: i64,
+        status: &str,
+        error_message: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE serialization_jobs
+             SET completed_chapters_count = ?1, current_chapter_id = ?2, used_tokens = ?3, status = ?4, error_message = ?5, updated_at = ?6
+             WHERE id = ?7",
+            params![
+                completed_chapters,
+                current_chapter_id,
+                used_tokens,
+                status,
+                error_message,
+                now,
+                job_id
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_serialization_jobs(&self, novel_id: &str) -> Result<Vec<SerializationJob>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, status, target_chapters_count, completed_chapters_count, current_chapter_id, auto_approve, budget_tokens, used_tokens, config, error_message, created_at, updated_at
+             FROM serialization_jobs WHERE novel_id = ?1 ORDER BY created_at DESC",
+        )?;
+
+        let rows = stmt.query_map(params![novel_id], |row| {
+            let auto_int: i64 = row.get(6)?;
+            Ok(SerializationJob {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                status: row.get(2)?,
+                target_chapters_count: row.get(3)?,
+                completed_chapters_count: row.get(4)?,
+                current_chapter_id: row.get(5)?,
+                auto_approve: auto_int == 1,
+                budget_tokens: row.get(7)?,
+                used_tokens: row.get(8)?,
+                config: row.get(9)?,
+                error_message: row.get(10)?,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
     }
 }
 

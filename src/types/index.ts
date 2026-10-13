@@ -226,3 +226,80 @@ export interface CollaborativeWorkflowResult {
   message: string;
 }
 
+// --- Phase 4: Layered Memory Engine (L0~L4) ---
+
+export interface CanonFact {
+  id: string;
+  novel_id: string;
+  subject_id: string;
+  predicate: string;
+  object_value: string;
+  truth_scope: 'GLOBAL' | 'LOCAL' | 'CONTINGENT';
+  authority_level: 'CONFIRMED_PLOT' | 'CANON' | 'HYPOTHESIS';
+  status: string;
+  effective_from: string;
+  effective_until: string;
+  source_chapter_id?: string;
+  version: number;
+  created_at: number;
+}
+
+export interface CharacterStateEvent {
+  id: string;
+  character_id: string;
+  source_chapter_id?: string;
+  effective_time: string;
+  field_name: string;
+  previous_value: string;
+  new_value: string;
+  status: string;
+  created_at: number;
+}
+
+export interface MemoryContextPack {
+  working_memory_l0: string;
+  short_term_l1: string[];
+  arc_memory_l2: string[];
+  canon_rules_l3: string[];
+  character_profiles_l3: string[];
+  retrieved_history_l4: string[];
+  assembled_system_prompt: string;
+}
+
+export interface ExtractChapterMemoryResult {
+  chapter_id: string;
+  chapter_summary: string;
+  character_state_events: CharacterStateEvent[];
+  timeline_events: StoryEvent[];
+  identified_threads: PlotThread[];
+  new_canon_facts: CanonFact[];
+  message: string;
+}
+
+// --- Phase 5: Serialization Engine ---
+
+export interface SerializationJob {
+  id: string;
+  novel_id: string;
+  status: 'PENDING' | 'RUNNING' | 'PAUSED' | 'WAITING_REVIEW' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
+  target_chapters_count: number;
+  completed_chapters_count: number;
+  current_chapter_id?: string;
+  auto_approve: boolean;
+  budget_tokens: number;
+  used_tokens: number;
+  config: string;
+  error_message?: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface StartSerializationJobInput {
+  novel_id: string;
+  chapters_count: number;
+  chapter_target_words?: number;
+  auto_approve?: boolean;
+  budget_tokens?: number;
+}
+
+

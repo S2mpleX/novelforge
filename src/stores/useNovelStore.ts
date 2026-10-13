@@ -7,7 +7,7 @@ import type {
   AiProvider,
 } from '@/types';
 
-export type ActiveTab = 'EDITOR' | 'DASHBOARD' | 'CHARACTERS' | 'WORLD' | 'PLOTS' | 'SETTINGS';
+export type ActiveTab = 'EDITOR' | 'DASHBOARD' | 'CHARACTERS' | 'WORLD' | 'PLOTS' | 'MEMORY' | 'SETTINGS';
 export type SaveStatus = 'SAVED' | 'SAVING' | 'DIRTY' | 'ERROR';
 
 interface NovelState {

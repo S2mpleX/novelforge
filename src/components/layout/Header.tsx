@@ -15,8 +15,11 @@ import {
   Menu,
   PanelRightClose,
   PanelRightOpen,
+  Brain,
+  TrendingUp,
 } from 'lucide-react';
 import { SettingsModal } from '@/components/modals/SettingsModal';
+import { SerializationModal } from '@/components/modals/SerializationModal';
 
 export const Header: React.FC = () => {
   const {
@@ -32,6 +35,7 @@ export const Header: React.FC = () => {
   } = useNovelStore();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showSerializationModal, setShowSerializationModal] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
 
   // Accurate word count: characters excluding whitespace
@@ -155,10 +159,31 @@ export const Header: React.FC = () => {
             <Compass className="w-3.5 h-3.5" />
             世界观设定
           </button>
+          <button
+            onClick={() => setActiveTab('MEMORY')}
+            className={`px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1.5 transition ${
+              activeTab === 'MEMORY'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Brain className="w-3.5 h-3.5" />
+            记忆引擎
+          </button>
         </div>
 
         {/* Right: Auto-save status, Word count, Export & Settings */}
         <div className="flex items-center gap-3">
+          {/* Serialization Auto-Pilot Trigger */}
+          <button
+            onClick={() => setShowSerializationModal(true)}
+            className="px-3 py-1.5 rounded text-xs font-medium bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20 border border-indigo-500/40"
+            title="打开多 Agent 自动连载控制台"
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+            自动连载
+          </button>
+
           {/* Word count & Save status */}
           {activeChapter && (
             <div className="flex items-center gap-3 text-xs pr-2 border-r border-slate-800">
@@ -244,6 +269,9 @@ export const Header: React.FC = () => {
       )}
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showSerializationModal && (
+        <SerializationModal onClose={() => setShowSerializationModal(false)} />
+      )}
     </>
   );
 };

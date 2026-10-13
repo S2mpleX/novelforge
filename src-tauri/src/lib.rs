@@ -69,6 +69,22 @@ pub fn run() {
             commands::run_style_polish,
             commands::run_scene_planning,
             commands::run_collaborative_workflow,
+            // Layered Memory Engine (Phase 4)
+            commands::list_canon_facts,
+            commands::create_canon_fact,
+            commands::delete_canon_fact,
+            commands::list_character_state_events,
+            commands::create_character_state_event,
+            commands::search_chapters_fts,
+            commands::assemble_memory_context_pack,
+            commands::extract_chapter_memory,
+            // Serialization Engine (Phase 5)
+            commands::create_serialization_job,
+            commands::get_serialization_job,
+            commands::list_serialization_jobs,
+            commands::pause_serialization_job,
+            commands::cancel_serialization_job,
+            commands::advance_serialization_job_step,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovelForge AI application");
