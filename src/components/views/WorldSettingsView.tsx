@@ -1,0 +1,375 @@
+import React, { useState, useEffect } from 'react';
+import { useNovelStore } from '@/stores/useNovelStore';
+import { api } from '@/utils/tauriBridge';
+import type { WorldRule, PlotThread } from '@/types';
+import {
+  Compass,
+  Bookmark,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Layers,
+} from 'lucide-react';
+import { PlotArcsView } from './PlotArcsView';
+
+interface WorldSettingsViewProps {
+  initialTab?: 'RULES' | 'PLOT_ARCS' | 'PLOTS';
+}
+
+export const WorldSettingsView: React.FC<WorldSettingsViewProps> = ({ initialTab = 'RULES' }) => {
+  const { activeNovel } = useNovelStore();
+
+  const [subTab, setSubTab] = useState<'RULES' | 'PLOT_ARCS' | 'PLOTS'>(initialTab);
+  const [rules, setRules] = useState<WorldRule[]>([]);
+  const [threads, setThreads] = useState<PlotThread[]>([]);
+
+  // Rule form state
+  const [showAddRule, setShowAddRule] = useState(false);
+  const [ruleTitle, setRuleTitle] = useState('');
+  const [ruleContent, setRuleContent] = useState('');
+  const [ruleAuthority, setRuleAuthority] = useState<'CANON' | 'EXTENDED' | 'HYPOTHESIS'>('CANON');
+
+  // Plot thread form state
+  const [showAddThread, setShowAddThread] = useState(false);
+  const [threadTitle, setThreadTitle] = useState('');
+  const [threadDesc, setThreadDesc] = useState('');
+
+  const loadData = async () => {
+    if (!activeNovel) return;
+    try {
+      const [rls, thrs] = await Promise.all([
+        api.listWorldRules(activeNovel.id),
+        api.listPlotThreads(activeNovel.id),
+      ]);
+      setRules(rls);
+      setThreads(thrs);
+    } catch (e) {
+      console.error('加载世界观设定失败:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [activeNovel?.id]);
+
+  useEffect(() => {
+    if (initialTab) {
+      setSubTab(initialTab);
+    }
+  }, [initialTab]);
+
+  const handleAddRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeNovel || !ruleTitle.trim()) return;
+
+    await api.createWorldRule({
+      novel_id: activeNovel.id,
+      title: ruleTitle.trim(),
+      rule_content: ruleContent.trim(),
+      authority_level: ruleAuthority,
+    });
+
+    setRuleTitle('');
+    setRuleContent('');
+    setShowAddRule(false);
+    loadData();
+  };
+
+  const handleAddThread = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeNovel || !threadTitle.trim()) return;
+
+    await api.createPlotThread({
+      novel_id: activeNovel.id,
+      title: threadTitle.trim(),
+      description: threadDesc.trim(),
+    });
+
+    setThreadTitle('');
+    setThreadDesc('');
+    setShowAddThread(false);
+    loadData();
+  };
+
+  if (!activeNovel) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-[#786f65]">
+        请选择或创建小说项目以管理世界观设定
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col bg-[#f4efe6] select-none overflow-hidden h-[calc(100vh-3.5rem)]">
+      {/* Top World Sub-Navigation */}
+      <div className="h-12 border-b border-[#ded5c4] px-6 flex items-center justify-between bg-[#efe9dc]/95 shrink-0 shadow-xs">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSubTab('RULES')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+              subTab === 'RULES'
+                ? 'bg-[#854d0e] text-white shadow-xs'
+                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
+            }`}
+          >
+            <Compass className="w-3.5 h-3.5" />
+            世界观法则 ({rules.length})
+          </button>
+          <button
+            onClick={() => setSubTab('PLOT_ARCS')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+              subTab === 'PLOT_ARCS'
+                ? 'bg-[#854d0e] text-white shadow-xs'
+                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            大纲与剧情弧
+          </button>
+          <button
+            onClick={() => setSubTab('PLOTS')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+              subTab === 'PLOTS'
+                ? 'bg-[#854d0e] text-white shadow-xs'
+                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
+            }`}
+          >
+            <Bookmark className="w-3.5 h-3.5" />
+            伏笔与悬念 ({threads.length})
+          </button>
+        </div>
+
+        <div>
+          {subTab === 'RULES' && (
+            <button
+              onClick={() => setShowAddRule(true)}
+              className="px-3 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              新增世界观规则
+            </button>
+          )}
+          {subTab === 'PLOTS' && (
+            <button
+              onClick={() => setShowAddThread(true)}
+              className="px-3 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              埋设新伏笔
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      {subTab === 'PLOT_ARCS' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <PlotArcsView novelId={activeNovel.id} />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-4xl mx-auto">
+            {/* WORLD RULES (CANON) TAB */}
+            {subTab === 'RULES' && (
+              <div>
+                {rules.length === 0 ? (
+                  <div className="text-center py-16 border border-dashed border-[#ded5c4] rounded-xl bg-[#fdfbf7]">
+                    <Compass className="w-10 h-10 text-[#9e9383] mx-auto mb-2 opacity-50" />
+                    <h4 className="text-sm font-bold text-[#2b2621] font-serif mb-1">暂无世界观设定</h4>
+                    <p className="text-xs text-[#786f65] mb-4 max-w-md mx-auto">
+                      记录战力体系、地理法则、超凡体系等权威公理（Canon），防止长篇创作前后矛盾，杜绝战力崩坏！
+                    </p>
+                    <button
+                      onClick={() => setShowAddRule(true)}
+                      className="px-4 py-2 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium transition shadow-sm"
+                    >
+                      添加第一条核心规则
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {rules.map((r) => (
+                      <div
+                        key={r.id}
+                        className="p-4 rounded-xl bg-[#fdfbf7] border border-[#ded5c4] hover:border-amber-800/40 shadow-xs transition"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                            <h4 className="text-sm font-bold text-[#1f1d1a] font-serif">{r.title}</h4>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold font-mono ${
+                            r.authority_level === 'CANON'
+                              ? 'bg-emerald-800/10 text-emerald-800 border border-emerald-800/20'
+                              : r.authority_level === 'EXTENDED'
+                              ? 'bg-amber-800/10 text-amber-800 border border-amber-800/20'
+                              : 'bg-indigo-800/10 text-indigo-800 border border-indigo-800/20'
+                          }`}>
+                            {r.authority_level === 'CANON' ? 'CANON (权威铁律)' : r.authority_level === 'EXTENDED' ? 'EXTENDED (推演扩展)' : 'HYPOTHESIS (假设猜想)'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#3d362e] leading-relaxed whitespace-pre-wrap">{r.rule_content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PLOT THREADS TAB */}
+            {subTab === 'PLOTS' && (
+              <div>
+                {threads.length === 0 ? (
+                  <div className="text-center py-16 border border-dashed border-[#ded5c4] rounded-xl bg-[#fdfbf7]">
+                    <Bookmark className="w-10 h-10 text-[#9e9383] mx-auto mb-2 opacity-50" />
+                    <h4 className="text-sm font-bold text-[#2b2621] font-serif mb-1">暂无悬念伏笔</h4>
+                    <p className="text-xs text-[#786f65] mb-4 max-w-md mx-auto">
+                      登记尚未揭晓的秘密与伏笔线索，辅助多 Agent 在后续章节流转中持续追踪与适时回收！
+                    </p>
+                    <button
+                      onClick={() => setShowAddThread(true)}
+                      className="px-4 py-2 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium transition shadow-sm"
+                    >
+                      埋设第一条伏笔
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {threads.map((t) => (
+                      <div
+                        key={t.id}
+                        className="p-4 rounded-xl bg-[#fdfbf7] border border-[#ded5c4] hover:border-amber-800/40 shadow-xs transition"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-amber-700" />
+                            <h4 className="text-sm font-bold text-[#1f1d1a] font-serif">{t.title}</h4>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-semibold font-mono ${
+                            t.status === 'RESOLVED'
+                              ? 'bg-emerald-800/10 text-emerald-800 border border-emerald-800/20'
+                              : 'bg-amber-800/10 text-amber-800 border border-amber-800/20'
+                          }`}>
+                            {t.status === 'RESOLVED' ? '已回收揭秘' : '待回收伏笔'}
+                          </span>
+                        </div>
+                        {t.description && (
+                          <p className="text-xs text-[#3d362e] leading-relaxed whitespace-pre-wrap">{t.description}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD WORLD RULE */}
+      {showAddRule && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#fdfbf7] border border-[#ded5c4] rounded-xl p-5 space-y-4 shadow-xl">
+            <h3 className="text-sm font-bold text-[#1f1d1a] font-serif">新增世界观法则 (Canon)</h3>
+            <form onSubmit={handleAddRule} className="space-y-3">
+              <div>
+                <label className="text-xs text-[#685f54] block mb-1">规则名称 *</label>
+                <input
+                  required
+                  value={ruleTitle}
+                  onChange={(e) => setRuleTitle(e.target.value)}
+                  placeholder="如：灵气潮汐法则、热力学禁区、超凡契约..."
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] focus:outline-none focus:ring-1 focus:ring-amber-700"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[#685f54] block mb-1">权威分级</label>
+                <select
+                  value={ruleAuthority}
+                  onChange={(e: any) => setRuleAuthority(e.target.value)}
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] focus:outline-none focus:ring-1 focus:ring-amber-700"
+                >
+                  <option value="CANON">CANON (权威不可动摇)</option>
+                  <option value="EXTENDED">EXTENDED (可扩展推演)</option>
+                  <option value="HYPOTHESIS">HYPOTHESIS (待确认猜想)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-[#685f54] block mb-1">规则详细描述 *</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={ruleContent}
+                  onChange={(e) => setRuleContent(e.target.value)}
+                  placeholder="详细规则与约束边界..."
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] resize-none focus:outline-none focus:ring-1 focus:ring-amber-700"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddRule(false)}
+                  className="px-3 py-1.5 rounded-lg border border-[#d5cbb8] text-xs text-[#685f54] hover:bg-[#eae2d3]"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium"
+                >
+                  保存规则
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD PLOT THREAD */}
+      {showAddThread && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#fdfbf7] border border-[#ded5c4] rounded-xl p-5 space-y-4 shadow-xl">
+            <h3 className="text-sm font-bold text-[#1f1d1a] font-serif">埋设新伏笔 / 故事线</h3>
+            <form onSubmit={handleAddThread} className="space-y-3">
+              <div>
+                <label className="text-xs text-[#685f54] block mb-1">伏笔标题 *</label>
+                <input
+                  required
+                  value={threadTitle}
+                  onChange={(e) => setThreadTitle(e.target.value)}
+                  placeholder="如：青铜古剑的真正来历、主角身世玉佩的缺口..."
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] focus:outline-none focus:ring-1 focus:ring-amber-700"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[#685f54] block mb-1">线索内容与预期回收</label>
+                <textarea
+                  rows={4}
+                  value={threadDesc}
+                  onChange={(e) => setThreadDesc(e.target.value)}
+                  placeholder="描述当前已埋设的细节线索及未来推进设想..."
+                  className="w-full bg-[#f7f2e7] border border-[#d5cbb8] rounded-lg p-2 text-xs text-[#2b2621] resize-none focus:outline-none focus:ring-1 focus:ring-amber-700"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddThread(false)}
+                  className="px-3 py-1.5 rounded-lg border border-[#d5cbb8] text-xs text-[#685f54] hover:bg-[#eae2d3]"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-700 text-white text-xs font-medium"
+                >
+                  登记伏笔
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

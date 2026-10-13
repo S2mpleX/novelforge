@@ -49,6 +49,18 @@ async function safeInvoke<T>(cmd: string, args?: any): Promise<T> {
   return handleWebMockCall(cmd, args) as Promise<T>;
 }
 
+const webStreamListeners: Array<(payload: StreamChunkPayload) => void> = [];
+
+export function emitWebStreamChunk(payload: StreamChunkPayload) {
+  webStreamListeners.forEach((fn) => {
+    try {
+      fn(payload);
+    } catch (e) {
+      console.error('WebStream listener error:', e);
+    }
+  });
+}
+
 export const api = {
   // Novels
   listNovels: () => safeInvoke<Novel[]>('list_novels'),
@@ -245,7 +257,11 @@ export const api = {
 
   onStreamChunk: (callback: (payload: StreamChunkPayload) => void) => {
     if (!isTauri()) {
-      return Promise.resolve(() => {});
+      webStreamListeners.push(callback);
+      return Promise.resolve(() => {
+        const idx = webStreamListeners.indexOf(callback);
+        if (idx !== -1) webStreamListeners.splice(idx, 1);
+      });
     }
     return listen<StreamChunkPayload>('novel-stream-chunk', (event) => {
       callback(event.payload);

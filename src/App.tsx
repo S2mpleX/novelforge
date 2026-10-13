@@ -5,7 +5,8 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { NovelEditor } from '@/components/editor/NovelEditor';
 import { AiAssistantPanel } from '@/components/editor/AiAssistantPanel';
 import { DashboardView } from '@/components/views/DashboardView';
-import { StoryBibleView } from '@/components/views/StoryBibleView';
+import { CharactersView } from '@/components/views/CharactersView';
+import { WorldSettingsView } from '@/components/views/WorldSettingsView';
 import { MemoryEngineView } from '@/components/views/MemoryEngineView';
 import { isTauri } from '@/utils/tauriBridge';
 import { Info, X } from 'lucide-react';
@@ -50,9 +51,9 @@ export const App: React.FC = () => {
             </>
           )}
           {activeTab === 'DASHBOARD' && <DashboardView />}
-          {(activeTab === 'CHARACTERS' || activeTab === 'WORLD' || activeTab === 'PLOTS') && (
-            <StoryBibleView />
-          )}
+          {activeTab === 'CHARACTERS' && <CharactersView />}
+          {activeTab === 'WORLD' && <WorldSettingsView />}
+          {activeTab === 'PLOTS' && <WorldSettingsView initialTab="PLOTS" />}
           {activeTab === 'MEMORY' && <MemoryEngineView />}
         </main>
       </div>

@@ -23,6 +23,7 @@ import type {
   ReviewReport,
   StylePolishResponse,
 } from '@/types';
+import { emitWebStreamChunk } from './tauriBridge';
 
 const SEED_NOVEL_ID = 'seed-novel-001';
 const SEED_CHAPTER_ID = 'seed-chapter-001';
@@ -789,6 +790,34 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         characters: getStorage<Character[]>('characters', []),
         rules: getStorage<WorldRule[]>('world_rules', []),
       }, null, 2);
+    }
+
+    case 'generate_stream_chapter': {
+      const { chapter_id } = args.input;
+      const paragraphs = [
+        `\n\n舷窗之外，无垠的柯伊伯带冰晶碎屑在曲率引擎的幽蓝辉光照耀下，泛着冷冽如霜的微芒。`,
+        `李观棋静立在主控台前，修长有力的指尖悬停在跃迁扳机上方半寸处。仪表盘上的引力梯度波形正在剧烈震颤，宛如深海中苏醒巨兽的沉重脉搏。`,
+        `“第三号因果锚点尚未闭合，强行跃迁的坍缩概率高达百分之七十三。”林幽清冷的声音自通讯矩阵中传来，带着不容置疑的严苛。`,
+        `李观棋眼帘微垂，瞳孔深处倒映着跳跃的赤色警示符文。他没有丝毫迟疑，沉声道：“若在此刻退缩，整支先驱者舰队都将被吸入重力井裂隙。启动备用曲率环，我们逆流而上。”`,
+      ];
+
+      setTimeout(async () => {
+        for (let i = 0; i < paragraphs.length; i++) {
+          emitWebStreamChunk({
+            chapter_id,
+            chunk: paragraphs[i],
+            is_done: false,
+          });
+          await new Promise((r) => setTimeout(r, 350));
+        }
+        emitWebStreamChunk({
+          chapter_id,
+          chunk: '',
+          is_done: true,
+        });
+      }, 50);
+
+      return paragraphs.join('\n');
     }
 
     default:

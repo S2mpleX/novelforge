@@ -27,7 +27,10 @@ import {
   Trash2,
   AlertTriangle,
   Flame,
+  Keyboard,
+  FastForward,
 } from 'lucide-react';
+import { useTypewriterStream } from '@/utils/useTypewriterStream';
 
 const PROMPT_PRESETS = [
   { label: '顺势续写', desc: '承接前文因果情绪，自然推进后续冲突', instruction: '根据前文剧情因果与人物当前状态，顺畅续写后续桥段，保持故事冲突与情绪张力。' },
@@ -61,10 +64,24 @@ export const AiAssistantPanel: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'STREAM_WRITE' | 'COLLABORATE' | 'CONTINUITY' | 'STYLE_POLISH' | 'TOOLBOX'>('STREAM_WRITE');
 
+  // --- TYPEWRITER STREAMING ENGINE ---
+  const {
+    displayedText: streamResult,
+    isTyping,
+    speed: typewriterSpeed,
+    setSpeed: setTypewriterSpeed,
+    enabled: typewriterEnabled,
+    setEnabled: setTypewriterEnabled,
+    pushChunk,
+    markStreamDone,
+    flushAll,
+    reset: resetTypewriter,
+    fullText: fullStreamResult,
+  } = useTypewriterStream();
+
   // --- STREAM WRITE STATE ---
   const [instruction, setInstruction] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [streamResult, setStreamResult] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // New Generation controls
@@ -117,15 +134,17 @@ export const AiAssistantPanel: React.FC = () => {
     api.onStreamChunk((payload) => {
       if (activeChapter && payload.chapter_id === activeChapter.id) {
         if (payload.chunk) {
-          setStreamResult((prev) => prev + payload.chunk);
+          pushChunk(payload.chunk);
         }
         if (payload.is_done) {
-          setIsGenerating(false);
-          if (payload.error) {
-            setStatusMessage(`生成出错: ${payload.error}`);
-          } else {
-            setStatusMessage('生成完毕，请审阅或应用！');
-          }
+          markStreamDone(() => {
+            setIsGenerating(false);
+            if (payload.error) {
+              setStatusMessage(`生成出错: ${payload.error}`);
+            } else {
+              setStatusMessage('正文流式创作完毕，请审阅或应用！');
+            }
+          });
         }
       }
     }).then((fn) => {
@@ -135,7 +154,7 @@ export const AiAssistantPanel: React.FC = () => {
     return () => {
       if (unlisten) unlisten();
     };
-  }, [activeChapter?.id]);
+  }, [activeChapter?.id, pushChunk, markStreamDone]);
 
   if (!rightPanelOpen) return null;
 
@@ -148,7 +167,7 @@ export const AiAssistantPanel: React.FC = () => {
     }
 
     setIsGenerating(true);
-    setStreamResult('');
+    resetTypewriter();
     setStatusMessage('正文作家 Agent 正在流式写作中...');
 
     // Combine prompt with length, style, and creativity instructions
@@ -172,11 +191,12 @@ export const AiAssistantPanel: React.FC = () => {
   };
 
   const handleStashCurrentDraft = () => {
-    if (!streamResult) return;
+    const textToStash = fullStreamResult || streamResult;
+    if (!textToStash) return;
     const newDraft: StashedDraft = {
       id: 'stash_' + Date.now(),
       createdAt: new Date().toLocaleTimeString(),
-      text: streamResult,
+      text: textToStash,
       summary: instruction.slice(0, 24) || '灵感草稿',
     };
     setStashedDrafts((prev) => [newDraft, ...prev]);
@@ -257,8 +277,9 @@ export const AiAssistantPanel: React.FC = () => {
   };
 
   const handleAppendToEditor = async () => {
-    if (!streamResult) return;
-    const formattedParagraphs = streamResult
+    const textToApply = fullStreamResult || streamResult;
+    if (!textToApply) return;
+    const formattedParagraphs = textToApply
       .split('\n')
       .filter((p) => p.trim())
       .map((p) => `<p>${p.trim()}</p>`)
@@ -268,16 +289,17 @@ export const AiAssistantPanel: React.FC = () => {
     updateEditorContent(newContent);
     await saveCurrentChapter(true, 'AI_APPEND');
     setStatusMessage('已成功追加到正文末尾并保存快照！');
-    setStreamResult('');
+    resetTypewriter();
   };
 
   const handleReplaceEditor = async () => {
-    if (!streamResult) return;
+    const textToApply = fullStreamResult || streamResult;
+    if (!textToApply) return;
     if (!confirm('确定要用 AI 生成的内容替换当前章节正文吗？（原正文已自动保存为历史版本，可随时回退）')) {
       return;
     }
 
-    const formattedParagraphs = streamResult
+    const formattedParagraphs = textToApply
       .split('\n')
       .filter((p) => p.trim())
       .map((p) => `<p>${p.trim()}</p>`)
@@ -286,7 +308,7 @@ export const AiAssistantPanel: React.FC = () => {
     updateEditorContent(formattedParagraphs);
     await saveCurrentChapter(true, 'AI_REPLACE');
     setStatusMessage('已替换正文并创建新版本快照！');
-    setStreamResult('');
+    resetTypewriter();
   };
 
   const handleCopy = (text: string) => {
@@ -669,10 +691,49 @@ export const AiAssistantPanel: React.FC = () => {
             ) : (
               <div className="flex-1 flex flex-col min-h-0 border border-[#ded5c4] rounded-lg bg-[#fdfbf7] p-2.5 shadow-xs">
                 <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-[#ded5c4]">
-                  <span className="text-[11px] font-semibold text-[#786f65]">
-                    实时正文草稿 ({streamResult.length} 字)
-                  </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-semibold text-[#786f65]">
+                      实时正文草稿 ({streamResult.length}{fullStreamResult && fullStreamResult.length !== streamResult.length ? `/${fullStreamResult.length}` : ''} 字)
+                    </span>
+                    {/* 拟真打字机模拟开关与速度档位 */}
+                    <div className="flex items-center gap-1 ml-1 bg-[#efe7da] px-1.5 py-0.5 rounded-full border border-[#dcd1be] text-[10px]">
+                      <button
+                        onClick={() => setTypewriterEnabled(!typewriterEnabled)}
+                        className={`flex items-center gap-0.5 px-1 py-0.2 rounded transition ${typewriterEnabled ? 'text-amber-900 font-semibold' : 'text-[#8e8476]'}`}
+                        title={typewriterEnabled ? "已开启作家打字机模拟：拟真逐字敲击节奏" : "已开启极速直出模式"}
+                      >
+                        <Keyboard className="w-2.5 h-2.5" />
+                        {typewriterEnabled ? '打字机' : '直出'}
+                      </button>
+                      {typewriterEnabled && (
+                        <span className="flex items-center gap-0.5 border-l border-[#dcd1be] pl-1 text-[#6b6255]">
+                          {(['slow', 'normal', 'fast'] as const).map((spd) => (
+                            <button
+                              key={spd}
+                              onClick={() => setTypewriterSpeed(spd)}
+                              className={`px-1 rounded transition ${typewriterSpeed === spd ? 'bg-amber-800 text-white font-bold' : 'hover:text-[#2b2621]'}`}
+                              title={spd === 'slow' ? '悠然 (约25字/s)' : spd === 'normal' ? '标准 (约50字/s)' : '飞速 (约100字/s)'}
+                            >
+                              {spd === 'slow' ? '慢' : spd === 'normal' ? '中' : '快'}
+                            </button>
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* 打字中随时可一键跳过 */}
+                    {isTyping && (
+                      <button
+                        onClick={flushAll}
+                        className="text-[10px] text-amber-900 bg-amber-800/10 hover:bg-amber-800/20 px-1.5 py-0.5 rounded flex items-center gap-0.5 font-medium transition animate-pulse"
+                        title="立即跳过动画，呈现完整正文"
+                      >
+                        <FastForward className="w-2.5 h-2.5" />
+                        跳过
+                      </button>
+                    )}
                     {streamResult && (
                       <>
                         <button
@@ -684,9 +745,9 @@ export const AiAssistantPanel: React.FC = () => {
                           暂存
                         </button>
                         <button
-                          onClick={() => handleCopy(streamResult)}
+                          onClick={() => handleCopy(fullStreamResult || streamResult)}
                           className="text-[10px] text-[#786f65] hover:text-[#231f1a] flex items-center gap-0.5"
-                          title="复制"
+                          title="复制全文"
                         >
                           <Copy className="w-3 h-3" />
                           复制
@@ -697,14 +758,24 @@ export const AiAssistantPanel: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto text-xs text-[#2b2621] whitespace-pre-wrap leading-relaxed select-text font-serif pr-1">
-                  {streamResult || (
+                  {streamResult ? (
+                    <>
+                      {streamResult}
+                      {(isGenerating || isTyping) && (
+                        <span 
+                          className="inline-block w-1.5 h-3.5 ml-0.5 bg-[#854d0e] animate-pulse align-middle rounded-xs shadow-xs" 
+                          title="作家 Agent 正在码字中..."
+                        />
+                      )}
+                    </>
+                  ) : (
                     <span className="text-[#a89f92] italic select-none">
                       点击上方启动后，Agent 将在此处实时流式输出生成的正文草稿...
                     </span>
                   )}
                 </div>
 
-                {streamResult && !isGenerating && (
+                {streamResult && !isGenerating && !isTyping && (
                   <div className="pt-2 border-t border-[#ded5c4] grid grid-cols-2 gap-2 mt-2">
                     <button
                       onClick={handleAppendToEditor}

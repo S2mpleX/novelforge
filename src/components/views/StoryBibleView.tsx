@@ -16,9 +16,21 @@ import { CharacterFlowView } from './CharacterFlowView';
 import { PlotArcsView } from './PlotArcsView';
 
 export const StoryBibleView: React.FC = () => {
-  const { activeNovel } = useNovelStore();
+  const { activeNovel, activeTab: storeTab } = useNovelStore();
 
-  const [activeTab, setActiveTab] = useState<'CHARACTERS' | 'RELATIONSHIPS' | 'RULES' | 'PLOT_ARCS' | 'PLOTS'>('CHARACTERS');
+  const [activeTab, setActiveTab] = useState<'CHARACTERS' | 'RELATIONSHIPS' | 'RULES' | 'PLOT_ARCS' | 'PLOTS'>(
+    storeTab === 'WORLD' ? 'RULES' : storeTab === 'PLOTS' ? 'PLOTS' : 'CHARACTERS'
+  );
+
+  useEffect(() => {
+    if (storeTab === 'WORLD') {
+      setActiveTab('RULES');
+    } else if (storeTab === 'CHARACTERS') {
+      setActiveTab('CHARACTERS');
+    } else if (storeTab === 'PLOTS') {
+      setActiveTab('PLOTS');
+    }
+  }, [storeTab]);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [rules, setRules] = useState<WorldRule[]>([]);
   const [threads, setThreads] = useState<PlotThread[]>([]);
