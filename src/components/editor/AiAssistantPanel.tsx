@@ -29,6 +29,8 @@ import {
   Flame,
   Keyboard,
   FastForward,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { useTypewriterStream } from '@/utils/useTypewriterStream';
 
@@ -67,16 +69,18 @@ export const AiAssistantPanel: React.FC = () => {
   // --- TYPEWRITER STREAMING ENGINE ---
   const {
     displayedText: streamResult,
+    fullText: fullStreamResult,
     isTyping,
     speed: typewriterSpeed,
-    setSpeed: setTypewriterSpeed,
     enabled: typewriterEnabled,
+    soundEnabled,
+    toggleSound,
+    setSpeed: setTypewriterSpeed,
     setEnabled: setTypewriterEnabled,
     pushChunk,
     markStreamDone,
     flushAll,
     reset: resetTypewriter,
-    fullText: fullStreamResult,
   } = useTypewriterStream();
 
   // --- STREAM WRITE STATE ---
@@ -695,29 +699,42 @@ export const AiAssistantPanel: React.FC = () => {
                     <span className="text-[11px] font-semibold text-[#786f65]">
                       实时正文草稿 ({streamResult.length}{fullStreamResult && fullStreamResult.length !== streamResult.length ? `/${fullStreamResult.length}` : ''} 字)
                     </span>
-                    {/* 拟真打字机模拟开关与速度档位 */}
+                    {/* 拟真打字机模拟开关、速度档位与机械按键音 */}
                     <div className="flex items-center gap-1 ml-1 bg-[#efe7da] px-1.5 py-0.5 rounded-full border border-[#dcd1be] text-[10px]">
                       <button
                         onClick={() => setTypewriterEnabled(!typewriterEnabled)}
                         className={`flex items-center gap-0.5 px-1 py-0.2 rounded transition ${typewriterEnabled ? 'text-amber-900 font-semibold' : 'text-[#8e8476]'}`}
-                        title={typewriterEnabled ? "已开启作家打字机模拟：拟真逐字敲击节奏" : "已开启极速直出模式"}
+                        title={typewriterEnabled ? "已开启拟真作家打字机：词组脉冲、呼吸停顿与微抖动" : "已开启极速直出模式"}
                       >
                         <Keyboard className="w-2.5 h-2.5" />
                         {typewriterEnabled ? '打字机' : '直出'}
                       </button>
                       {typewriterEnabled && (
-                        <span className="flex items-center gap-0.5 border-l border-[#dcd1be] pl-1 text-[#6b6255]">
-                          {(['slow', 'normal', 'fast'] as const).map((spd) => (
-                            <button
-                              key={spd}
-                              onClick={() => setTypewriterSpeed(spd)}
-                              className={`px-1 rounded transition ${typewriterSpeed === spd ? 'bg-amber-800 text-white font-bold' : 'hover:text-[#2b2621]'}`}
-                              title={spd === 'slow' ? '悠然 (约25字/s)' : spd === 'normal' ? '标准 (约50字/s)' : '飞速 (约100字/s)'}
-                            >
-                              {spd === 'slow' ? '慢' : spd === 'normal' ? '中' : '快'}
-                            </button>
-                          ))}
-                        </span>
+                        <>
+                          <span className="flex items-center gap-0.5 border-l border-[#dcd1be] pl-1 text-[#6b6255]">
+                            {([
+                              { id: 'slow', label: '沉思', tip: '沉思品味：逐字推敲 (约7字/s)' },
+                              { id: 'normal', label: '作家', tip: '作家手速：自然词组心流 (约14字/s)' },
+                              { id: 'fast', label: '泉涌', tip: '文思泉涌：快速成文 (约28字/s)' },
+                            ] as const).map(({ id, label, tip }) => (
+                              <button
+                                key={id}
+                                onClick={() => setTypewriterSpeed(id)}
+                                className={`px-1 rounded transition ${typewriterSpeed === id ? 'bg-amber-800 text-white font-bold' : 'hover:text-[#2b2621]'}`}
+                                title={tip}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </span>
+                          <button
+                            onClick={toggleSound}
+                            className={`flex items-center px-1 py-0.2 rounded transition border-l border-[#dcd1be] pl-1 ${soundEnabled ? 'text-amber-900 font-bold' : 'text-[#a89f92] hover:text-[#6b6255]'}`}
+                            title={soundEnabled ? "机械按键音已开启（点击静音）" : "机械按键音已静音（点击开启）"}
+                          >
+                            {soundEnabled ? <Volume2 className="w-2.5 h-2.5" /> : <VolumeX className="w-2.5 h-2.5" />}
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

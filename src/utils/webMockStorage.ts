@@ -794,22 +794,31 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
 
     case 'generate_stream_chapter': {
       const { chapter_id } = args.input;
-      const paragraphs = [
+      const fullProse = [
         `\n\n舷窗之外，无垠的柯伊伯带冰晶碎屑在曲率引擎的幽蓝辉光照耀下，泛着冷冽如霜的微芒。`,
         `李观棋静立在主控台前，修长有力的指尖悬停在跃迁扳机上方半寸处。仪表盘上的引力梯度波形正在剧烈震颤，宛如深海中苏醒巨兽的沉重脉搏。`,
         `“第三号因果锚点尚未闭合，强行跃迁的坍缩概率高达百分之七十三。”林幽清冷的声音自通讯矩阵中传来，带着不容置疑的严苛。`,
         `李观棋眼帘微垂，瞳孔深处倒映着跳跃的赤色警示符文。他没有丝毫迟疑，沉声道：“若在此刻退缩，整支先驱者舰队都将被吸入重力井裂隙。启动备用曲率环，我们逆流而上。”`,
-      ];
+      ].join('\n');
 
       setTimeout(async () => {
-        for (let i = 0; i < paragraphs.length; i++) {
+        // 切割为 2~5 字的微细流式片段，模拟真实模型 Token 输出
+        let offset = 0;
+        while (offset < fullProse.length) {
+          const chunkSize = Math.floor(Math.random() * 4) + 2;
+          const chunk = fullProse.slice(offset, offset + chunkSize);
+          offset += chunkSize;
+
           emitWebStreamChunk({
             chapter_id,
-            chunk: paragraphs[i],
+            chunk,
             is_done: false,
           });
-          await new Promise((r) => setTimeout(r, 350));
+
+          const jitterWait = Math.floor(Math.random() * 50) + 70;
+          await new Promise((r) => setTimeout(r, jitterWait));
         }
+
         emitWebStreamChunk({
           chapter_id,
           chunk: '',
@@ -817,7 +826,7 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         });
       }, 50);
 
-      return paragraphs.join('\n');
+      return fullProse;
     }
 
     default:

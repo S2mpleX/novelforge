@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { typewriterAudio } from './typewriterAudio';
 
 export type TypewriterSpeed = 'slow' | 'normal' | 'fast';
 
@@ -7,27 +8,53 @@ interface UseTypewriterOptions {
   initialEnabled?: boolean;
 }
 
-const SPEED_CONFIG: Record<TypewriterSpeed, { baseInterval: number; maxStep: number; pauseComma: number; pausePeriod: number; pauseNewline: number }> = {
+// 真实人类打字动力学参数模型 (Human-like Typing Kinetics)
+const SPEED_CONFIG: Record<
+  TypewriterSpeed,
+  {
+    label: string;
+    charInterval: number; // 基础按键间隔 (ms)
+    burstChance: number; // 词组连击概率
+    burstCharInterval: number; // 词组内连敲间隔 (ms)
+    burstPause: number; // 词组打完后的微停顿/选词思索 (ms)
+    pauseComma: number; // 逗号顿号微呼吸停顿 (ms)
+    pausePeriod: number; // 句号叹号问号深思停顿 (ms)
+    pauseNewline: number; // 段落换行构思停顿 (ms)
+    jitter: number; // 自然生理微抖动范围 (±ms)
+  }
+> = {
   slow: {
-    baseInterval: 35,
-    maxStep: 1,
-    pauseComma: 90,
-    pausePeriod: 160,
-    pauseNewline: 220,
+    label: '沉思',
+    charInterval: 130, // 约 7~8 字/秒：沉静推敲，逐字细品
+    burstChance: 0.35,
+    burstCharInterval: 65,
+    burstPause: 260,
+    pauseComma: 300,
+    pausePeriod: 580,
+    pauseNewline: 750,
+    jitter: 35,
   },
   normal: {
-    baseInterval: 18,
-    maxStep: 2,
-    pauseComma: 60,
-    pausePeriod: 110,
-    pauseNewline: 150,
+    label: '作家',
+    charInterval: 72, // 约 13~15 字/秒：专业作者键盘心流，阅读跟随感极佳
+    burstChance: 0.45,
+    burstCharInterval: 38,
+    burstPause: 140,
+    pauseComma: 180,
+    pausePeriod: 380,
+    pauseNewline: 500,
+    jitter: 20,
   },
   fast: {
-    baseInterval: 9,
-    maxStep: 4,
-    pauseComma: 25,
-    pausePeriod: 50,
-    pauseNewline: 70,
+    label: '泉涌',
+    charInterval: 36, // 约 25~30 字/秒：文思泉涌，飞速铺陈
+    burstChance: 0.55,
+    burstCharInterval: 22,
+    burstPause: 75,
+    pauseComma: 80,
+    pausePeriod: 180,
+    pauseNewline: 240,
+    jitter: 10,
   },
 };
 
@@ -35,11 +62,18 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [speed, setSpeed] = useState<TypewriterSpeed>(() => {
-    return (localStorage.getItem('novelforge_typewriter_speed') as TypewriterSpeed) || options?.initialSpeed || 'normal';
+    return (
+      (localStorage.getItem('novelforge_typewriter_speed') as TypewriterSpeed) ||
+      options?.initialSpeed ||
+      'normal'
+    );
   });
   const [enabled, setEnabled] = useState<boolean>(() => {
     const saved = localStorage.getItem('novelforge_typewriter_enabled');
     return saved !== null ? saved === 'true' : (options?.initialEnabled ?? true);
+  });
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    return !typewriterAudio.getMuted();
   });
 
   // State refs for animation loop
@@ -48,6 +82,7 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
   const isStreamDoneRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeCallbackRef = useRef<(() => void) | null>(null);
+  const burstRemainingRef = useRef(0); // 当前连击词组剩余字符计数
 
   const handleSetSpeed = useCallback((s: TypewriterSpeed) => {
     setSpeed(s);
@@ -58,22 +93,29 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
     setEnabled(val);
     localStorage.setItem('novelforge_typewriter_enabled', String(val));
     if (!val) {
-      // If disabled mid-stream, flush everything immediately
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
       setDisplayedText(fullTextRef.current);
       queueRef.current = [];
+      burstRemainingRef.current = 0;
       if (isStreamDoneRef.current) {
         setIsTyping(false);
       }
     }
   }, []);
 
-  // Tick step loop
+  const handleToggleSound = useCallback(() => {
+    const nextVal = !soundEnabled;
+    setSoundEnabled(nextVal);
+    typewriterAudio.setMuted(!nextVal);
+  }, [soundEnabled]);
+
+  // Tick loop simulating organic human writing
   const processNextTick = useCallback(() => {
     if (queueRef.current.length === 0) {
+      burstRemainingRef.current = 0;
       if (isStreamDoneRef.current) {
         setIsTyping(false);
         if (activeCallbackRef.current) {
@@ -88,36 +130,64 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
     const cfg = SPEED_CONFIG[speed];
     const qLen = queueRef.current.length;
 
-    // Adaptive step size based on queue backlog
+    // 严谨温和的背压控制：绝不轻易破坏逐字敲击的真实感
     let step = 1;
-    if (qLen > 120) {
-      step = cfg.maxStep * 2;
-    } else if (qLen > 50) {
-      step = cfg.maxStep;
+    if (qLen > 450) {
+      step = 3; // 极端堆积时每次最多 3 字
+    } else if (qLen > 220) {
+      step = 2; // 较大堆积时每次 2 字
     } else {
-      step = 1;
+      step = 1; // 常规状态坚定保持单字敲击
     }
 
-    // Take characters from queue
     const charsToTake = Math.min(step, qLen);
     const takenChars = queueRef.current.splice(0, charsToTake).join('');
     setDisplayedText((prev) => prev + takenChars);
 
-    // Calculate delay with realistic punctuation pause
-    let delay = cfg.baseInterval + Math.floor(Math.random() * 6 - 3); // subtle natural jitter
-    const lastChar = takenChars.slice(-1);
+    // 播放轻微触感音（换行发出低频回车音）
+    const isNewline = takenChars.includes('\n');
+    typewriterAudio.playKeyClick(isNewline);
 
-    if (qLen < 60) {
-      if (lastChar === '。' || lastChar === '！' || lastChar === '？' || lastChar === '”' || lastChar === '…') {
-        delay += cfg.pausePeriod;
-      } else if (lastChar === '，' || lastChar === '；' || lastChar === '、') {
-        delay += cfg.pauseComma;
-      } else if (lastChar === '\n') {
-        delay += cfg.pauseNewline;
+    // 计算下一个按键动作的人类学有机延迟
+    const lastChar = takenChars.slice(-1);
+    const jitter = Math.floor((Math.random() * 2 - 1) * cfg.jitter);
+    let delay = cfg.charInterval + jitter;
+
+    // 1. 词组脉冲模式处理 (Word Burst)
+    if (burstRemainingRef.current > 0) {
+      burstRemainingRef.current -= 1;
+      delay = cfg.burstCharInterval + jitter;
+      if (burstRemainingRef.current === 0) {
+        // 词组输出完毕，插入选词/思考停顿
+        delay += cfg.burstPause;
+      }
+    } else {
+      // 随机开启新词组连击 (2~4 字)
+      if (Math.random() < cfg.burstChance && !isNewline) {
+        burstRemainingRef.current = Math.floor(Math.random() * 3) + 2;
+        delay = cfg.burstCharInterval + jitter;
       }
     }
 
-    timerRef.current = setTimeout(processNextTick, Math.max(4, delay));
+    // 2. 文学停顿优先级：标点与换行深思熟虑停顿
+    if (lastChar === '。' || lastChar === '！' || lastChar === '？' || lastChar === '”' || lastChar === '…' || lastChar === '—') {
+      burstRemainingRef.current = 0;
+      delay += cfg.pausePeriod;
+    } else if (lastChar === '，' || lastChar === '；' || lastChar === '、' || lastChar === '：') {
+      burstRemainingRef.current = 0;
+      delay += cfg.pauseComma;
+    } else if (isNewline) {
+      burstRemainingRef.current = 0;
+      delay += cfg.pauseNewline;
+    }
+
+    // 3. 适度队列压缩（如果积压 > 100 字，按比例温和加速，但下限不低于 16ms）
+    if (qLen > 100) {
+      const compression = Math.max(0.65, 1 - (qLen - 100) / 600);
+      delay = Math.round(delay * compression);
+    }
+
+    timerRef.current = setTimeout(processNextTick, Math.max(14, delay));
   }, [speed]);
 
   // Push incoming chunk from stream
@@ -132,12 +202,10 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
         return;
       }
 
-      // Break chunk into individual characters and enqueue
       const chars = Array.from(chunk);
       queueRef.current.push(...chars);
       setIsTyping(true);
 
-      // Start ticker if idle
       if (!timerRef.current) {
         processNextTick();
       }
@@ -173,6 +241,7 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
       timerRef.current = null;
     }
     queueRef.current = [];
+    burstRemainingRef.current = 0;
     setDisplayedText(fullTextRef.current);
     if (isStreamDoneRef.current) {
       setIsTyping(false);
@@ -192,6 +261,7 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
     queueRef.current = [];
     fullTextRef.current = '';
     isStreamDoneRef.current = false;
+    burstRemainingRef.current = 0;
     activeCallbackRef.current = null;
     setDisplayedText('');
     setIsTyping(false);
@@ -213,6 +283,8 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
     setSpeed: handleSetSpeed,
     enabled,
     setEnabled: handleSetEnabled,
+    soundEnabled,
+    toggleSound: handleToggleSound,
     pushChunk,
     markStreamDone,
     flushAll,
