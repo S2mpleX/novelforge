@@ -132,12 +132,21 @@ body {
   outline: none !important;
   min-height: 560px;
   font-family: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", SimSun, "PingFang SC", "Microsoft YaHei", serif;
-  font-size: 1.18rem;
-  line-height: 2.15;
+  font-size: var(--editor-font-size, 18px);
+  line-height: var(--editor-line-height, 2.15);
   letter-spacing: 0.03em;
   color: #231f1a; /* 徽墨浓黑 */
   user-select: text;
   padding-bottom: 140px;
+}
+
+.editor-surface {
+  font-size: var(--editor-font-size, 18px);
+}
+
+.editor-surface .ProseMirror {
+  font-size: var(--editor-font-size, 18px) !important;
+  line-height: var(--editor-line-height, 2.15) !important;
 }
 
 .ProseMirror p {
@@ -183,9 +192,9 @@ body {
   margin-bottom: 0.8em;
 }
 
-.ProseMirror h1 { font-size: 1.8rem; border-bottom: 1px solid #ded3bf; padding-bottom: 0.4em; }
-.ProseMirror h2 { font-size: 1.45rem; }
-.ProseMirror h3 { font-size: 1.25rem; }
+.ProseMirror h1 { font-size: 1.6em; border-bottom: 1px solid #ded3bf; padding-bottom: 0.4em; }
+.ProseMirror h2 { font-size: 1.35em; }
+.ProseMirror h3 { font-size: 1.15em; }
 
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

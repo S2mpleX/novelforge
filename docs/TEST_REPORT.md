@@ -100,3 +100,12 @@ cargo build --target-dir E:\tools\novelforge_target
 - **世界观设定检查**：点击顶栏【世界观设定】正确进入专属 `WorldSettingsView`，包含“世界观法则 (Canon)”、“大纲与剧情弧”、“伏笔与悬念”，右上角对应展示【+ 新增世界观规则】与【+ 埋设新伏笔】。
 - **路由状态同步**：解决了旧版在组件内部使用写死局部状态导致切换失效的问题；存量 `StoryBibleView` 保持双向状态响应，向后兼容 100%。
 - **全量测试与构建**：`npx tsc --noEmit` 零类型错误；`pnpm build` 412ms 极速打包通过；原生后端 `db_test` 23/23 项端到端业务测试 100% 通过。
+
+### 2.6 正文字号调节失效修复验证 (`Bugfix: Typography Engine`)
+- **CSS 变量动态生效验证**：`.editor-surface .ProseMirror` 绑定 `--editor-font-size`，正文字体大小随状态变更即时重绘，消除原有 `font-size: 1.18rem` 样式硬编码阻断问题。
+- **步进逻辑与极值边界测试**：
+  - 点击 `A-`：每次平滑减少 2px，在到达 12px 时正确禁用 (`disabled:opacity-30 disabled:cursor-not-allowed`)；
+  - 点击 `A+`：每次平滑增加 2px，在到达 32px 时正确禁用；
+  - 按钮点击区域扩展，悬停、点击下沉及光标反馈完全正常。
+- **预设浮层与快捷跳转测试**：点击中间 `{fontSize}px` 标签可正常展开/折叠包含 6 大预设（14/16/18/20/22/26px）及一键恢复 18px 默认的浮层菜单，点击选项或浮层外区域正确关闭并即时应用。
+- **全链路编译与单元测试**：`pnpm build` (tsc + vite) 469ms 零错误编译通过；后端 `db_test` 23/23 核心测试 100% 通过。

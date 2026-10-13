@@ -91,3 +91,14 @@
      - `WorldSettingsView`（世界观中心）：聚焦世界观法则 (Canon 权威公理/战力体系)、宏观大纲剧情弧 (Plot Arcs)、伏笔悬念追踪 (Plot Threads)，配备【+ 新增世界观规则】与【+ 埋设新伏笔】操作。
   2. **一级路由精准分流**：在 `App.tsx` 中将 `CHARACTERS`、`WORLD`、`PLOTS` 严格分流至专属视图，并支持 `initialTab` 深度直达。
   3. **向后兼容**：保留并重构 `StoryBibleView`，添加与全局 `store.activeTab` 状态的双向响应，确保存量引用与测试无损兼容。
+
+## ADR-014: 正文字号调节失效修复与弹性排版系统 (Editor Typography Engine Fix)
+- **状态**：已采纳
+- **上下文**：用户反馈工具栏上的“字体调整按钮无法使用 (A- 18px A+)”。排查发现原因有二：
+  1. CSS 特异性覆盖：`.ProseMirror` 样式中直接硬编码了 `font-size: 1.18rem;`，导致外层通过 Tailwind 动态切换的 `text-base` / `text-lg` / `text-xl` 无法生效，正文字号始终不变；
+  2. 交互逻辑受限：字号范围仅限 `'16' | '18' | '20'`，边界点击时无响应且无禁用反馈，中间数字无法点击，缺乏现代文本编辑器的弹性与丰富预设。
+- **决策**：
+  1. **采用 CSS 变量解耦与层叠穿透**：通过 `--editor-font-size` 和 `--editor-line-height` 控制 ProseMirror 编辑器实际字号与行距，通过 `.editor-surface .ProseMirror` 强特异性覆盖，标题采用 `em` 相对等比缩放。
+  2. **12px~32px 弹性平滑步进**：支持 12px 至 32px 宽广字号范围，点击 A- / A+ 步进 2px，极值处具备 `disabled:opacity-30 disabled:cursor-not-allowed` 明确反馈。
+  3. **字号预设下拉浮层**：点击中间字号数字可呼出快捷预设浮层（14px、16px、18px、20px、22px、26px 以及一键重置默认 18px），点击外部自动关闭。
+  4. **全端同步**：流式生成预览框与持久化存储实时生效。

@@ -26,7 +26,15 @@ import { CreateNovelModal } from '@/components/modals/CreateNovelModal';
 import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
 
 type PaperTheme = 'xuan' | 'bamboo' | 'kraft' | 'midnight';
-type FontSize = '16' | '18' | '20';
+
+const FONT_PRESETS = [
+  { size: 14, label: '小号字', desc: '14px' },
+  { size: 16, label: '紧凑字', desc: '16px' },
+  { size: 18, label: '标准字', desc: '18px (默认)' },
+  { size: 20, label: '舒逸字', desc: '20px' },
+  { size: 22, label: '大号字', desc: '22px' },
+  { size: 26, label: '特大字', desc: '26px' },
+];
 
 const PAPER_STYLES: Record<PaperTheme, { bg: string; paper: string; border: string; text: string; shadow: string; label: string }> = {
   xuan: {
@@ -81,9 +89,31 @@ export const NovelEditor: React.FC = () => {
   const [paperTheme, setPaperTheme] = useState<PaperTheme>(() => {
     return (localStorage.getItem('novelforge_paper_theme') as PaperTheme) || 'xuan';
   });
-  const [fontSize, setFontSize] = useState<FontSize>(() => {
-    return (localStorage.getItem('novelforge_font_size') as FontSize) || '18';
+  const [fontSize, setFontSize] = useState<number>(() => {
+    const saved = localStorage.getItem('novelforge_font_size');
+    if (saved) {
+      const val = parseInt(saved, 10);
+      if (!isNaN(val) && val >= 12 && val <= 36) {
+        return val;
+      }
+    }
+    return 18;
   });
+  const [showFontSizeMenu, setShowFontSizeMenu] = useState(false);
+  const fontSizeMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close font size dropdown when clicking outside
+  useEffect(() => {
+    if (!showFontSizeMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fontSizeMenuRef.current && !fontSizeMenuRef.current.contains(e.target as Node)) {
+        setShowFontSizeMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showFontSizeMenu]);
+
   const [scratchNotes, setScratchNotes] = useState(() => {
     return localStorage.getItem(`novelforge_notes_${activeNovel?.id || 'default'}`) || '';
   });
@@ -94,9 +124,18 @@ export const NovelEditor: React.FC = () => {
     localStorage.setItem('novelforge_paper_theme', theme);
   };
 
-  const handleSetFontSize = (size: FontSize) => {
-    setFontSize(size);
-    localStorage.setItem('novelforge_font_size', size);
+  const handleSetFontSize = (size: number) => {
+    const clamped = Math.min(32, Math.max(12, size));
+    setFontSize(clamped);
+    localStorage.setItem('novelforge_font_size', clamped.toString());
+  };
+
+  const handleDecreaseFontSize = () => {
+    handleSetFontSize(fontSize - 2);
+  };
+
+  const handleIncreaseFontSize = () => {
+    handleSetFontSize(fontSize + 2);
   };
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -441,25 +480,84 @@ export const NovelEditor: React.FC = () => {
             ))}
           </div>
 
-          {/* Font Size Toggle */}
-          <div className="flex items-center gap-0.5 bg-[#e8e0d0] p-0.5 rounded-md border border-[#d5cbb8]">
-            <button
-              onClick={() => handleSetFontSize(fontSize === '20' ? '18' : '16')}
-              className="px-1 py-0.5 rounded text-[10px] font-mono text-[#6b6255] hover:text-[#231f1a]"
-              title="减小字号"
-            >
-              A-
-            </button>
-            <span className="text-[10px] px-1 font-mono text-[#854d0e] font-bold">
-              {fontSize}px
-            </span>
-            <button
-              onClick={() => handleSetFontSize(fontSize === '16' ? '18' : '20')}
-              className="px-1 py-0.5 rounded text-[10px] font-mono text-[#6b6255] hover:text-[#231f1a]"
-              title="放大字号"
-            >
-              A+
-            </button>
+          {/* Font Size Adjuster & Quick Presets */}
+          <div ref={fontSizeMenuRef} className="relative flex items-center">
+            <div className="flex items-center gap-0.5 bg-[#e8e0d0] p-0.5 rounded-md border border-[#d5cbb8] shadow-2xs">
+              <button
+                type="button"
+                onClick={handleDecreaseFontSize}
+                disabled={fontSize <= 12}
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-[#6b6255] hover:text-[#231f1a] hover:bg-[#dfd5c4] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent active:scale-95 transition cursor-pointer"
+                title={`减小字号 (当前 ${fontSize}px，快捷步进 2px)`}
+                aria-label="减小字号"
+              >
+                A-
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFontSizeMenu((prev) => !prev)}
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono text-[#854d0e] font-bold hover:bg-[#dfd5c4] transition cursor-pointer flex items-center gap-0.5"
+                title="点击快速选择字号或恢复默认"
+              >
+                {fontSize}px
+              </button>
+              <button
+                type="button"
+                onClick={handleIncreaseFontSize}
+                disabled={fontSize >= 32}
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-[#6b6255] hover:text-[#231f1a] hover:bg-[#dfd5c4] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent active:scale-95 transition cursor-pointer"
+                title={`放大字号 (当前 ${fontSize}px，快捷步进 2px)`}
+                aria-label="放大字号"
+              >
+                A+
+              </button>
+            </div>
+
+            {/* Quick Font Size Presets Popover */}
+            {showFontSizeMenu && (
+              <div className="absolute top-full left-0 mt-1.5 w-44 bg-[#fdfbf7] border border-[#ded5c4] rounded-xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="text-[10px] font-serif font-bold text-[#854d0e] px-1.5 py-1 mb-1 border-b border-[#eee6d8] flex items-center justify-between">
+                  <span>正文字号调节</span>
+                  <span className="font-mono text-xs">{fontSize}px</span>
+                </div>
+                <div className="space-y-0.5">
+                  {FONT_PRESETS.map((preset) => (
+                    <button
+                      key={preset.size}
+                      type="button"
+                      onClick={() => {
+                        handleSetFontSize(preset.size);
+                        setShowFontSizeMenu(false);
+                      }}
+                      className={`w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center justify-between transition cursor-pointer ${
+                        fontSize === preset.size
+                          ? 'bg-[#854d0e] text-white font-bold shadow-xs'
+                          : 'text-[#3d362e] hover:bg-[#f2ece0]'
+                      }`}
+                    >
+                      <span>{preset.label}</span>
+                      <span className={`font-mono text-[11px] ${fontSize === preset.size ? 'text-white/90' : 'text-[#8c8273]'}`}>
+                        {preset.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {fontSize !== 18 && (
+                  <div className="mt-1.5 pt-1.5 border-t border-[#eee6d8]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSetFontSize(18);
+                        setShowFontSizeMenu(false);
+                      }}
+                      className="w-full py-1 rounded text-[11px] font-serif text-[#854d0e] hover:bg-[#f2ece0] transition text-center cursor-pointer font-medium"
+                    >
+                      恢复默认 18px
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -541,7 +639,13 @@ export const NovelEditor: React.FC = () => {
             </div>
 
             {/* Tiptap Editor Surface */}
-            <div className={`min-h-[540px] ${fontSize === '16' ? 'text-base leading-relaxed' : fontSize === '20' ? 'text-xl leading-loose' : 'text-lg leading-relaxed'}`}>
+            <div
+              className="min-h-[540px] editor-surface"
+              style={{
+                '--editor-font-size': `${fontSize}px`,
+                '--editor-line-height': fontSize >= 24 ? '2.25' : fontSize <= 14 ? '1.9' : '2.15',
+              } as React.CSSProperties}
+            >
               <EditorContent editor={editor} />
             </div>
 
@@ -552,7 +656,13 @@ export const NovelEditor: React.FC = () => {
                   <Sparkles className="w-4 h-4 animate-spin text-amber-700" />
                   <span>正文作家 Agent 正在实时流式创作中...</span>
                 </div>
-                <p className="text-[#2b2621] text-base whitespace-pre-wrap leading-relaxed font-serif">
+                <p
+                  className="text-[#2b2621] whitespace-pre-wrap font-serif leading-relaxed"
+                  style={{
+                    fontSize: `${fontSize}px`,
+                    lineHeight: fontSize >= 24 ? '2.25' : fontSize <= 14 ? '1.9' : '2.15',
+                  }}
+                >
                   {streamText}
                 </p>
               </div>

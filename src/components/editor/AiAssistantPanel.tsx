@@ -694,60 +694,26 @@ export const AiAssistantPanel: React.FC = () => {
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0 border border-[#ded5c4] rounded-lg bg-[#fdfbf7] p-2.5 shadow-xs">
-                <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-[#ded5c4]">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-semibold text-[#786f65]">
-                      实时正文草稿 ({streamResult.length}{fullStreamResult && fullStreamResult.length !== streamResult.length ? `/${fullStreamResult.length}` : ''} 字)
+                {/* 顶栏第一行：标题、字数与草稿动作 */}
+                <div className="flex items-center justify-between gap-1 mb-1 pb-1 border-b border-[#ded5c4]">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[11px] font-semibold text-[#786f65] truncate">
+                      实时正文草稿
                     </span>
-                    {/* 拟真打字机模拟开关、速度档位与机械按键音 */}
-                    <div className="flex items-center gap-1 ml-1 bg-[#efe7da] px-1.5 py-0.5 rounded-full border border-[#dcd1be] text-[10px]">
-                      <button
-                        onClick={() => setTypewriterEnabled(!typewriterEnabled)}
-                        className={`flex items-center gap-0.5 px-1 py-0.2 rounded transition ${typewriterEnabled ? 'text-amber-900 font-semibold' : 'text-[#8e8476]'}`}
-                        title={typewriterEnabled ? "已开启拟真作家打字机：词组脉冲、呼吸停顿与微抖动" : "已开启极速直出模式"}
-                      >
-                        <Keyboard className="w-2.5 h-2.5" />
-                        {typewriterEnabled ? '打字机' : '直出'}
-                      </button>
-                      {typewriterEnabled && (
-                        <>
-                          <span className="flex items-center gap-0.5 border-l border-[#dcd1be] pl-1 text-[#6b6255]">
-                            {([
-                              { id: 'slow', label: '沉思', tip: '沉思品味：逐字推敲 (约7字/s)' },
-                              { id: 'normal', label: '作家', tip: '作家手速：自然词组心流 (约14字/s)' },
-                              { id: 'fast', label: '泉涌', tip: '文思泉涌：快速成文 (约28字/s)' },
-                            ] as const).map(({ id, label, tip }) => (
-                              <button
-                                key={id}
-                                onClick={() => setTypewriterSpeed(id)}
-                                className={`px-1 rounded transition ${typewriterSpeed === id ? 'bg-amber-800 text-white font-bold' : 'hover:text-[#2b2621]'}`}
-                                title={tip}
-                              >
-                                {label}
-                              </button>
-                            ))}
-                          </span>
-                          <button
-                            onClick={toggleSound}
-                            className={`flex items-center px-1 py-0.2 rounded transition border-l border-[#dcd1be] pl-1 ${soundEnabled ? 'text-amber-900 font-bold' : 'text-[#a89f92] hover:text-[#6b6255]'}`}
-                            title={soundEnabled ? "机械按键音已开启（点击静音）" : "机械按键音已静音（点击开启）"}
-                          >
-                            {soundEnabled ? <Volume2 className="w-2.5 h-2.5" /> : <VolumeX className="w-2.5 h-2.5" />}
-                          </button>
-                        </>
-                      )}
-                    </div>
+                    <span className="text-[10px] text-[#8e8476] font-mono whitespace-nowrap bg-[#efe7da] px-1 py-0.2 rounded border border-[#dcd1be] shrink-0">
+                      {streamResult.length}{fullStreamResult && fullStreamResult.length !== streamResult.length ? `/${fullStreamResult.length}` : ''} 字
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
                     {/* 打字中随时可一键跳过 */}
                     {isTyping && (
                       <button
                         onClick={flushAll}
-                        className="text-[10px] text-amber-900 bg-amber-800/10 hover:bg-amber-800/20 px-1.5 py-0.5 rounded flex items-center gap-0.5 font-medium transition animate-pulse"
+                        className="text-[10px] text-amber-900 bg-amber-800/10 hover:bg-amber-800/20 px-1.5 py-0.5 rounded flex items-center gap-0.5 font-medium transition animate-pulse shrink-0 whitespace-nowrap"
                         title="立即跳过动画，呈现完整正文"
                       >
-                        <FastForward className="w-2.5 h-2.5" />
+                        <FastForward className="w-2.5 h-2.5 shrink-0" />
                         跳过
                       </button>
                     )}
@@ -755,23 +721,80 @@ export const AiAssistantPanel: React.FC = () => {
                       <>
                         <button
                           onClick={handleStashCurrentDraft}
-                          className="text-[10px] text-amber-800 hover:text-amber-900 flex items-center gap-0.5 font-medium"
-                          title="存入草稿箱"
+                          className="text-[10px] text-amber-800 hover:text-amber-900 flex items-center gap-0.5 font-medium px-1.5 py-0.5 rounded hover:bg-amber-800/10 transition shrink-0 whitespace-nowrap"
+                          title="存入候选草稿箱"
                         >
-                          <Bookmark className="w-3 h-3" />
+                          <Bookmark className="w-3 h-3 shrink-0" />
                           暂存
                         </button>
                         <button
                           onClick={() => handleCopy(fullStreamResult || streamResult)}
-                          className="text-[10px] text-[#786f65] hover:text-[#231f1a] flex items-center gap-0.5"
+                          className="text-[10px] text-[#786f65] hover:text-[#231f1a] flex items-center gap-0.5 px-1.5 py-0.5 rounded hover:bg-[#eae2d3] transition shrink-0 whitespace-nowrap"
                           title="复制全文"
                         >
-                          <Copy className="w-3 h-3" />
+                          <Copy className="w-3 h-3 shrink-0" />
                           复制
                         </button>
                       </>
                     )}
                   </div>
+                </div>
+
+                {/* 顶栏第二行：专有拟真打字机控制条（实时速度无缝切换 + 机械音效） */}
+                <div className="flex items-center justify-between px-2 py-1 mb-1.5 bg-[#efe7da]/70 rounded-md border border-[#dcd1be] text-[10px] shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                    <button
+                      onClick={() => setTypewriterEnabled(!typewriterEnabled)}
+                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition font-medium shrink-0 whitespace-nowrap ${
+                        typewriterEnabled ? 'bg-amber-800/15 text-amber-900 font-semibold' : 'text-[#8e8476] hover:text-[#423d33]'
+                      }`}
+                      title={typewriterEnabled ? "已开启拟真作家打字机（点击切换为极速直出）" : "已开启极速直出模式（点击开启拟真打字机）"}
+                    >
+                      <Keyboard className="w-2.5 h-2.5 shrink-0" />
+                      {typewriterEnabled ? '打字机' : '极速直出'}
+                    </button>
+
+                    {typewriterEnabled && (
+                      <>
+                        <span className="text-[9px] text-[#c5bba8] select-none">|</span>
+                        <div className="flex items-center gap-0.5 shrink-0 whitespace-nowrap">
+                          {([
+                            { id: 'slow', label: '沉思', tip: '沉思品味：逐字推敲 (约7~8字/s)' },
+                            { id: 'normal', label: '作家', tip: '作家手速：自然词组心流 (约13~15字/s)' },
+                            { id: 'fast', label: '泉涌', tip: '文思泉涌：快速成文 (约25~30字/s)' },
+                          ] as const).map(({ id, label, tip }) => (
+                            <button
+                              key={id}
+                              onClick={() => setTypewriterSpeed(id)}
+                              className={`px-1.5 py-0.5 rounded transition shrink-0 whitespace-nowrap ${
+                                typewriterSpeed === id
+                                  ? 'bg-amber-800 text-white font-bold shadow-xs'
+                                  : 'text-[#6b6255] hover:text-[#2b2621] hover:bg-white/60'
+                              }`}
+                              title={tip}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {typewriterEnabled && (
+                    <div className="flex items-center shrink-0 whitespace-nowrap">
+                      <button
+                        onClick={toggleSound}
+                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition shrink-0 whitespace-nowrap ${
+                          soundEnabled ? 'text-amber-900 bg-amber-800/15 font-semibold' : 'text-[#a89f92] hover:text-[#6b6255]'
+                        }`}
+                        title={soundEnabled ? "机械按键音已开启（点击静音）" : "机械按键音已静音（点击开启）"}
+                      >
+                        {soundEnabled ? <Volume2 className="w-2.5 h-2.5 shrink-0" /> : <VolumeX className="w-2.5 h-2.5 shrink-0" />}
+                        <span className="text-[9px]">{soundEnabled ? '音效开' : '静音'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto text-xs text-[#2b2621] whitespace-pre-wrap leading-relaxed select-text font-serif pr-1">

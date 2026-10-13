@@ -76,41 +76,19 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
     return !typewriterAudio.getMuted();
   });
 
-  // State refs for animation loop
+  // State refs for animation loop (guarantees real-time instant responsiveness)
+  const speedRef = useRef<TypewriterSpeed>(speed);
+  speedRef.current = speed;
+
+  const enabledRef = useRef<boolean>(enabled);
+  enabledRef.current = enabled;
+
   const queueRef = useRef<string[]>([]);
   const fullTextRef = useRef('');
   const isStreamDoneRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeCallbackRef = useRef<(() => void) | null>(null);
   const burstRemainingRef = useRef(0); // 当前连击词组剩余字符计数
-
-  const handleSetSpeed = useCallback((s: TypewriterSpeed) => {
-    setSpeed(s);
-    localStorage.setItem('novelforge_typewriter_speed', s);
-  }, []);
-
-  const handleSetEnabled = useCallback((val: boolean) => {
-    setEnabled(val);
-    localStorage.setItem('novelforge_typewriter_enabled', String(val));
-    if (!val) {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      setDisplayedText(fullTextRef.current);
-      queueRef.current = [];
-      burstRemainingRef.current = 0;
-      if (isStreamDoneRef.current) {
-        setIsTyping(false);
-      }
-    }
-  }, []);
-
-  const handleToggleSound = useCallback(() => {
-    const nextVal = !soundEnabled;
-    setSoundEnabled(nextVal);
-    typewriterAudio.setMuted(!nextVal);
-  }, [soundEnabled]);
 
   // Tick loop simulating organic human writing
   const processNextTick = useCallback(() => {
@@ -127,7 +105,23 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
       return;
     }
 
-    const cfg = SPEED_CONFIG[speed];
+    if (!enabledRef.current) {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      setDisplayedText(fullTextRef.current);
+      queueRef.current = [];
+      burstRemainingRef.current = 0;
+      if (isStreamDoneRef.current) {
+        setIsTyping(false);
+      }
+      return;
+    }
+
+    // Always fetch latest real-time speed configuration via ref
+    const currentSpeed = speedRef.current;
+    const cfg = SPEED_CONFIG[currentSpeed];
     const qLen = queueRef.current.length;
 
     // 严谨温和的背压控制：绝不轻易破坏逐字敲击的真实感
@@ -188,7 +182,56 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
     }
 
     timerRef.current = setTimeout(processNextTick, Math.max(14, delay));
-  }, [speed]);
+  }, []);
+
+  // Real-time speed switcher: immediately interrupts pending pause and recalculates next tick
+  const handleSetSpeed = useCallback(
+    (s: TypewriterSpeed) => {
+      setSpeed(s);
+      speedRef.current = s;
+      localStorage.setItem('novelforge_typewriter_speed', s);
+
+      // 实时生效：如果当前正在等待下一个 tick，立即取消并用新速度唤醒！
+      if (timerRef.current && queueRef.current.length > 0) {
+        clearTimeout(timerRef.current);
+        burstRemainingRef.current = 0; // 重置连击计数，以新参数立即起步
+        timerRef.current = setTimeout(processNextTick, 8);
+      }
+    },
+    [processNextTick]
+  );
+
+  const handleSetEnabled = useCallback(
+    (val: boolean) => {
+      setEnabled(val);
+      enabledRef.current = val;
+      localStorage.setItem('novelforge_typewriter_enabled', String(val));
+      if (!val) {
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+        setDisplayedText(fullTextRef.current);
+        queueRef.current = [];
+        burstRemainingRef.current = 0;
+        if (isStreamDoneRef.current) {
+          setIsTyping(false);
+        }
+      } else {
+        // 如果重新开启且有待渲染队列，立即启动
+        if (queueRef.current.length > 0 && !timerRef.current) {
+          processNextTick();
+        }
+      }
+    },
+    [processNextTick]
+  );
+
+  const handleToggleSound = useCallback(() => {
+    const nextVal = !soundEnabled;
+    setSoundEnabled(nextVal);
+    typewriterAudio.setMuted(!nextVal);
+  }, [soundEnabled]);
 
   // Push incoming chunk from stream
   const pushChunk = useCallback(
@@ -196,8 +239,7 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
       if (!chunk) return;
       fullTextRef.current += chunk;
 
-      if (!enabled) {
-        // Direct output when typewriter is off
+      if (!enabledRef.current) {
         setDisplayedText(fullTextRef.current);
         return;
       }
@@ -210,7 +252,7 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
         processNextTick();
       }
     },
-    [enabled, processNextTick]
+    [processNextTick]
   );
 
   // Mark stream as complete
@@ -221,7 +263,7 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
         activeCallbackRef.current = onComplete;
       }
 
-      if (!enabled || queueRef.current.length === 0) {
+      if (!enabledRef.current || queueRef.current.length === 0) {
         setIsTyping(false);
         if (timerRef.current) {
           clearTimeout(timerRef.current);
@@ -231,7 +273,7 @@ export function useTypewriterStream(options?: UseTypewriterOptions) {
         if (onComplete) onComplete();
       }
     },
-    [enabled]
+    []
   );
 
   // Fast forward / Skip all animations immediately
