@@ -4,6 +4,7 @@ version = "2.0.0"
 description = "NovelForge AI - Professional Multi-Agent Long-form Novel Creation System"
 authors = ["NovelForge Team"]
 edition = "2024"
+default-run = "novelforge-ai"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
