@@ -17,10 +17,12 @@ import {
   ChevronRight,
   ChevronDown,
   Clapperboard,
+  FileText,
 } from 'lucide-react';
 import { CreateNovelModal } from '@/components/modals/CreateNovelModal';
 import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
 import { VersionDrawer } from '@/components/modals/VersionDrawer';
+import { WordImportModal } from '@/components/modals/WordImportModal';
 import type { ContentTreeNode } from '@/types';
 
 export const Sidebar: React.FC = () => {
@@ -46,6 +48,7 @@ export const Sidebar: React.FC = () => {
   const [showCreateNovel, setShowCreateNovel] = useState(false);
   const [showCreateChapter, setShowCreateChapter] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
+  const [showWordImportModal, setShowWordImportModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Split Chapter Modal State
@@ -210,13 +213,23 @@ export const Sidebar: React.FC = () => {
               <BookOpen className="w-3.5 h-3.5 text-amber-800" />
               当前作品项目
             </span>
-            <button
-              onClick={() => setShowCreateNovel(true)}
-              className="text-xs text-amber-800 hover:text-amber-900 font-medium flex items-center gap-1 transition px-1.5 py-0.5 rounded hover:bg-amber-800/10"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              新建
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowWordImportModal(true)}
+                className="text-[11px] text-blue-700 hover:text-blue-900 font-medium flex items-center gap-1 transition px-1.5 py-0.5 rounded hover:bg-blue-800/10 cursor-pointer"
+                title="导入已有 Word (.docx) 存稿并智能分章"
+              >
+                <FileText className="w-3 h-3" />
+                导入Word
+              </button>
+              <button
+                onClick={() => setShowCreateNovel(true)}
+                className="text-xs text-amber-800 hover:text-amber-900 font-medium flex items-center gap-1 transition px-1.5 py-0.5 rounded hover:bg-amber-800/10 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                新建
+              </button>
+            </div>
           </div>
 
           <div className="relative">
@@ -272,6 +285,14 @@ export const Sidebar: React.FC = () => {
 
           <div className="flex items-center gap-1">
             <button
+              onClick={() => setShowWordImportModal(true)}
+              disabled={!activeNovel}
+              className="p-1 rounded text-blue-700 hover:text-blue-900 hover:bg-blue-100/60 transition disabled:opacity-30 cursor-pointer"
+              title="从 Word (.docx) 导入章节到当前小说"
+            >
+              <FileText className="w-3.5 h-3.5" />
+            </button>
+            <button
               onClick={handleRenumber}
               className="p-1 rounded text-[#786f65] hover:text-amber-900 hover:bg-[#ded4c3] transition"
               title="全书规范化重编号 (自动整理部/卷/章/场景连续序号)"
@@ -322,13 +343,22 @@ export const Sidebar: React.FC = () => {
                 <FolderOpen className="w-8 h-8 text-[#9e9383] mx-auto mb-2 opacity-50" />
                 <p className="text-xs text-[#786f65] mb-3">暂无章节内容</p>
                 {activeNovel && (
-                  <button
-                    onClick={() => setShowCreateChapter(true)}
-                    className="px-3 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium hover:bg-amber-700 transition inline-flex items-center gap-1 shadow-sm"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    新建第一章
-                  </button>
+                  <div className="flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => setShowCreateChapter(true)}
+                      className="px-3 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium hover:bg-amber-700 transition inline-flex items-center gap-1 shadow-sm cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      新建第一章
+                    </button>
+                    <button
+                      onClick={() => setShowWordImportModal(true)}
+                      className="px-3 py-1.5 rounded-lg bg-blue-700 text-white text-xs font-medium hover:bg-blue-600 transition inline-flex items-center gap-1 shadow-sm cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      导入Word
+                    </button>
+                  </div>
                 )}
               </div>
             ) : (
@@ -557,6 +587,7 @@ export const Sidebar: React.FC = () => {
       {showCreateNovel && <CreateNovelModal onClose={() => setShowCreateNovel(false)} />}
       {showCreateChapter && <CreateChapterModal onClose={() => setShowCreateChapter(false)} />}
       {showVersions && <VersionDrawer onClose={() => setShowVersions(false)} />}
+      {showWordImportModal && <WordImportModal isOpen={showWordImportModal} onClose={() => setShowWordImportModal(false)} />}
     </>
   );
 };

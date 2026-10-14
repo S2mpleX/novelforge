@@ -1,7 +1,7 @@
 {
   "name": "novelforge-ai",
   "private": true,
-  "version": "2.3.2",
+  "version": "2.3.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -26,6 +26,7 @@
     "@xyflow/react": "^12.12.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.55.0",
+    "mammoth": "^1.13.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "tailwind-merge": "^3.7.0",

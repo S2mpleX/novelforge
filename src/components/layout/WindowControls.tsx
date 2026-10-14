@@ -77,7 +77,9 @@ export const WindowControls: React.FC = () => {
 
   return (
     <div
-      className="flex items-center ml-2 pl-2 border-l border-[#ded5c4] dark:border-stone-700/60 -mr-1 shrink-0 z-50 select-none"
+      className={`flex items-center ml-1.5 pl-1.5 border-l border-[#ded5c4] dark:border-stone-700/60 shrink-0 z-50 select-none ${
+        isMaximized ? 'pr-1' : 'pr-2.5'
+      }`}
       data-tauri-drag-region="false"
     >
       {/* 最小化 */}

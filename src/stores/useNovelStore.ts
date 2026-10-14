@@ -6,6 +6,7 @@ import type {
   Chapter,
   ChapterVersion,
   AiProvider,
+  AiModel,
   Part,
   Scene,
   PlotBeat,
@@ -33,6 +34,7 @@ interface NovelState {
   activeTab: ActiveTab;
   providers: AiProvider[];
   activeProvider: AiProvider | null;
+  activeModel: AiModel | null;
   versions: ChapterVersion[];
   sidebarCollapsed: boolean;
   rightPanelOpen: boolean;
@@ -85,6 +87,7 @@ interface NovelState {
   deleteChapter: (chapterId: string) => Promise<void>;
 
   loadProviders: () => Promise<void>;
+  switchActiveProvider: (providerId: string, modelName?: string) => Promise<void>;
   setIsGenerating: (isGenerating: boolean) => void;
   setStreamText: (text: string) => void;
   appendStreamText: (chunk: string) => void;
@@ -118,6 +121,7 @@ export const useNovelStore = create<NovelState>((set, get) => ({
   activeTab: 'EDITOR',
   providers: [],
   activeProvider: null,
+  activeModel: null,
   versions: [],
   sidebarCollapsed: false,
   rightPanelOpen: true,
@@ -365,9 +369,60 @@ export const useNovelStore = create<NovelState>((set, get) => ({
     try {
       const providers = await api.listProviders();
       const active = providers.find((p) => p.is_active) || (providers.length > 0 ? providers[0] : null);
-      set({ providers, activeProvider: active });
+      let activeModel: AiModel | null = null;
+      if (active) {
+        try {
+          const models = await api.listModels(active.id);
+          activeModel = models.find((m) => m.is_default) || models[0] || null;
+        } catch (e) {
+          console.error('加载活跃模型失败:', e);
+        }
+      }
+      set({ providers, activeProvider: active, activeModel });
     } catch (e) {
       console.error('加载模型服务商失败:', e);
+    }
+  },
+
+  switchActiveProvider: async (providerId: string, modelName?: string) => {
+    try {
+      const providers = get().providers;
+      const target = providers.find((p) => p.id === providerId);
+      if (!target) return;
+      const models = await api.listModels(target.id);
+      const targetModel =
+        (modelName && models.find((m) => m.model_name === modelName)) ||
+        models.find((m) => m.is_default) ||
+        models[0];
+
+      await api.saveProvider({
+        id: target.id,
+        name: target.name,
+        provider_type: target.provider_type,
+        base_url: target.base_url,
+        api_key: target.api_key,
+        is_active: true,
+        models:
+          models.length > 0
+            ? models.map((m) => ({
+                id: m.id,
+                model_name: m.model_name,
+                display_name: m.display_name,
+                context_window: m.context_window,
+                max_output_tokens: m.max_output_tokens,
+                is_default: targetModel ? m.id === targetModel.id : m.is_default,
+              }))
+            : [
+                {
+                  model_name: modelName || 'gemini-3.8-flash-high',
+                  display_name: modelName || '默认模型',
+                  is_default: true,
+                },
+              ],
+      });
+      await get().loadProviders();
+    } catch (e) {
+      console.error('切换活跃服务商失败:', e);
     }
   },
 

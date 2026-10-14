@@ -228,13 +228,36 @@ if ($exeName) {
         git push origin main --tags --force
         Write-Host '     ✅ Git 代码与标签已同步至 GitHub' -ForegroundColor Green
 
-        Write-Host '     正在直接发布到 GitHub Releases ...' -ForegroundColor Yellow
+        Write-Host "     正在直接发布到 GitHub Releases ..." -ForegroundColor Yellow
         try {
-            $credInput = "protocol=https`nhost=github.com`n`n"
-            $cred = $credInput | git credential fill
-            $token = ($cred | Select-String 'password=').ToString().Replace('password=', '').Trim()
+            $token = ""
+            $gcmCandidates = @(
+                "C:\Program Files\Git\mingw64\bin\git-credential-manager.exe",
+                "C:\Program Files\Git\bin\git-credential-manager.exe"
+            )
+            foreach ($gcm in $gcmCandidates) {
+                if (Test-Path $gcm) {
+                    $cred = "protocol=https`nhost=github.com`n`n" | & $gcm get 2>$null
+                    $pwLine = ($cred | Select-String 'password=')
+                    if ($pwLine) {
+                        $token = $pwLine.ToString().Replace('password=', '').Trim()
+                        break
+                    }
+                }
+            }
+            if ([string]::IsNullOrWhiteSpace($token)) {
+                $cred = "protocol=https`nhost=github.com`n`n" | git credential fill 2>$null
+                $pwLine = ($cred | Select-String 'password=')
+                if ($pwLine) {
+                    $token = $pwLine.ToString().Replace('password=', '').Trim()
+                }
+            }
+            if ([string]::IsNullOrWhiteSpace($token)) {
+                throw "未能从 Git 凭据管理器中读取到 GitHub Token，请确保在系统 Git 中已登录 GitHub"
+            }
+
             $headers = @{
-                'Authorization' = 'token ' + $token
+                'Authorization' = "token $token"
                 'User-Agent' = 'NovelForge-Deploy'
                 'Accept' = 'application/vnd.github.v3+json'
             }
@@ -255,7 +278,8 @@ if ($exeName) {
                 }
             } | ConvertTo-Json -Depth 4
             $latestJsonPath = $destDir + '\latest.json'
-            [System.IO.File]::WriteAllText($latestJsonPath, $latestMeta, [System.Text.Encoding]::UTF8)
+            $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+            [System.IO.File]::WriteAllText($latestJsonPath, $latestMeta, $utf8NoBom)
 
             # 创建 GitHub Release
             $relPayload = @{

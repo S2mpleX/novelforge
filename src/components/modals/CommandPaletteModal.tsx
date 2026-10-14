@@ -24,6 +24,7 @@ import {
   GitCommit,
   Feather,
   Swords,
+  FileText,
 } from 'lucide-react';
 
 interface Props {
@@ -40,6 +41,7 @@ interface Props {
   onOpenVoiceProfile?: () => void;
   onOpenArena?: () => void;
   onOpenTypesetter?: () => void;
+  onOpenWordImport?: () => void;
 }
 
 export const CommandPaletteModal: React.FC<Props> = ({
@@ -56,6 +58,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
   onOpenVoiceProfile,
   onOpenArena,
   onOpenTypesetter,
+  onOpenWordImport,
 }) => {
   const {
     chapters,
@@ -104,6 +107,16 @@ export const CommandPaletteModal: React.FC<Props> = ({
       action: () => {
         onClose();
         saveCurrentChapter(true, 'COMMAND_PALETTE_SAVE');
+      },
+    },
+    {
+      id: 'cmd-import-word',
+      icon: <FileText className="w-4 h-4 text-blue-600" />,
+      title: '导入 Word 文档 (.docx) 智能解析与分章入库',
+      category: '创作工具',
+      action: () => {
+        onClose();
+        onOpenWordImport?.();
       },
     },
     {

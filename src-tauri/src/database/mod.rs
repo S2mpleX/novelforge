@@ -107,8 +107,8 @@ impl DbManager {
                 params![
                     &model_id,
                     &provider_id,
-                    "gpt-4o-mini",
-                    "GPT-4o Mini (默认)",
+                    "gemini-3.8-flash-high",
+                    "Gemini 3.8 Flash High (默认)",
                     128000,
                     4096,
                     1,
@@ -1204,7 +1204,7 @@ impl DbManager {
                         let m = AiModel {
                             id: "fallback".to_string(),
                             provider_id: p.id.clone(),
-                            model_name: "gpt-4o-mini".to_string(),
+                            model_name: "gemini-3.8-flash-high".to_string(),
                             display_name: "Default Model".to_string(),
                             context_window: 128000,
                             max_output_tokens: 4096,

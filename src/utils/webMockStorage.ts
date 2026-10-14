@@ -12,6 +12,7 @@ import type {
   WorldRule,
   PlotThread,
   AiProvider,
+  AiModel,
   ConnectionTestResult,
   CanonFact,
   CharacterStateEvent,
@@ -42,11 +43,18 @@ const SEED_CHAPTER_ID = 'seed-chapter-001';
 const SEED_CHAR1_ID = 'seed-char-001';
 const SEED_CHAR2_ID = 'seed-char-002';
 
+const memoryStorage = new Map<string, string>();
+
 function getStorage<T>(key: string, defaultValue: T): T {
   try {
-    const raw = localStorage.getItem(`novelforge_${key}`);
-    if (!raw) return defaultValue;
-    return JSON.parse(raw);
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(`novelforge_${key}`);
+      if (!raw) return defaultValue;
+      return JSON.parse(raw);
+    }
+    const mem = memoryStorage.get(`novelforge_${key}`);
+    if (!mem) return defaultValue;
+    return JSON.parse(mem);
   } catch {
     return defaultValue;
   }
@@ -54,7 +62,12 @@ function getStorage<T>(key: string, defaultValue: T): T {
 
 function setStorage<T>(key: string, value: T): void {
   try {
-    localStorage.setItem(`novelforge_${key}`, JSON.stringify(value));
+    const serialized = JSON.stringify(value);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(`novelforge_${key}`, serialized);
+    } else {
+      memoryStorage.set(`novelforge_${key}`, serialized);
+    }
   } catch (e) {
     console.warn('LocalStorage save error:', e);
   }
@@ -600,10 +613,14 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
     }
 
     case 'list_models': {
+      const providerId = args?.providerId;
+      const allModels = getStorage<AiModel[]>('models', []);
+      const matched = allModels.filter((m) => m.provider_id === providerId);
+      if (matched.length > 0) return matched;
       return [
         {
           id: 'model-1',
-          provider_id: args?.providerId || 'seed-provider-001',
+          provider_id: providerId || 'seed-provider-001',
           model_name: 'gemini-3.8-flash-high',
           display_name: 'gemini-3.8-flash-high',
           context_window: 1048576,
@@ -617,6 +634,11 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
     case 'save_provider': {
       const providers = getStorage<AiProvider[]>('providers', []);
       const input = args.input;
+      if (input.is_active) {
+        providers.forEach((p) => {
+          p.is_active = false;
+        });
+      }
       let existing = providers.find((p) => p.id === input.id || p.base_url === input.base_url);
       if (existing) {
         existing.name = input.name;
@@ -638,6 +660,25 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         providers.push(existing);
       }
       setStorage('providers', providers);
+
+      if (input.models && input.models.length > 0) {
+        let allModels = getStorage<AiModel[]>('models', []);
+        allModels = allModels.filter((m) => m.provider_id !== existing!.id);
+        input.models.forEach((m: any, idx: number) => {
+          allModels.push({
+            id: m.id || `model_${existing!.id}_${idx}`,
+            provider_id: existing!.id,
+            model_name: m.model_name,
+            display_name: m.display_name || m.model_name,
+            context_window: m.context_window || 128000,
+            max_output_tokens: m.max_output_tokens || 4096,
+            is_default: m.is_default ?? (idx === 0),
+            created_at: Date.now(),
+          });
+        });
+        setStorage('models', allModels);
+      }
+
       return existing;
     }
 

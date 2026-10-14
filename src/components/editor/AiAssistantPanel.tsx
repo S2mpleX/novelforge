@@ -61,6 +61,7 @@ export const AiAssistantPanel: React.FC = () => {
     saveCurrentChapter,
     rightPanelOpen,
     activeProvider,
+    activeModel,
     loadProviders,
     creationContext,
   } = useNovelStore();
@@ -446,8 +447,13 @@ export const AiAssistantPanel: React.FC = () => {
         </div>
         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#fdfbf7] border border-[#d5cbb8] text-[11px] text-[#6b6255]">
           <Zap className="w-3 h-3 text-amber-700" />
-          <span className="max-w-[130px] sm:max-w-[200px] md:max-w-xs truncate font-medium" title={activeProvider?.name}>
-            {activeProvider ? activeProvider.name : '未配置模型'}
+          <span
+            className="max-w-[130px] sm:max-w-[200px] md:max-w-xs truncate font-medium"
+            title={`${activeProvider?.name || '未配置'}${activeModel ? ` (${activeModel.model_name})` : ''}`}
+          >
+            {activeProvider
+              ? `${activeProvider.name}${activeModel ? ` · ${activeModel.model_name}` : ''}`
+              : '未配置模型'}
           </span>
         </div>
       </div>
