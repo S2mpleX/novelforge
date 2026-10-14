@@ -6,16 +6,19 @@
 #   .\scripts\release.ps1 2.5.0   → 指定版本号
 
 param(
-    [Parameter(Mandatory=$true, Position=0)]
-    [string]$BumpType
+    [Parameter(Mandatory=$false, Position=0)]
+    [string]$BumpType = ""
 )
 
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot\..
 
+# 设置终端输出为 UTF-8，防止控制台中文乱码
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║   NovelForge AI — 一键版本发布脚本              ║" -ForegroundColor Cyan
+Write-Host "║   NovelForge AI — 一键版本发布与自动构建系统    ║" -ForegroundColor Cyan
 Write-Host "╚══════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
@@ -24,7 +27,7 @@ Write-Host ""
 # ────────────────────────────────────────────
 $pkgJson = Get-Content "package.json" -Raw | ConvertFrom-Json
 $currentVersion = $pkgJson.version
-Write-Host "[1/9] 当前版本: v$currentVersion" -ForegroundColor Yellow
+Write-Host "[1/10] 当前应用版本: v$currentVersion" -ForegroundColor Yellow
 
 # ────────────────────────────────────────────
 # 2. 计算新版本号
@@ -34,25 +37,54 @@ $major = [int]$parts[0]
 $minor = [int]$parts[1]
 $patch = [int]$parts[2]
 
-switch ($BumpType) {
-    "patch" { $patch++; }
-    "minor" { $minor++; $patch = 0; }
-    "major" { $major++; $minor = 0; $patch = 0; }
-    default {
-        # 视为直接指定版本号
-        if ($BumpType -match '^\d+\.\d+\.\d+$') {
-            $parts2 = $BumpType.Split('.')
-            $major = [int]$parts2[0]
-            $minor = [int]$parts2[1]
-            $patch = [int]$parts2[2]
-        } else {
-            Write-Host "错误：参数必须是 patch / minor / major 或具体版本号 (如 2.5.0)" -ForegroundColor Red
-            exit 1
+if ([string]::IsNullOrWhiteSpace($BumpType)) {
+    Write-Host ""
+    Write-Host "请选择升级类型：" -ForegroundColor White
+    Write-Host "  [1] patch  - 修复 Bug（推荐）如 v$currentVersion -> v$major.$minor.$([int]$patch + 1)" -ForegroundColor Green
+    Write-Host "  [2] minor  - 新增功能如 v$currentVersion -> v$major.$([int]$minor + 1).0" -ForegroundColor Cyan
+    Write-Host "  [3] major  - 重大重构如 v$currentVersion -> v$([int]$major + 1).0.0" -ForegroundColor Magenta
+    Write-Host "  [4] 自定义指定具体版本号 (例如 2.3.5)" -ForegroundColor Yellow
+    Write-Host "  [5] 仅本地重新打包（保持当前版本 v$currentVersion）" -ForegroundColor Gray
+    Write-Host "  [0] 退出" -ForegroundColor Red
+    Write-Host ""
+    $choice = Read-Host "请输入数字 [1-5, 0] (默认 1)"
+    if ([string]::IsNullOrWhiteSpace($choice)) { $choice = "1" }
+
+    switch ($choice) {
+        "1" { $BumpType = "patch" }
+        "2" { $BumpType = "minor" }
+        "3" { $BumpType = "major" }
+        "4" {
+            $customVer = Read-Host "请输入目标版本号 (如 2.3.5)"
+            $BumpType = $customVer.Trim().TrimStart('v')
         }
+        "5" { $BumpType = "keep" }
+        "0" { Write-Host "已退出。"; exit 0 }
+        default { $BumpType = "patch" }
     }
 }
 
-$newVersion = "$major.$minor.$patch"
+if ($BumpType -eq "keep") {
+    $newVersion = $currentVersion
+} else {
+    switch ($BumpType) {
+        "patch" { $patch++; }
+        "minor" { $minor++; $patch = 0; }
+        "major" { $major++; $minor = 0; $patch = 0; }
+        default {
+            if ($BumpType -match '^\d+\.\d+\.\d+$') {
+                $parts2 = $BumpType.Split('.')
+                $major = [int]$parts2[0]
+                $minor = [int]$parts2[1]
+                $patch = [int]$parts2[2]
+            } else {
+                Write-Host "错误：参数必须是 patch / minor / major 或具体版本号 (如 2.5.0)" -ForegroundColor Red
+                exit 1
+            }
+        }
+    }
+    $newVersion = "$major.$minor.$patch"
+}
 Write-Host "[2/9] 新版本号: v$currentVersion → v$newVersion" -ForegroundColor Green
 
 $confirm = Read-Host "     确认发布 v$newVersion？(y/N)"
