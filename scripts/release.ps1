@@ -1,4 +1,4 @@
-﻿# NovelForge AI — 一键版本发布脚本
+# NovelForge AI — 一键版本发布脚本
 # 用法：
 #   .\scripts\release.ps1 patch   → 2.2.0 → 2.2.1（修 Bug）
 #   .\scripts\release.ps1 minor   → 2.2.0 → 2.3.0（加功能）
@@ -230,7 +230,8 @@ if ($exeName) {
 
         Write-Host '     正在直接发布到 GitHub Releases ...' -ForegroundColor Yellow
         try {
-            $cred = 'url=https://github.com' | git credential fill
+            $credInput = "protocol=https`nhost=github.com`n`n"
+            $cred = $credInput | git credential fill
             $token = ($cred | Select-String 'password=').ToString().Replace('password=', '').Trim()
             $headers = @{
                 'Authorization' = 'token ' + $token
