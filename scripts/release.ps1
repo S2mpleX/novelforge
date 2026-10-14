@@ -1,4 +1,4 @@
-# NovelForge AI — 一键版本发布脚本
+﻿# NovelForge AI — 一键版本发布脚本
 # 用法：
 #   .\scripts\release.ps1 patch   → 2.2.0 → 2.2.1（修 Bug）
 #   .\scripts\release.ps1 minor   → 2.2.0 → 2.3.0（加功能）
@@ -39,28 +39,28 @@ $patch = [int]$parts[2]
 
 if ([string]::IsNullOrWhiteSpace($BumpType)) {
     Write-Host ''
-    Write-Host '请选择升级类型:' -ForegroundColor White
-    Write-Host ('  [1] patch  - 修复 Bug（推荐）如 v' + $currentVersion + ' -> v' + $major + '.' + $minor + '.' + ([int]$patch + 1)) -ForegroundColor Green
-    Write-Host ('  [2] minor  - 新增功能如 v' + $currentVersion + ' -> v' + $major + '.' + ([int]$minor + 1) + '.0') -ForegroundColor Cyan
-    Write-Host ('  [3] major  - 重大重构如 v' + $currentVersion + ' -> v' + ([int]$major + 1) + '.0.0') -ForegroundColor Magenta
-    Write-Host '  [4] 自定义指定具体版本号 (例如 2.3.5)' -ForegroundColor Yellow
-    Write-Host ('  [5] 仅本地重新打包（保持当前版本 v' + $currentVersion + '）') -ForegroundColor Gray
-    Write-Host '  [0] 退出' -ForegroundColor Red
-    Write-Host ''
-    $choice = Read-Host '请输入数字 [1-5, 0] (默认 1)'
-    if ([string]::IsNullOrWhiteSpace($choice)) { $choice = '1' }
+    Write-Host "请选择升级类型:" -ForegroundColor White
+    Write-Host "  [1] patch  - 修复 Bug（推荐）如 v$currentVersion -> v$major.$minor.$([int]$patch + 1)" -ForegroundColor Green
+    Write-Host "  [2] minor  - 新增功能如 v$currentVersion -> v$major.$([int]$minor + 1).0" -ForegroundColor Cyan
+    Write-Host "  [3] major  - 重大重构如 v$currentVersion -> v$([int]$major + 1).0.0" -ForegroundColor Magenta
+    Write-Host "  [4] 自定义指定具体版本号 (例如 2.3.5)" -ForegroundColor Yellow
+    Write-Host "  [5] 仅本地重新打包（保持当前版本 v$currentVersion）" -ForegroundColor Gray
+    Write-Host "  [0] 退出" -ForegroundColor Red
+    Write-Host ""
+    $choice = Read-Host "请输入数字 [1-5, 0] (默认 1)"
+    if ([string]::IsNullOrWhiteSpace($choice)) { $choice = "1" }
 
     switch ($choice) {
-        '1' { $BumpType = 'patch' }
-        '2' { $BumpType = 'minor' }
-        '3' { $BumpType = 'major' }
-        '4' {
-            $customVer = Read-Host '请输入目标版本号 (如 2.3.5)'
+        "1" { $BumpType = "patch" }
+        "2" { $BumpType = "minor" }
+        "3" { $BumpType = "major" }
+        "4" {
+            $customVer = Read-Host "请输入目标版本号 (如 2.3.5)"
             $BumpType = $customVer.Trim().TrimStart('v')
         }
-        '5' { $BumpType = 'keep' }
-        '0' { Write-Host '已退出'; exit 0 }
-        default { $BumpType = 'patch' }
+        "5" { $BumpType = "keep" }
+        "0" { Write-Host "已退出"; exit 0 }
+        default { $BumpType = "patch" }
     }
 }
 
@@ -295,10 +295,10 @@ if ($exeName) {
             Write-Host ('🎉 恭喜！v' + $newVersion + ' 已正式发布到 GitHub !') -ForegroundColor Green
             Write-Host '所有已安装客户端在打开软件时，将自动检测到该新版本并提示一键升级 !' -ForegroundColor Cyan
         } catch {
-            Write-Host ('⚠️ 直接上传 Release 时遇到异常: ' + $_) -ForegroundColor Yellow
-            Write-Host '请检查 GitHub 访问网络或稍后在网页端手动上传桌面产物' -ForegroundColor Gray
+            Write-Host "⚠️ 直接上传 Release 时遇到异常: $_" -ForegroundColor Yellow
+            Write-Host "请检查 GitHub 访问网络或稍后在网页端手动上传桌面产物" -ForegroundColor Gray
         }
     }
 } else {
-    Write-Host ('警告: 未在 ' + $bundleDir + ' 找到安装包文件') -ForegroundColor Yellow
+    Write-Host "警告: 未在 $bundleDir 找到安装包文件" -ForegroundColor Yellow
 }

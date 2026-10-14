@@ -269,10 +269,10 @@ console.log('\n▶ [测试九] 多实例独立性验证 (Multi-Instance Isolatio
 // ----------------------------------------------------
 // 测试十：连续切换布局、最大化、恢复和调整窗口尺寸，不出现不可访问面板
 // ----------------------------------------------------
-console.log('\n▶ [测试十] 5 套预设连续循环切换与面板可访问性全面巡检');
+console.log('\n▶ [测试十] 预设连续循环切换与面板可访问性全面巡检');
 {
   const presetKeys = Object.keys(BUILTIN_WORKSPACE_PRESETS);
-  assert(presetKeys.length === 5, '五套内置预设完整登记');
+  assert(presetKeys.length >= 5, '内置预设完整登记 (已包含 V2.3 新增工作区)');
 
   for (const key of presetKeys) {
     const preset = BUILTIN_WORKSPACE_PRESETS[key];

@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod database;
+pub mod export;
 pub mod models;
 pub mod providers;
 
@@ -104,6 +105,7 @@ pub fn run() {
             commands::advance_serialization_job_step,
             // Publishing & System Diagnostics (Phase 6 & 7)
             commands::export_novel_html_book,
+            commands::export_novel_epub,
             commands::export_novel_archive,
             commands::import_novel_archive,
             commands::backup_database,
@@ -163,6 +165,12 @@ pub fn run() {
             commands::set_active_voice_profile,
             commands::delete_voice_profile,
             commands::generate_finding_repair,
+            // V2.4 Multi-Model Arena
+            commands::execute_arena_duel,
+            commands::merge_arena_outputs,
+            commands::list_model_arena_runs,
+            commands::save_model_arena_run,
+            commands::delete_model_arena_run,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovelForge AI application");

@@ -71,7 +71,21 @@ export const PublishingModal: React.FC<PublishingModalProps> = ({ onClose }) => 
     }
   };
 
-  // 2. Export Standard Web Novel TXT
+  // 2. Export Standard EPUB 3 Book
+  const handleExportEpubBook = async () => {
+    if (!activeNovel) return;
+    setLoading(true);
+    try {
+      const res = await api.exportNovelEpub(activeNovel.id);
+      showNotification(`🎉 标准 EPUB 3 电子书导出成功！文件位置: ${res.file_path} (${(res.file_size / 1024).toFixed(1)} KB)`);
+    } catch (e: any) {
+      showNotification(`EPUB 导出失败: ${e.message || e}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Export Standard Web Novel TXT
   const handleExportTxt = async () => {
     if (!activeNovel) return;
     setLoading(true);
@@ -315,7 +329,31 @@ export const PublishingModal: React.FC<PublishingModalProps> = ({ onClose }) => 
                   </button>
                 </div>
 
-                {/* 2. Web Novel TXT */}
+                {/* 2. Standard EPUB 3 */}
+                <div className="bg-[#f7f2e7] p-5 rounded-xl border border-[#ded5c4] hover:border-[#854d0e]/60 transition space-y-3 shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg bg-[#efe9dc] text-[#854d0e] border border-[#ded5c4]">
+                      <BookOpen className="w-5 h-5 text-amber-700" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-serif font-bold text-[#2b2621]">标准 EPUB 3 电子书 (.epub)</h4>
+                      <p className="text-[11px] text-[#685f54] font-serif">国际标准格式，兼容微信读书、Kindle、多看与电纸书</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[#52493d] font-serif leading-relaxed">
+                    严格遵循 IDPF 规范，内嵌典雅水墨封面、层级目录导航（NCX/Nav）与宣纸排版 CSS，支持无缝导入微信读书与各品牌墨水屏阅读器。
+                  </p>
+                  <button
+                    onClick={handleExportEpubBook}
+                    disabled={loading || !activeNovel}
+                    className="w-full py-2 bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] rounded-lg text-xs font-serif font-medium flex items-center justify-center gap-1.5 transition disabled:opacity-50 shadow-xs cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    导出标准 EPUB 3
+                  </button>
+                </div>
+
+                {/* 3. Web Novel TXT */}
                 <div className="bg-[#f7f2e7] p-5 rounded-xl border border-[#ded5c4] hover:border-[#854d0e]/60 transition space-y-3 shadow-2xs">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-lg bg-[#efe9dc] text-[#854d0e] border border-[#ded5c4]">

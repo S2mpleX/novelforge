@@ -25,6 +25,7 @@ import {
 import { CreateNovelModal } from '@/components/modals/CreateNovelModal';
 import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
 import { WindowControls } from '@/components/layout/WindowControls';
+import { FloatingSelectionMenu } from './FloatingSelectionMenu';
 
 type PaperTheme = 'xuan' | 'bamboo' | 'kraft' | 'midnight';
 
@@ -864,6 +865,7 @@ export const NovelEditor: React.FC = () => {
               } as React.CSSProperties}
             >
               <EditorContent editor={editor} />
+              <FloatingSelectionMenu editor={editor} />
             </div>
 
             {/* Physical Manuscript Bottom Seal Stamp */}

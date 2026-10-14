@@ -26,6 +26,7 @@ const QUICK_TOOLS: { type: ToolboxActionType; label: string; icon: any }[] = [
   { type: 'gold_opening', label: '黄金开篇', icon: BookOpen },
   { type: 'chapter_outline', label: '单章细纲', icon: FileText },
   { type: 'dialogue_polish', label: '对白精修', icon: Users },
+  { type: 'humanizer_polish', label: '去AI味重塑', icon: Sparkles },
 ];
 
 export const ToolboxPanel: React.FC = () => {

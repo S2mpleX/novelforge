@@ -10,21 +10,31 @@ export const WindowControls: React.FC = () => {
     if (!isTauri()) return;
     setInTauri(true);
 
+    let isMounted = true;
     let unlisten: (() => void) | undefined;
     (async () => {
       try {
         const { getCurrentWindow } = await import('@tauri-apps/api/window');
         const appWindow = getCurrentWindow();
-        setIsMaximized(await appWindow.isMaximized());
-        unlisten = await appWindow.onResized(async () => {
-          setIsMaximized(await appWindow.isMaximized());
+        const max = await appWindow.isMaximized();
+        if (isMounted) setIsMaximized(max);
+        const fn = await appWindow.onResized(async () => {
+          if (isMounted) {
+            setIsMaximized(await appWindow.isMaximized());
+          }
         });
+        if (!isMounted) {
+          if (typeof fn === 'function') fn();
+        } else {
+          unlisten = fn;
+        }
       } catch (err) {
         console.warn('[WindowControls] Failed to attach window listeners:', err);
       }
     })();
 
     return () => {
+      isMounted = false;
       if (unlisten) {
         unlisten();
       }

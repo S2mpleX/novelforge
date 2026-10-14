@@ -19,6 +19,7 @@ import {
   Target,
   Book,
   Feather,
+  Swords,
 } from 'lucide-react';
 
 // Panel components
@@ -45,6 +46,8 @@ import { NovelInfoPanel } from './panels/NovelInfoPanel';
 import { ToolboxPanel } from './panels/ToolboxPanel';
 import { WorkflowPanel } from './panels/WorkflowPanel';
 import { VoiceProfilePanel } from './panels/VoiceProfilePanel';
+import { ModelArenaPanel } from './panels/ModelArenaPanel';
+import { TypesetterCleanerPanel } from './panels/TypesetterCleanerPanel';
 
 export const PANEL_METADATA_MAP: Record<PanelType, PanelMeta> = {
   chapters: {
@@ -300,6 +303,28 @@ export const PANEL_METADATA_MAP: Record<PanelType, PanelMeta> = {
     category: 'ai',
     description: '作者文风档案建模、节奏语调参数调控、一键试读与全局/单书隔离激活',
   },
+  model_arena: {
+    type: 'model_arena',
+    title: '多模型比稿竞技场',
+    iconName: 'Swords',
+    minWidth: 420,
+    minHeight: 350,
+    defaultSize: { width: 850, height: 600 },
+    allowMultiple: false,
+    category: 'ai',
+    description: '双模型并发流式生成、盲测文笔对决、Humanizer 诊断评分与一键智能融稿',
+  },
+  typesetter_cleaner: {
+    type: 'typesetter_cleaner',
+    title: '网文排版清洗机',
+    iconName: 'Sparkles',
+    minWidth: 320,
+    minHeight: 280,
+    defaultSize: { width: 620, height: 500 },
+    allowMultiple: false,
+    category: 'ai',
+    description: '起点/番茄/晋江全角排版、标点统一与敏感词预检',
+  },
 };
 
 export function getPanelIcon(panelType: PanelType) {
@@ -350,6 +375,10 @@ export function getPanelIcon(panelType: PanelType) {
       return GitCommit;
     case 'voice_profiles':
       return Feather;
+    case 'model_arena':
+      return Swords;
+    case 'typesetter_cleaner':
+      return Sparkles;
     default:
       return BookOpen;
   }
@@ -403,6 +432,10 @@ export function renderPanelComponent(panel: PanelInstance): React.ReactNode {
       return <WorkflowPanel />;
     case 'voice_profiles':
       return <VoiceProfilePanel />;
+    case 'model_arena':
+      return <ModelArenaPanel />;
+    case 'typesetter_cleaner':
+      return <TypesetterCleanerPanel />;
     default:
       return (
         <div className="flex-1 flex items-center justify-center text-xs text-[#786f65]">

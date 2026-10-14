@@ -484,6 +484,29 @@ CREATE TABLE IF NOT EXISTS voice_profiles (
     FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
 );
 
+-- Model Arena runs table (双模比稿竞技场)
+CREATE TABLE IF NOT EXISTS model_arena_runs (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT NOT NULL,
+    chapter_id TEXT,
+    prompt TEXT NOT NULL,
+    model_a_provider TEXT NOT NULL,
+    model_a_name TEXT NOT NULL,
+    model_a_output TEXT NOT NULL,
+    model_a_duration_ms INTEGER NOT NULL DEFAULT 0,
+    model_a_tokens INTEGER NOT NULL DEFAULT 0,
+    model_b_provider TEXT NOT NULL,
+    model_b_name TEXT NOT NULL,
+    model_b_output TEXT NOT NULL,
+    model_b_duration_ms INTEGER NOT NULL DEFAULT 0,
+    model_b_tokens INTEGER NOT NULL DEFAULT 0,
+    winner_slot TEXT DEFAULT 'NONE', -- 'A', 'B', 'TIE', 'MERGED', 'NONE'
+    is_blind INTEGER DEFAULT 0,
+    merged_output TEXT DEFAULT '',
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
+
 -- Create indexes for high performance
 CREATE INDEX IF NOT EXISTS idx_chapters_novel_id ON chapters(novel_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_volume_id ON chapters(volume_id);
@@ -512,6 +535,7 @@ CREATE INDEX IF NOT EXISTS idx_workflow_templates_novel ON workflow_templates(no
 CREATE INDEX IF NOT EXISTS idx_workflow_runs_novel ON workflow_runs(novel_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_step_records_run ON workflow_step_records(run_id, step_index);
 CREATE INDEX IF NOT EXISTS idx_voice_profiles_novel ON voice_profiles(novel_id);
+CREATE INDEX IF NOT EXISTS idx_model_arena_runs_novel ON model_arena_runs(novel_id);
 "#;
 
 pub const FTS5_SCHEMA: &str = r#"

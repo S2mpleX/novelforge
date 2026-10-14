@@ -3,6 +3,7 @@ import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
 import type { ToolboxActionType } from '@/types';
 import { ContextPicker } from '@/components/common/ContextPicker';
+import { HumanizerEngine } from '@/features/humanizer/HumanizerEngine';
 import {
   Sparkles,
   BookOpen,
@@ -91,6 +92,14 @@ const TOOLBOX_ACTIONS: ToolActionMeta[] = [
     category: '文字精炼',
     description: '消除AI说教味，强化言辞机锋、潜台词博弈与具有呼吸感的微表情',
     placeholder: '例：将原本直白的质问改写为看似客气、实则步步紧逼的诛心之语...',
+    defaultDestination: 'insert_editor',
+  },
+  {
+    type: 'humanizer_polish',
+    title: 'Humanizer 去AI味重塑',
+    category: '文字精炼',
+    description: '深度剔除"嘴角勾起/眼中闪过/仿佛/深吸一口气"等50+种机械套话，强化生理触感与潜台词留白',
+    placeholder: '粘贴需要去AI味、注入生活呼吸感与文学质感的正文段落（点击下方可一键填入当前正文）...',
     defaultDestination: 'insert_editor',
   },
 ];
@@ -350,11 +359,28 @@ export const NovelistToolboxModal: React.FC<NovelistToolboxModalProps> = ({
             </div>
 
             {/* 用户个性化需求 */}
-            <div className="flex-1 flex flex-col">
-              <label className="text-xs font-medium text-foreground mb-1.5 flex items-center justify-between">
-                <span>个性化构思与定制需求（选填）：</span>
-                <span className="text-[11px] text-muted-foreground">留空则由 AI 自动推演</span>
-              </label>
+            <div className="flex-1 flex flex-col space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-foreground">
+                  {selectedActionType === 'humanizer_polish' ? '待去AI味重塑的正文段落：' : '个性化构思与定制需求（选填）：'}
+                </label>
+                <div className="flex items-center gap-2">
+                  {activeChapter && editorContent && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const plain = editorContent.replace(/<[^>]+>/g, '\n').replace(/\n\s*\n/g, '\n\n').trim();
+                        setCustomInput(plain);
+                      }}
+                      className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>从当前章节载入正文</span>
+                    </button>
+                  )}
+                  <span className="text-[11px] text-muted-foreground">留空则由 AI 自动推演</span>
+                </div>
+              </div>
+
               <textarea
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
@@ -362,6 +388,49 @@ export const NovelistToolboxModal: React.FC<NovelistToolboxModalProps> = ({
                 rows={5}
                 className="w-full text-xs p-3 rounded-xl bg-background border border-border/80 focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none font-sans leading-relaxed"
               />
+
+              {/* 实时 Humanizer 诊断状态条 */}
+              {customInput.trim().length > 10 && (() => {
+                const audit = HumanizerEngine.auditText(customInput);
+                return (
+                  <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 text-xs space-y-1.5 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium flex items-center gap-1.5 text-foreground">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        Humanizer 质感诊断:
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          audit.score >= 85 ? 'bg-emerald-500/15 text-emerald-600' :
+                          audit.score >= 65 ? 'bg-amber-500/15 text-amber-600' : 'bg-rose-500/15 text-rose-600'
+                        }`}>
+                          {audit.score} 分 ({audit.score >= 85 ? '自然人情味' : audit.score >= 65 ? '轻度AI腔' : '严重AI套话'})
+                        </span>
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        检出套话: <strong className={audit.clicheCount > 0 ? 'text-amber-600 font-semibold' : 'text-emerald-600'}>{audit.clicheCount}</strong> 处
+                      </span>
+                    </div>
+
+                    {audit.matches.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1 border-t border-border/40">
+                        {Array.from(new Set(audit.matches.map(m => m.phrase))).slice(0, 8).map((phrase) => (
+                          <span
+                            key={phrase}
+                            className="px-1.5 py-0.5 text-[10px] rounded-md bg-rose-500/10 text-rose-600 border border-rose-500/20 font-mono"
+                            title="典型 AI 模板套话，建议用具象动作或生理反应替换"
+                          >
+                            ⚠️ {phrase}
+                          </span>
+                        ))}
+                        {audit.matches.length > 8 && (
+                          <span className="text-[10px] text-muted-foreground self-center">
+                            等共 {audit.matches.length} 处
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 执行生成按钮 */}

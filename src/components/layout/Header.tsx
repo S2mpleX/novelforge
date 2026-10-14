@@ -28,6 +28,7 @@ import {
   Wand2,
   GitCommit,
   Feather,
+  Swords,
 } from 'lucide-react';
 import { SettingsModal } from '@/components/modals/SettingsModal';
 import { SerializationModal } from '@/components/modals/SerializationModal';
@@ -37,6 +38,8 @@ import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
 import { NovelistToolboxModal } from '@/components/modals/NovelistToolboxModal';
 import { WorkflowRunnerModal } from '@/components/modals/WorkflowRunnerModal';
 import { VoiceProfileModal } from '@/components/modals/VoiceProfileModal';
+import { ModelArenaModal } from '@/components/arena/ModelArenaModal';
+import { TypesetterCleanerModal } from '@/components/modals/TypesetterCleanerModal';
 
 import { useUpdateStore } from '@/features/updater/stores/useUpdateStore';
 import { WindowControls } from './WindowControls';
@@ -74,6 +77,8 @@ export const Header: React.FC = () => {
   const [showToolboxModal, setShowToolboxModal] = useState(false);
   const [showWorkflowModal, setShowWorkflowModal] = useState(false);
   const [showVoiceProfileModal, setShowVoiceProfileModal] = useState(false);
+  const [showArenaModal, setShowArenaModal] = useState(false);
+  const [showTypesetterModal, setShowTypesetterModal] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [showScaleMenu, setShowScaleMenu] = useState(false);
   const scaleMenuRef = useRef<HTMLDivElement | null>(null);
@@ -185,7 +190,7 @@ export const Header: React.FC = () => {
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <span className="font-bold text-[#231f1a] text-sm tracking-wide">NovelForge AI</span>
                 <span className="px-1.5 py-0.2 text-[10px] font-semibold bg-amber-800/10 text-amber-800 rounded-full border border-amber-800/20">
-                  V2.1
+                  v2.3
                 </span>
               </div>
             </div>
@@ -203,7 +208,7 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Center: Navigation Segmented Tabs (Ink Seal Style) */}
-        <div className="flex items-center gap-0.5 lg:gap-1 bg-[#e4dcce] p-1 rounded-xl border border-[#d5cbb8] shadow-inner shrink-0 mx-1 lg:mx-2">
+        <div className="flex items-center gap-0.5 lg:gap-1 bg-[#e4dcce] p-1 rounded-xl border border-[#d5cbb8] shadow-inner shrink-0 mx-2">
           <button
             onClick={() => setActiveTab('EDITOR')}
             className={`px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-150 shrink-0 whitespace-nowrap cursor-pointer ${
@@ -214,7 +219,7 @@ export const Header: React.FC = () => {
             title="正文创作"
           >
             <BookOpen className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden 2xl:inline">正文创作</span>
+            <span className="hidden xl:inline">正文创作</span>
           </button>
           <button
             onClick={() => setActiveTab('DASHBOARD')}
@@ -226,7 +231,7 @@ export const Header: React.FC = () => {
             title="概览看板"
           >
             <LayoutDashboard className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden 2xl:inline">概览看板</span>
+            <span className="hidden xl:inline">概览看板</span>
           </button>
           <button
             onClick={() => setActiveTab('CHARACTERS')}
@@ -238,7 +243,7 @@ export const Header: React.FC = () => {
             title="人物档案"
           >
             <Users className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden 2xl:inline">人物档案</span>
+            <span className="hidden xl:inline">人物档案</span>
           </button>
           <button
             onClick={() => setActiveTab('WORLD')}
@@ -250,7 +255,7 @@ export const Header: React.FC = () => {
             title="世界观设定"
           >
             <Compass className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden 2xl:inline">世界观设定</span>
+            <span className="hidden xl:inline">世界观设定</span>
           </button>
           <button
             onClick={() => setActiveTab('MEMORY')}
@@ -262,12 +267,12 @@ export const Header: React.FC = () => {
             title="记忆引擎"
           >
             <Brain className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden 2xl:inline">记忆引擎</span>
+            <span className="hidden xl:inline">记忆引擎</span>
           </button>
         </div>
 
-        {/* Right - Secondary Toolbar (flex-shrink, wraps/hides gracefully when screen is narrow or scaled up) */}
-        <div className="flex items-center gap-1 lg:gap-1.5 min-w-0 overflow-hidden shrink justify-end">
+        {/* Right - Unified Action & System Controls (Permanent Right Anchor, Zero Left Overlap) */}
+        <div className="flex items-center gap-1 lg:gap-1.5 shrink-0 ml-auto pl-2 z-20">
           {/* Quick Command Palette Search Button */}
           <button
             onClick={() => setShowCommandPalette(true)}
@@ -300,17 +305,7 @@ export const Header: React.FC = () => {
             title="打开多 Agent 自动连载控制台"
           >
             <TrendingUp className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden 2xl:inline">自动连载</span>
-          </button>
-
-          {/* Publishing & Backup */}
-          <button
-            onClick={() => setShowPublishingModal(true)}
-            className="px-2 lg:px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-800/10 hover:bg-emerald-800/20 text-emerald-800 transition-all flex items-center gap-1.5 border border-emerald-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
-            title="打开发布交付中心与数据库灾备"
-          >
-            <Archive className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden 2xl:inline">交付备份</span>
+            <span className="hidden 3xl:inline">自动连载</span>
           </button>
 
           {/* V2.3: Novelist Toolbox */}
@@ -320,7 +315,7 @@ export const Header: React.FC = () => {
             title="打开小说专项工具箱 (8大创作专项/设定关联)"
           >
             <Wand2 className="w-3.5 h-3.5 shrink-0 text-amber-700" />
-            <span className="hidden 2xl:inline">专项工具箱</span>
+            <span className="hidden 3xl:inline">百宝箱</span>
           </button>
 
           {/* V2.3: Workflow Engine */}
@@ -330,7 +325,7 @@ export const Header: React.FC = () => {
             title="打开剧情工作流执行引擎"
           >
             <GitCommit className="w-3.5 h-3.5 shrink-0 text-indigo-700" />
-            <span className="hidden 2xl:inline">工作流引擎</span>
+            <span className="hidden 3xl:inline">工作流</span>
           </button>
 
           {/* V2.3.1: Voice Profile Studio */}
@@ -340,12 +335,42 @@ export const Header: React.FC = () => {
             title="打开作者文风档案工作室 (文风建模/试读/切换)"
           >
             <Feather className="w-3.5 h-3.5 shrink-0 text-amber-800" />
-            <span className="hidden 2xl:inline">文风档案</span>
+            <span className="hidden 3xl:inline">文风档案</span>
+          </button>
+
+          {/* V2.4: Multi-Model Arena */}
+          <button
+            onClick={() => setShowArenaModal(true)}
+            className="px-2 lg:px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-800/10 hover:bg-amber-800/20 text-amber-900 transition-all flex items-center gap-1.5 border border-amber-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
+            title="打开多模型同台比稿竞技场 (双模推演/盲测PK/智能融稿)"
+          >
+            <Swords className="w-3.5 h-3.5 shrink-0 text-amber-800" />
+            <span className="hidden 3xl:inline">比稿竞技</span>
+          </button>
+
+          {/* V2.5: Typesetter Cleaner */}
+          <button
+            onClick={() => setShowTypesetterModal(true)}
+            className="px-2 lg:px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-800/10 hover:bg-amber-800/20 text-amber-900 transition-all flex items-center gap-1.5 border border-amber-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
+            title="打开网文平台排版清洗机 (起点/番茄全角缩进与敏感词预检)"
+          >
+            <Sparkles className="w-3.5 h-3.5 shrink-0 text-amber-800" />
+            <span className="hidden 3xl:inline">排版清洗</span>
+          </button>
+
+          {/* Publishing & Backup */}
+          <button
+            onClick={() => setShowPublishingModal(true)}
+            className="px-2 lg:px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-800/10 hover:bg-emerald-800/20 text-emerald-800 transition-all flex items-center gap-1.5 border border-emerald-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
+            title="打开发布交付中心与数据库灾备"
+          >
+            <Archive className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden 3xl:inline">交付备份</span>
           </button>
 
           {/* Word count & Save status */}
           {activeChapter && (
-            <div className="hidden xl:flex items-center gap-1.5 px-2 py-1 bg-[#e4dcce] rounded-lg border border-[#d5cbb8] text-xs shrink-0 whitespace-nowrap">
+            <div className="hidden 2xl:flex items-center gap-1.5 px-2 py-1 bg-[#e4dcce] rounded-lg border border-[#d5cbb8] text-xs shrink-0 whitespace-nowrap">
               <span className="text-[#786f65]">
                 <strong className="text-[#231f1a] font-mono font-semibold">{characterCount}</strong> 字
               </span>
@@ -355,25 +380,25 @@ export const Header: React.FC = () => {
               {saveStatus === 'SAVED' && (
                 <span className="flex items-center gap-1 text-emerald-700 font-medium text-[11px]">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                  <span className="hidden 2xl:inline">已存</span>
+                  <span className="hidden 3xl:inline">已存</span>
                 </span>
               )}
               {saveStatus === 'SAVING' && (
                 <span className="flex items-center gap-1 text-amber-700 font-medium text-[11px] animate-pulse">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
-                  <span className="hidden 2xl:inline">保存中</span>
+                  <span className="hidden 3xl:inline">保存中</span>
                 </span>
               )}
               {saveStatus === 'DIRTY' && (
                 <span className="flex items-center gap-1 text-[#786f65] text-[11px]">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-600/60" />
-                  <span className="hidden 2xl:inline">待存</span>
+                  <span className="hidden 3xl:inline">待存</span>
                 </span>
               )}
               {saveStatus === 'ERROR' && (
                 <span className="flex items-center gap-1 text-rose-700 font-medium text-[11px]">
                   <AlertCircle className="w-3 h-3" />
-                  <span className="hidden 2xl:inline">失败</span>
+                  <span className="hidden 3xl:inline">失败</span>
                 </span>
               )}
             </div>
@@ -397,10 +422,6 @@ export const Header: React.FC = () => {
               全本
             </button>
           </div>
-        </div>
-
-        {/* Right - Essential Controls & Window Controls (shrink-0, ml-auto, highest priority, never pushed out) */}
-        <div className="flex items-center gap-1 lg:gap-1.5 shrink-0 ml-auto pl-1 z-20">
           <div className="hidden sm:block w-px h-4 bg-[#ded5c4] shrink-0" />
 
           {/* Global UI Scale Stepper */}
@@ -589,6 +610,18 @@ export const Header: React.FC = () => {
           onClose={() => setShowVoiceProfileModal(false)}
         />
       )}
+      {showArenaModal && (
+        <ModelArenaModal
+          isOpen={showArenaModal}
+          onClose={() => setShowArenaModal(false)}
+        />
+      )}
+      {showTypesetterModal && (
+        <TypesetterCleanerModal
+          isOpen={showTypesetterModal}
+          onClose={() => setShowTypesetterModal(false)}
+        />
+      )}
       <CommandPaletteModal
         isOpen={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
@@ -606,6 +639,8 @@ export const Header: React.FC = () => {
         onOpenToolbox={() => setShowToolboxModal(true)}
         onOpenWorkflow={() => setShowWorkflowModal(true)}
         onOpenVoiceProfile={() => setShowVoiceProfileModal(true)}
+        onOpenArena={() => setShowArenaModal(true)}
+        onOpenTypesetter={() => setShowTypesetterModal(true)}
       />
     </>
   );

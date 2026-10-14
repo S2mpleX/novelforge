@@ -20,6 +20,7 @@ use crate::models::{
     WorkflowStepRecord, AdvanceWorkflowStepInput, UpdateWorkflowStepOutputInput,
     WorkflowRunDetails, ExecuteToolboxActionInput, ExecuteToolboxActionResult,
     VoiceProfile, SaveVoiceProfileInput, GenerateFindingRepairInput, FindingRepairResult,
+    ModelArenaRun, SaveModelArenaRunInput, ArenaStreamChunkPayload, ExecuteArenaDuelInput, ArenaDuelResult, MergeArenaOutputsInput,
 };
 use crate::providers::{
     ChatMessage, ChatCompletionRequest, ConnectionTestResult, OpenAIClient,
@@ -1330,6 +1331,16 @@ pub fn export_novel_html_book(
 }
 
 #[tauri::command]
+pub fn export_novel_epub(
+    db: State<DbManager>,
+    novel_id: String,
+    output_path: Option<String>,
+) -> Result<crate::export::EpubExportResult, String> {
+    db.export_novel_epub(&novel_id, output_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn export_novel_archive(
     db: State<DbManager>,
     novel_id: String,
@@ -1757,4 +1768,331 @@ pub async fn generate_finding_repair(
         repaired_text: parsed.repaired_text,
         explanation: parsed.explanation,
     })
+}
+
+// --- V2.4 MULTI-MODEL ARENA COMMANDS ---
+
+#[tauri::command]
+pub async fn execute_arena_duel(
+    app: AppHandle,
+    db: State<'_, DbManager>,
+    input: ExecuteArenaDuelInput,
+) -> Result<ArenaDuelResult, String> {
+    // 1. 获取 Slot A 的 Provider 与 Model
+    let (prov_a, model_a) = if let Some(ref pid) = input.slot_a_provider_id {
+        let p = db
+            .get_provider_by_id(pid)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("未找到指定的模型服务商 A: {}", pid))?;
+        let m = if let Some(ref m_name) = input.slot_a_model {
+            m_name.clone()
+        } else {
+            let models = db.list_models(&p.id).map_err(|e| e.to_string())?;
+            models
+                .into_iter()
+                .find(|m| m.is_default)
+                .map(|m| m.model_name)
+                .unwrap_or_else(|| "gpt-4o-mini".to_string())
+        };
+        (p, m)
+    } else {
+        let (p, m) = db
+            .get_active_provider_and_model()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "未找到已激活的 AI 服务商 A，请先配置并激活 API".to_string())?;
+        let m_name = input.slot_a_model.unwrap_or(m.model_name);
+        (p, m_name)
+    };
+
+    // 2. 获取 Slot B 的 Provider 与 Model
+    let (prov_b, model_b) = if let Some(ref pid) = input.slot_b_provider_id {
+        let p = db
+            .get_provider_by_id(pid)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("未找到指定的模型服务商 B: {}", pid))?;
+        let m = if let Some(ref m_name) = input.slot_b_model {
+            m_name.clone()
+        } else {
+            let models = db.list_models(&p.id).map_err(|e| e.to_string())?;
+            models
+                .into_iter()
+                .find(|m| m.is_default)
+                .map(|m| m.model_name)
+                .unwrap_or_else(|| "gpt-4o-mini".to_string())
+        };
+        (p, m)
+    } else {
+        let (p, m) = db
+            .get_active_provider_and_model()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "未找到已激活的 AI 服务商 B，请先配置并激活 API".to_string())?;
+        let m_name = input.slot_b_model.unwrap_or(m.model_name);
+        (p, m_name)
+    };
+
+    let session_id = input.session_id.clone();
+    let max_tokens = input.max_tokens.unwrap_or(3000);
+
+    // 异步任务 Slot A
+    let task_a = {
+        let app = app.clone();
+        let session_id = session_id.clone();
+        let base_url = prov_a.base_url.clone();
+        let api_key = prov_a.api_key.clone();
+        let model = model_a;
+        let temp = input.slot_a_temperature.unwrap_or(0.75);
+        let sys_prompt = input.system_prompt.clone();
+        let user_prompt = input.user_prompt.clone();
+
+        tokio::spawn(async move {
+            let start = std::time::Instant::now();
+            let client = OpenAIClient::new();
+            let req = ChatCompletionRequest {
+                model,
+                messages: vec![
+                    ChatMessage {
+                        role: "system".to_string(),
+                        content: sys_prompt,
+                    },
+                    ChatMessage {
+                        role: "user".to_string(),
+                        content: user_prompt,
+                    },
+                ],
+                temperature: Some(temp),
+                max_tokens: Some(max_tokens),
+                stream: true,
+            };
+
+            let app_clone = app.clone();
+            let session_clone = session_id.clone();
+
+            let res = client
+                .stream_chat_completion(&base_url, &api_key, req, move |chunk| {
+                    let payload = ArenaStreamChunkPayload {
+                        session_id: session_clone.clone(),
+                        slot: "A".to_string(),
+                        chunk: chunk.to_string(),
+                        is_done: false,
+                        error: None,
+                    };
+                    let _ = app_clone.emit("arena-stream-chunk", payload);
+                    Ok(())
+                })
+                .await;
+
+            let duration_ms = start.elapsed().as_millis() as i64;
+
+            match res {
+                Ok(content) => {
+                    let _ = app.emit(
+                        "arena-stream-chunk",
+                        ArenaStreamChunkPayload {
+                            session_id,
+                            slot: "A".to_string(),
+                            chunk: String::new(),
+                            is_done: true,
+                            error: None,
+                        },
+                    );
+                    Ok((content, duration_ms))
+                }
+                Err(e) => {
+                    let _ = app.emit(
+                        "arena-stream-chunk",
+                        ArenaStreamChunkPayload {
+                            session_id,
+                            slot: "A".to_string(),
+                            chunk: String::new(),
+                            is_done: true,
+                            error: Some(e.clone()),
+                        },
+                    );
+                    Err(e)
+                }
+            }
+        })
+    };
+
+    // 异步任务 Slot B
+    let task_b = {
+        let app = app.clone();
+        let session_id = session_id.clone();
+        let base_url = prov_b.base_url.clone();
+        let api_key = prov_b.api_key.clone();
+        let model = model_b;
+        let temp = input.slot_b_temperature.unwrap_or(0.75);
+        let sys_prompt = input.system_prompt.clone();
+        let user_prompt = input.user_prompt.clone();
+
+        tokio::spawn(async move {
+            let start = std::time::Instant::now();
+            let client = OpenAIClient::new();
+            let req = ChatCompletionRequest {
+                model,
+                messages: vec![
+                    ChatMessage {
+                        role: "system".to_string(),
+                        content: sys_prompt,
+                    },
+                    ChatMessage {
+                        role: "user".to_string(),
+                        content: user_prompt,
+                    },
+                ],
+                temperature: Some(temp),
+                max_tokens: Some(max_tokens),
+                stream: true,
+            };
+
+            let app_clone = app.clone();
+            let session_clone = session_id.clone();
+
+            let res = client
+                .stream_chat_completion(&base_url, &api_key, req, move |chunk| {
+                    let payload = ArenaStreamChunkPayload {
+                        session_id: session_clone.clone(),
+                        slot: "B".to_string(),
+                        chunk: chunk.to_string(),
+                        is_done: false,
+                        error: None,
+                    };
+                    let _ = app_clone.emit("arena-stream-chunk", payload);
+                    Ok(())
+                })
+                .await;
+
+            let duration_ms = start.elapsed().as_millis() as i64;
+
+            match res {
+                Ok(content) => {
+                    let _ = app.emit(
+                        "arena-stream-chunk",
+                        ArenaStreamChunkPayload {
+                            session_id,
+                            slot: "B".to_string(),
+                            chunk: String::new(),
+                            is_done: true,
+                            error: None,
+                        },
+                    );
+                    Ok((content, duration_ms))
+                }
+                Err(e) => {
+                    let _ = app.emit(
+                        "arena-stream-chunk",
+                        ArenaStreamChunkPayload {
+                            session_id,
+                            slot: "B".to_string(),
+                            chunk: String::new(),
+                            is_done: true,
+                            error: Some(e.clone()),
+                        },
+                    );
+                    Err(e)
+                }
+            }
+        })
+    };
+
+    let (res_a, res_b) = tokio::join!(task_a, task_b);
+
+    let (slot_a_output, slot_a_duration_ms) = match res_a {
+        Ok(Ok(pair)) => pair,
+        Ok(Err(e)) => (format!("[模型 A 执行失败]: {}", e), 0),
+        Err(e) => (format!("[模型 A 任务异常]: {}", e), 0),
+    };
+
+    let (slot_b_output, slot_b_duration_ms) = match res_b {
+        Ok(Ok(pair)) => pair,
+        Ok(Err(e)) => (format!("[模型 B 执行失败]: {}", e), 0),
+        Err(e) => (format!("[模型 B 任务异常]: {}", e), 0),
+    };
+
+    Ok(ArenaDuelResult {
+        session_id,
+        slot_a_output,
+        slot_a_duration_ms,
+        slot_b_output,
+        slot_b_duration_ms,
+    })
+}
+
+#[tauri::command]
+pub async fn merge_arena_outputs(
+    db: State<'_, DbManager>,
+    input: MergeArenaOutputsInput,
+) -> Result<String, String> {
+    let (provider, model) = db
+        .get_active_provider_and_model()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "未找到已激活的 AI 服务商，请先配置 API".to_string())?;
+
+    let novel = db.get_novel(&input.novel_id).map_err(|e| e.to_string())?;
+    let focus = input
+        .merge_focus
+        .unwrap_or_else(|| "以两者的剧情推进和精彩细节为基础，取长补短，去粗取精".to_string());
+
+    let system_prompt = format!(
+        "你是一名顶级小说融稿编辑专家与金牌主笔。\n\
+         当前正在创作小说：《{}》，题材定位：{}，基调要求：{}。\n\
+         【职责】针对两个 AI 模型同时推演出的两份候选草案（A 与 B），完成高水平的艺术融合：\n\
+         1. 提取 A 方案与 B 方案各自最出彩的情节爆点、人物动作、对话潜台词与感官描写；\n\
+         2. 化解两份草案可能存在的文字重复或细微节奏冲突，保持整篇风格和谐统一；\n\
+         3. 严格遵循融合偏好：{}\n\
+         4. 直接输出融合后的沉浸式小说正文，严禁任何前言后语或客套解释！",
+        novel.title, novel.genre_profile, novel.writing_style, focus
+    );
+
+    let user_prompt = format!(
+        "【原始创作指令】: {}\n\n\
+         【候选草案 A】:\n{}\n\n\
+         【候选草案 B】:\n{}\n\n\
+         请立即开始融稿，直接输出最终合成的精华正文：",
+        input.prompt, input.output_a, input.output_b
+    );
+
+    let client = OpenAIClient::new();
+    let req = ChatCompletionRequest {
+        model: model.model_name,
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: system_prompt,
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: user_prompt,
+            },
+        ],
+        temperature: Some(0.7),
+        max_tokens: Some(3000),
+        stream: false,
+    };
+
+    client
+        .chat_completion(&provider.base_url, &provider.api_key, req)
+        .await
+}
+
+#[tauri::command]
+pub fn list_model_arena_runs(
+    db: State<DbManager>,
+    novel_id: String,
+) -> Result<Vec<ModelArenaRun>, String> {
+    db.list_model_arena_runs(&novel_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_model_arena_run(
+    db: State<DbManager>,
+    input: SaveModelArenaRunInput,
+) -> Result<ModelArenaRun, String> {
+    db.save_model_arena_run(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_model_arena_run(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_model_arena_run(&id).map_err(|e| e.to_string())
 }

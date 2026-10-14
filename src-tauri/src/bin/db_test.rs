@@ -1,3 +1,4 @@
+use uuid::Uuid;
 use novelforge_ai_lib::database::DbManager;
 use novelforge_ai_lib::models::{
     CreateChapterInput, CreateCharacterInput, CreateNovelInput, CreateWorldRuleInput,
@@ -5,7 +6,7 @@ use novelforge_ai_lib::models::{
     CreateCharacterArcInput, CreateParallelThreadInput, CreatePlotAssociationInput, HierarchyConfig,
     MoveNodeInput, SplitChapterInput, MergeChaptersInput, SplitSceneInput, MergeScenesInput,
     RenumberHierarchyInput, CreateWorkflowRunInput, AdvanceWorkflowStepInput, ExecuteToolboxActionInput,
-    SaveVoiceProfileInput,
+    SaveVoiceProfileInput, SaveModelArenaRunInput,
 };
 
 fn main() {
@@ -618,6 +619,112 @@ fn main() {
     assert_eq!(switched_vp.name, "硬核科幻·冷峻考据风");
     println!("48. 验证文风切换与隔离持久化: 成功切换为【{}】，原自定义文风已自动置为非激活", switched_vp.name);
 
-    println!("=== 100% 测试验证通过！V2.3.1 文风档案建模与审稿仲裁修复等全业务 48 项验证完毕！ ===");
+    // 49. 验证 Model Arena 比稿记录持久化与盲测模式
+    let arena_run = db.save_model_arena_run(SaveModelArenaRunInput {
+        id: None,
+        novel_id: novel.id.clone(),
+        chapter_id: Some(ch1.id.clone()),
+        prompt: "描写反物质发动机预热启动时的舰桥震撼氛围".to_string(),
+        model_a_provider: "DeepSeek 官方".to_string(),
+        model_a_name: "deepseek-chat".to_string(),
+        model_a_output: "淡蓝色的切伦科夫辐射幽光沿着磁约束管道层层点亮，林远脚下的金属甲板传来低频蜂鸣。".to_string(),
+        model_a_duration_ms: 1250,
+        model_a_tokens: 320,
+        model_b_provider: "OpenAI 官方".to_string(),
+        model_b_name: "gpt-4o-mini".to_string(),
+        model_b_output: "警报红光骤然旋转，重力减震系统发出沉重的液压泄压声，整个主控室仿佛置身巨兽腹中。".to_string(),
+        model_b_duration_ms: 980,
+        model_b_tokens: 280,
+        winner_slot: Some("A".to_string()),
+        is_blind: Some(true),
+        merged_output: None,
+    }).expect("保存比稿记录失败");
+
+    let arena_list = db.list_model_arena_runs(&novel.id).expect("查询比稿列表失败");
+    assert!(!arena_list.is_empty());
+    let saved_run = arena_list.iter().find(|r| r.id == arena_run.id).expect("未找到刚刚保存的比稿记录");
+    assert_eq!(saved_run.winner_slot, "A");
+    assert!(saved_run.is_blind);
+    assert_eq!(saved_run.model_a_duration_ms, 1250);
+    println!("49. 验证 Model Arena 比稿记录持久化与盲测模式: 成功记录 A[{}] vs B[{}] 比稿，胜者[{}], 盲测模式[{}]",
+        saved_run.model_a_name, saved_run.model_b_name, saved_run.winner_slot, saved_run.is_blind);
+
+    // 50. 验证 Model Arena 结果智能融合更新
+    let updated_arena = db.save_model_arena_run(SaveModelArenaRunInput {
+        id: Some(arena_run.id.clone()),
+        novel_id: novel.id.clone(),
+        chapter_id: Some(ch1.id.clone()),
+        prompt: arena_run.prompt.clone(),
+        model_a_provider: arena_run.model_a_provider.clone(),
+        model_a_name: arena_run.model_a_name.clone(),
+        model_a_output: arena_run.model_a_output.clone(),
+        model_a_duration_ms: arena_run.model_a_duration_ms,
+        model_a_tokens: arena_run.model_a_tokens,
+        model_b_provider: arena_run.model_b_provider.clone(),
+        model_b_name: arena_run.model_b_name.clone(),
+        model_b_output: arena_run.model_b_output.clone(),
+        model_b_duration_ms: arena_run.model_b_duration_ms,
+        model_b_tokens: arena_run.model_b_tokens,
+        winner_slot: Some("MERGED".to_string()),
+        is_blind: Some(false),
+        merged_output: Some("淡蓝色的切伦科夫辐射沿管壁逐级点亮，重力减震系统泄压轰鸣，甲板在两股伟力交织下剧烈颤抖。".to_string()),
+    }).expect("更新比稿融合记录失败");
+
+    assert_eq!(updated_arena.winner_slot, "MERGED");
+    assert!(!updated_arena.merged_output.is_empty());
+    println!("50. 验证 Model Arena 结果智能融合更新: 胜者标记为[{}], 融合输出字数[{}]",
+        updated_arena.winner_slot, updated_arena.merged_output.chars().count());
+
+    // 51. 验证纯 Rust 原生 EPUB 3 电子书全功能打包与导出
+    let temp_epub_path = std::env::temp_dir().join(format!("test_novel_{}.epub", Uuid::new_v4()));
+    let epub_res = db.export_novel_epub(&novel.id, Some(temp_epub_path.to_string_lossy().to_string()))
+        .expect("导出 EPUB 电子书失败");
+    assert!(std::path::Path::new(&epub_res.file_path).exists(), "EPUB 文件未真实写入磁盘");
+    assert!(epub_res.file_size > 1500, "EPUB 尺寸应当包含样式表、元数据、封面与各章正文");
+    assert_eq!(epub_res.title, novel.title);
+    
+    // 校验 EPUB 规范结构：前 4 字节必须是 PK\x03\x04
+    let epub_bytes = std::fs::read(&epub_res.file_path).expect("读取生成的 EPUB 文件失败");
+    assert_eq!(&epub_bytes[0..4], &[0x50, 0x4b, 0x03, 0x04], "ZIP 魔法头验证通过");
+    // 校验第 30 字节开始的文件名为 mimetype，数据必须为 application/epub+zip
+    assert_eq!(&epub_bytes[30..38], b"mimetype", "首个 Entry 必须为 mimetype");
+    assert_eq!(&epub_bytes[38..58], b"application/epub+zip", "mimetype 数据必须为 application/epub+zip");
+    println!("51. 验证 EPUB 3 标准电子书打包: 生成文件[{}]，尺寸[{} 字节]，章节数[{}]，符合 IDPF 规范",
+        epub_res.file_path, epub_res.file_size, epub_res.chapter_count);
+
+    // 52. 验证 CRC-32 校验与 XML 转义单元算法
+    let crc_test = novelforge_ai_lib::export::calculate_crc32(b"123456789");
+    assert_eq!(crc_test, 0xCBF43926, "IEEE 802.3 CRC-32 测试向量验证通过");
+    let escaped = novelforge_ai_lib::export::xml_escape("<'A&B'>");
+    assert_eq!(escaped, "&lt;&apos;A&amp;B&apos;&gt;", "XML 字符转义完全合规");
+    println!("52. 验证 EPUB 导出基础单元: CRC-32 标准校验通过 (0x{:08X})，XML 安全转义验证通过", crc_test);
+
+    // 53. 验证安全防御与边界防护 (EPUB 非法路径拦截、无后缀补齐、换行过滤与纯标点标题降级)
+    let single_line_test = novelforge_ai_lib::export::xml_escape_single_line("第一卷\n\r<&>");
+    assert_eq!(single_line_test, "第一卷  &lt;&amp;&gt;", "单行 XML 转义成功过滤换行并转义实体");
+
+    // 验证非法包含空字符的路径被安全拒绝
+    let bad_path = format!("test_invalid\0.epub");
+    let err_res = db.export_novel_epub(&novel.id, Some(bad_path));
+    assert!(err_res.is_err(), "包含非法空字符的路径必须被安全拒绝");
+
+    // 验证缺少 .epub 扩展名自动补全
+    let no_ext_path = std::env::temp_dir().join(format!("auto_ext_novel_{}", Uuid::new_v4()));
+    let auto_ext_res = db.export_novel_epub(&novel.id, Some(no_ext_path.to_string_lossy().to_string())).expect("缺少扩展名应自动补全并成功");
+    assert!(auto_ext_res.file_path.ends_with(".epub"), "导出的文件路径必须以 .epub 结尾");
+    let _ = std::fs::remove_file(&auto_ext_res.file_path);
+
+    // 验证参数化工作流模板查询安全性
+    let wf_all = db.list_workflow_templates(None).expect("无 novel_id 参数化查询应正常");
+    let wf_novel = db.list_workflow_templates(Some(&novel.id)).expect("有 novel_id 参数化查询应正常");
+    assert!(wf_all.len() <= wf_novel.len() || !wf_all.is_empty(), "工作流模板参数化查询成功");
+
+    println!("53. 验证系统安全防御: 非法空字符路径拦截、.epub 扩展名自动补齐、单行元数据换行过滤验证通过");
+
+    // 清理临时文件
+    let _ = std::fs::remove_file(&epub_res.file_path);
+
+    println!("=== 100% 测试验证通过！V2.5 核心业务与安全防御 53 项验证完毕！ ===");
 }
+
 

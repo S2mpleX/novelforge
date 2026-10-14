@@ -61,6 +61,13 @@ import type {
   SaveVoiceProfileInput,
   GenerateFindingRepairInput,
   FindingRepairResult,
+  ModelArenaRun,
+  SaveModelArenaRunInput,
+  ArenaStreamChunkPayload,
+  ExecuteArenaDuelInput,
+  ArenaDuelResult,
+  MergeArenaOutputsInput,
+  EpubExportResult,
 } from '@/types';
 
 /**
@@ -83,6 +90,7 @@ async function safeInvoke<T>(cmd: string, args?: any): Promise<T> {
 }
 
 const webStreamListeners: Array<(payload: StreamChunkPayload) => void> = [];
+const arenaStreamListeners: Array<(payload: ArenaStreamChunkPayload) => void> = [];
 
 export function emitWebStreamChunk(payload: StreamChunkPayload) {
   webStreamListeners.forEach((fn) => {
@@ -90,6 +98,16 @@ export function emitWebStreamChunk(payload: StreamChunkPayload) {
       fn(payload);
     } catch (e) {
       console.error('WebStream listener error:', e);
+    }
+  });
+}
+
+export function emitArenaStreamChunk(payload: ArenaStreamChunkPayload) {
+  arenaStreamListeners.forEach((fn) => {
+    try {
+      fn(payload);
+    } catch (e) {
+      console.error('ArenaStream listener error:', e);
     }
   });
 }
@@ -505,4 +523,32 @@ export const api = {
     safeInvoke<void>('delete_voice_profile', { id }),
   generateFindingRepair: (input: GenerateFindingRepairInput) =>
     safeInvoke<FindingRepairResult>('generate_finding_repair', { input }),
+
+  // --- V2.4: Multi-Model Arena ---
+  onArenaStreamChunk: (callback: (payload: ArenaStreamChunkPayload) => void) => {
+    if (isTauri()) {
+      return listen<ArenaStreamChunkPayload>('arena-stream-chunk', (event) => {
+        callback(event.payload);
+      });
+    }
+    arenaStreamListeners.push(callback);
+    return Promise.resolve(() => {
+      const idx = arenaStreamListeners.indexOf(callback);
+      if (idx !== -1) arenaStreamListeners.splice(idx, 1);
+    });
+  },
+  executeArenaDuel: (input: ExecuteArenaDuelInput) =>
+    safeInvoke<ArenaDuelResult>('execute_arena_duel', { input }),
+  mergeArenaOutputs: (input: MergeArenaOutputsInput) =>
+    safeInvoke<string>('merge_arena_outputs', { input }),
+  listModelArenaRuns: (novelId: string) =>
+    safeInvoke<ModelArenaRun[]>('list_model_arena_runs', { novelId }),
+  saveModelArenaRun: (input: SaveModelArenaRunInput) =>
+    safeInvoke<ModelArenaRun>('save_model_arena_run', { input }),
+  deleteModelArenaRun: (id: string) =>
+    safeInvoke<void>('delete_model_arena_run', { id }),
+
+  // --- V2.5: EPUB 3 Export ---
+  exportNovelEpub: (novelId: string, outputPath?: string) =>
+    safeInvoke<EpubExportResult>('export_novel_epub', { novelId, outputPath }),
 };

@@ -136,7 +136,9 @@ export const AiAssistantPanel: React.FC = () => {
 
   // Listen for streaming chunks from Tauri backend
   useEffect(() => {
+    let isCancelled = false;
     let unlisten: (() => void) | undefined;
+
     api.onStreamChunk((payload) => {
       if (activeChapter && payload.chapter_id === activeChapter.id) {
         if (payload.chunk) {
@@ -154,11 +156,18 @@ export const AiAssistantPanel: React.FC = () => {
         }
       }
     }).then((fn) => {
-      unlisten = fn;
+      if (isCancelled) {
+        if (typeof fn === 'function') fn();
+      } else {
+        unlisten = fn;
+      }
+    }).catch((err) => {
+      console.error('[AiAssistantPanel] Failed to attach stream listener:', err);
     });
 
     return () => {
-      if (unlisten) unlisten();
+      isCancelled = true;
+      if (typeof unlisten === 'function') unlisten();
     };
   }, [activeChapter?.id, pushChunk, markStreamDone]);
 

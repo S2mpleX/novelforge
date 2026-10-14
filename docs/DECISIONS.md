@@ -273,10 +273,98 @@
      - 提供【🚫 忽略/误报】与【❌ 放弃草案】。
   4. **停靠工作台全新创作预设 (C10)**：
      - 新增「小说构思工坊 (`concept_workshop`)」与「工作流流水线 (`workflow_pipeline`)」两套专业级预设，工作台原生模块扩展至 23 个。
-  5. **48 项全量业务测试与极速构建**：
-     - `cargo run --bin db_test` 48 项测试 100% 通过；
-     - 前端 `npm run build` 1.12s 极速构建零错误。
+## ADR-026: 正文划词悬浮智能胶囊与水墨风原地 Visual Diff 局部采纳体系 (Floating Capsule & Inline Visual Diff)
+- **状态**：已采纳
+- **上下文**：
+  1. 长篇小说创作中，作者往往并不需要大模型动辄整章重写或生成成百上千字，而是针对个别词句或单个段落进行高频“微雕”（如：剔除偶发的 AI 套话、将干瘪的说明句改写为动作白描、为场景补充五感、精炼对白或顺手把好词句存为世界观设定）；
+  2. 以往的“AI 写作助手”面板与主工作区分立，需要作者手动划选文本 -> 复制 -> 切换面板粘贴 -> 发送 -> 复制结果 -> 切回正文粘贴替换，操作流极度割裂；
+  3. 传统的修改方案多为“纯文本覆盖”，作者无法直观一眼看出修改后的草案与原句到底删除了哪些字、增加了哪些字。
+- **决策**：
+  1. **Tiptap 划词悬浮智能胶囊 (`FloatingSelectionMenu.tsx`)**：
+     - 在编辑器表面挂载浮动菜单组件，监听 Selection 变化；当用户选中文学正文大于 2 个字符时，在光标上方平滑浮现典雅水墨风悬浮胶囊；
+     - 集成 5 大高频微操作（去AI味重写、动作化白描、五感具象化、对白脱俗化、存为法则设定）；
+     - 展开面板时锁住坐标，防止鼠标微移导致意外关闭；
+     - 允许作者在浮窗内直接打字微调，并支持一键 `[✓ 采纳替换]`，原子化替换 Tiptap 选区并触发带 `INLINE_AI_APPLY` 标记的不可逆版本快照；
+  2. **轻量纯算法差异引擎 (`textDiff.ts`)**：
+     - 自研纯 TypeScript 实现的高精度 Myers/LCS 差异算法，零第三方外部库依赖，执行耗时 <1ms；
+     - 支持字符级与中文词边界切分，准确识别 `EQUAL`、`ADDED`、`REMOVED` 变更块并合并相邻同类操作。
+  3. **水墨风可视化 Diff 组件与审稿中心全面接入 (`InlineDiffViewer.tsx` & `ReviewReportPanel.tsx`)**：
+     - 采用淡红划线高亮被删原文、淡翠绿底色高亮新增精修词句，契合文人宣纸雅致视觉；
+     - 支持【对比模式】与【最终效果】一键切换；
+     - 审稿中心（`ReviewReportPanel`）修复草案对比全面替换原先简陋的文本展示，支持一边编辑微调一边实时刷新 Diff 对比，极大降低审稿核验认知负荷。
+## ADR-027: 多模型同台比稿竞技场并发双流式架构、盲测模式与智能融合闭环 (Multi-Model Arena & Duel Architecture)
+- **状态**：已采纳
+- **上下文**：
+  1. 长篇小说创作中，作者往往难以确定特定场景更适合哪种大模型（例如：DeepSeek 擅长长线伏笔与严密因果逻辑，GPT-4o 擅长细腻情绪白描与对白节奏，Qwen 擅长纯正东方仙侠词藻，Claude 擅长克制冷峻哲思）；
+  2. 既往模式下，作者只能在一个面板生成一份内容，若不满意则清空重试，无法将两个不同模型（或同一模型在不同 Temperature 下）针对同一细纲提示词的产出并排对比；
+  3. 人类存在认知偏差与品牌光环倾向，作者看标签已知模型名称时容易产生主观先入为主，需要类似 LMSYS Chatbot Arena 的盲测机制（Blind Test）；
+  4. 创作者比对两份草稿后，常常发现“A 方案的动作打斗写得精彩，B 方案的环境烘托与对话极具韵味”，作者迫切需要一个能智能熔铸二者长处的“融合版（Merged Output）”，而非被动二选一。
+- **决策**：
+  1. **SQLite 数据底座与战报模型 (`model_arena_runs`)**：
+     - 在数据库中建立 `model_arena_runs` 表与作品索引 `idx_model_arena_runs_novel`；
+     - 完整记录双模型服务商、模型名称、提示词、双方耗时与 Token 统计、A/B 完整产出、获胜方标记 (`A` / `B` / `TIE` / `MERGED`)、盲测状态与融合文本；
+  2. **Rust 原生并发流式请求与独立多通道隔离 (`execute_arena_duel`)**：
+     - 在后端通过 Tokio 异步任务与 `tokio::join!` 同时拉起两个 HTTP SSE 流式客户端；
+     - 统一通过 Tauri 事件通道 `arena-stream-chunk` 广播分块，Payload 包含 `{ session_id, slot: "A" | "B", chunk, is_done }`，前端按 Slot 独立累加，彻底杜绝多流串流或竞态条件；
+  3. **专用文学融合 Agent (`merge_arena_outputs`)**：
+     - 编写独立结构化 Prompt，让模型作为资深小说主编，深度萃取 Slot A 与 Slot B 的亮点细节与高光金句，去粗取精，熔铸为一段通顺流畅的完整新文段；
+  4. **全屏沉浸与停靠面板双入口集成 (`ModelArenaModal` & `ModelArenaPanel`)**：
+     - 在 `PanelRegistry.tsx` 中注册为第 24 个原生停靠面板，支持拖拽吸附；同时在顶栏与 `Ctrl+K` 全局指令提供全屏沉浸弹窗；
+     - 集成盲测模式（Blind Test）：未投票前显示“选手甲 vs 选手乙”，投票后揭晓真实模型并保存战报；
+     - 集成 Humanizer 实时诊断：左右两栏直接显示人情味得分（0~100）与 AI 机械套话命中数，科学量化文学成色；
+     - 集成水墨风红绿 Visual Diff：支持一键直观对比 A/B 差异；
+     - 融合版原地一键采纳：支持将胜出方或融合版“替换正文选区”或“追加至文末”，自动触发版本快照持久化。
+  5. **50 项 Rust 数据库验证与 17 项前端专项测试**：
+     - `src-tauri/src/bin/db_test.rs` 扩展至 50 项测试，100% 验证比稿记录持久化与智能融合状态流转；
+     - `tests/test-model-arena.ts` 17 项测试 100% 验证参数装配、流式路由、盲测遮蔽、Humanizer 诊断、Diff 计算与融合落库。
 
+## ADR-028: 纯 Rust 原生轻量 EPUB 3 国际标准打包引擎与主流网文平台（起点/番茄/晋江）一键排版清洗机 (EPUB 3 Packaging & Web Novel Platform Typesetter)
+- **状态**：已采纳
+- **上下文**：
+  1. 长篇小说创作进入交付与分发阶段时，传统作者面临两大痛点：一是分发电子书需要格式合规且能直接导入微信读书、Kindle 等电子书阅读器（标准 EPUB 3 格式）；二是将正文复制到起点中文网、番茄小说、晋江文学城作者后台时，各平台对缩进、空行和标点格式要求各异，且极易因涉嫌敏感违规词导致锁章限流；
+  2. 若引入繁重的外部 C/C++ 动态链接库或重型第三方 Rust 依赖，容易破坏轻量绿色编译链（WinLibs MinGW-w64）；
+  3. EPUB 3 规范明确要求：`mimetype` 必须作为压缩包内第 1 个文件且必须未经压缩（STORE 模式），文件名为 `mimetype` 且内容为 `application/epub+zip`。
+- **决策**：
+  1. **纯 Rust 自研标准轻量 ZIP 与 EPUB 3 生成引擎 (`src-tauri/src/export/epub.rs`)**：
+     - 零新增外部网络依赖，直接实现标准 PKZIP 规范与 IEEE 802.3 CRC-32 计算；
+     - 保证第 1 个文件项为未压缩的 `mimetype`，严格生成 `META-INF/container.xml`、`OEBPS/content.opf`、`OEBPS/toc.ncx` 与 `OEBPS/nav.xhtml`；
+     - 内置经过针对电子墨水屏与高分辨率屏专业优化的中文字体排版 CSS（`style.css`）与精美 SVG 水墨封面（`cover.xhtml`）；
+     - 命令 `export_novel_epub` 支持自动生成文件至指定路径或系统文档目录。
+  2. **主流网文平台一键排版清洗机 (`TypesetterEngine.ts`)**：
+     - 预设覆盖起点中文网（全角两空格缩进、无多余空行紧凑版）、番茄小说（全角缩进、段间单空行呼吸版）、晋江文学城与通用全角纯净版；
+     - 标点符号智能转置：半角标点转全角（保护浮点数如 `3.14`）、连续减号转破折号 `——`、多重句点转六点省略号 `……`、直引号转成对中文双引号 `“”`。
+  3. **发布合规预检系统 (Censor Guard)**：
+     - 建立涉政、暴力血腥、低俗涉黄与平台常见限流封禁词库；
+     - 标出行号、列号与风险等级，并提供合理的网络文学化建议替换词（如“肢解”->“重创/撕碎”），支持在界面上一键直接替换。
+  4. **前端工作台第 25 个原生面板与交付中心扩充**：
+     - 注册 `typesetter_cleaner` 面板，支持多栏停靠布局；
+     - 增设全屏沉浸弹窗 `TypesetterCleanerModal`（顶栏与 `Ctrl+K` 均可唤起）；
+     - 在 `PublishingModal` 增设【标准 EPUB 3 电子书 (.epub)】一键导出卡片；
+  5. **52 项 Rust 测试与 19 项排版专项测试验证**：
+     - `cargo run --bin db_test` 52 项全部通过（含 EPUB 真实文件生成、PK\x03\x04 头校验与 CRC32 向量验证）；
+     - `pnpm test:typesetter` 19 项排版算法测试全绿通过。
 
+## ADR-029: 客户端异步监听器挂起内存泄漏防御与 EPUB/SQL/排版引擎全链路边界安全加固
+- **状态**：已采纳
+- **上下文**：
+  1. 系统在高频并发切换会话（如快速切换小说章节、在比稿竞技场多次重新生成或频繁挂载/卸载停靠面板）时，原生 Tauri 事件监听器 `listen` 为异步 Promise，若在 Promise 完成前组件 unmount，原本返回的注销函数 `unlisten` 将被丢弃，导致后台悬挂监听器持续占用内存并引发跨会话流式串流问题；
+  2. 敏感词扫描算法若遇到用户自定义词典传入空字符串 `""` 项时，`indexOf("", 0)` 返回 0，循环变量无法推进，将导致前端主线程陷入死循环并无响应卡死；
+  3. EPUB 电子书导出时，若书名为纯标点符号或全空格，生成的文件名将变为非法隐藏文件名；若路径传入包含空字符 `\0` 或缺少 `.epub` 后缀，需做防御性校验；同时书名/作者若包含换行符 `\r\n` 会破坏 XML/NCX 单行标签结构；
+  4. 数据库层排查动态拼接 SQL 隐患，需要将所有 SQL 查询实现 100% 严格参数化绑定。
+- **决策**：
+  1. **React 异步事件监听器防泄漏机制 (Cancellation Guard)**：
+     - 在 `ModelArenaPanel.tsx`、`AiAssistantPanel.tsx` 与 `WindowControls.tsx` 中引入 `isCancelled` / `isMounted` 状态守卫；
+     - 即使组件在 `api.onStreamChunk` / `api.onArenaStreamChunk` 未完成时卸载，Promise 回调返回后会立即检测并触发 `fn()` 注销，实现 100% 内存安全闭环；
+  2. **排版清洗机死循环防御**：
+     - 在 `TypesetterEngine.scanCensorWords` 中强制校验 `if (!item.word || item.word.length === 0) continue;`，彻底杜绝空词项导致的死循环；
+  3. **EPUB 导出边界与 XML 安全防御**：
+     - 增加 `xml_escape_single_line`，对单行元数据（`<dc:title>`, `<dc:creator>` 等）强制过滤 `\r` 与 `\n` 并转为空格和 trim；
+     - `export_to_file` 严格校验输入路径：拒绝 `\0` 空字符；缺少 `.epub` 时自动追加补齐；书名纯符号时安全降级为 `novel_{short_id}`；
+  4. **SQL 100% 参数化查询改造**：
+     - 将 `src-tauri/src/database/mod.rs` 中唯一的 `list_workflow_templates` 动态 `push_str` 改为 `WHERE is_builtin = 1 OR novel_id = ?1` 参数绑定；
+  5. **自动化测试覆盖**：
+     - `db_test.rs` 扩展至 53 项核心测试，验证 EPUB 非法路径拦截、后缀补全与单行换行过滤；
+     - `test-typesetter-engine.ts` 扩展至 20 项测试，验证空词典项死循环防御；
+     - `cargo check --all-targets` 与 `pnpm tsc --noEmit` 保持 0 错误 0 警告。
 
 

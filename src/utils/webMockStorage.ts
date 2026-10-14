@@ -29,8 +29,13 @@ import type {
   SaveVoiceProfileInput,
   GenerateFindingRepairInput,
   FindingRepairResult,
+  ModelArenaRun,
+  SaveModelArenaRunInput,
+  ExecuteArenaDuelInput,
+  ArenaDuelResult,
+  MergeArenaOutputsInput,
 } from '@/types';
-import { emitWebStreamChunk } from './tauriBridge';
+import { emitWebStreamChunk, emitArenaStreamChunk } from './tauriBridge';
 
 const SEED_NOVEL_ID = 'seed-novel-001';
 const SEED_CHAPTER_ID = 'seed-chapter-001';
@@ -1543,6 +1548,114 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         voice_profile_used: '仙侠修真·沉雄雅致风',
       };
       return result;
+    }
+
+    // --- V2.4: Multi-Model Arena ---
+    case 'execute_arena_duel': {
+      const input = args.input as ExecuteArenaDuelInput;
+      const slotAOutput = `【选手 A 生成草案】\n${input.user_prompt}。\n冷冽的星辉漫过舷窗，林远在控制台前屏住呼吸。仪器上的能量曲线正以指数级飙升，深空引力透镜将整片星系的光晕撕裂成环状，仿佛远古巨灵投下的冰冷注视。`;
+      const slotBOutput = `【选手 B 生成草案】\n${input.user_prompt}。\n刺目的警报猩红旋转，重力减震轴发出金属扭曲的低鸣。安雅一把按住手动泄压阀，大声呼喊：“核心温度已突破临界阈值，必须立刻逆向注水！”甲板随之剧烈颠簸。`;
+
+      // 模拟流式发射
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          emitArenaStreamChunk({
+            session_id: input.session_id,
+            slot: 'A',
+            chunk: slotAOutput,
+            is_done: true,
+            error: null,
+          });
+          emitArenaStreamChunk({
+            session_id: input.session_id,
+            slot: 'B',
+            chunk: slotBOutput,
+            is_done: true,
+            error: null,
+          });
+        }, 300);
+      }
+
+      const res: ArenaDuelResult = {
+        session_id: input.session_id,
+        slot_a_output: slotAOutput,
+        slot_a_duration_ms: 1280,
+        slot_b_output: slotBOutput,
+        slot_b_duration_ms: 1050,
+      };
+      return res;
+    }
+
+    case 'merge_arena_outputs': {
+      const _input = args.input as MergeArenaOutputsInput;
+      void _input;
+      const merged = `【智能双模融合精华版】\n冷冽星辉漫过舷窗，刺目的猩红警报同步回旋闪烁。林远在控制台前屏住呼吸，深空引力透镜将星系撕成环状，而安雅已稳稳按住泄压阀，金属轴低鸣中，两股伟力在视网膜投影上交织成绝美的毁灭与新生之光。`;
+      return merged;
+    }
+
+    case 'list_model_arena_runs': {
+      const runs = getStorage<ModelArenaRun[]>('model_arena_runs', []);
+      return runs.filter((r) => r.novel_id === args.novelId);
+    }
+
+    case 'save_model_arena_run': {
+      const input = args.input as SaveModelArenaRunInput;
+      const runs = getStorage<ModelArenaRun[]>('model_arena_runs', []);
+      const id = input.id || `arena-run-${Date.now()}`;
+      const now = Date.now();
+      const existingIdx = runs.findIndex((r) => r.id === id);
+
+      const newRun: ModelArenaRun = {
+        id,
+        novel_id: input.novel_id,
+        chapter_id: input.chapter_id || null,
+        prompt: input.prompt,
+        model_a_provider: input.model_a_provider,
+        model_a_name: input.model_a_name,
+        model_a_output: input.model_a_output,
+        model_a_duration_ms: input.model_a_duration_ms,
+        model_a_tokens: input.model_a_tokens,
+        model_b_provider: input.model_b_provider,
+        model_b_name: input.model_b_name,
+        model_b_output: input.model_b_output,
+        model_b_duration_ms: input.model_b_duration_ms,
+        model_b_tokens: input.model_b_tokens,
+        winner_slot: input.winner_slot || 'NONE',
+        is_blind: input.is_blind ?? false,
+        merged_output: input.merged_output || '',
+        created_at: now,
+      };
+
+      if (existingIdx !== -1) {
+        runs[existingIdx] = newRun;
+      } else {
+        runs.unshift(newRun);
+      }
+      setStorage('model_arena_runs', runs);
+      return newRun;
+    }
+
+    case 'delete_model_arena_run': {
+      const runs = getStorage<ModelArenaRun[]>('model_arena_runs', []);
+      const filtered = runs.filter((r) => r.id !== args.id);
+      setStorage('model_arena_runs', filtered);
+      return;
+    }
+
+    // --- V2.5: EPUB 3 Export ---
+    case 'export_novel_epub': {
+      const novels = getStorage<Novel[]>('novels', []);
+      const novel = novels.find((n) => n.id === args.novelId);
+      const chapters = getStorage<Chapter[]>('chapters', []).filter((c) => c.novel_id === args.novelId);
+      const title = novel?.title || '作品';
+      const totalWords = chapters.reduce((acc, c) => acc + (c.word_count || 0), 0);
+      return {
+        file_path: args.outputPath || `E:\\novels\\export\\${title}.epub`,
+        file_size: 1024 * 18 + totalWords * 2,
+        chapter_count: chapters.length,
+        word_count: totalWords,
+        title,
+      };
     }
 
     default:

@@ -653,7 +653,8 @@ export type ToolboxActionType =
   | 'world_law'
   | 'gold_opening'
   | 'chapter_outline'
-  | 'dialogue_polish';
+  | 'dialogue_polish'
+  | 'humanizer_polish';
 
 export interface ExecuteToolboxActionInput {
   novel_id: string;
@@ -726,4 +727,131 @@ export interface FindingRepairResult {
   diff_summary: string;
   voice_profile_used: string;
 }
+
+// ==========================================
+// V2.4 MULTI-MODEL ARENA (双模比稿竞技场)
+// ==========================================
+
+export interface ModelArenaRun {
+  id: string;
+  novel_id: string;
+  chapter_id?: string | null;
+  prompt: string;
+  model_a_provider: string;
+  model_a_name: string;
+  model_a_output: string;
+  model_a_duration_ms: number;
+  model_a_tokens: number;
+  model_b_provider: string;
+  model_b_name: string;
+  model_b_output: string;
+  model_b_duration_ms: number;
+  model_b_tokens: number;
+  winner_slot: 'A' | 'B' | 'TIE' | 'MERGED' | 'NONE';
+  is_blind: boolean;
+  merged_output?: string;
+  created_at: number;
+}
+
+export interface SaveModelArenaRunInput {
+  id?: string;
+  novel_id: string;
+  chapter_id?: string | null;
+  prompt: string;
+  model_a_provider: string;
+  model_a_name: string;
+  model_a_output: string;
+  model_a_duration_ms: number;
+  model_a_tokens: number;
+  model_b_provider: string;
+  model_b_name: string;
+  model_b_output: string;
+  model_b_duration_ms: number;
+  model_b_tokens: number;
+  winner_slot?: 'A' | 'B' | 'TIE' | 'MERGED' | 'NONE';
+  is_blind?: boolean;
+  merged_output?: string;
+}
+
+export interface ArenaStreamChunkPayload {
+  session_id: string;
+  slot: 'A' | 'B';
+  chunk: string;
+  is_done: boolean;
+  error?: string | null;
+}
+
+export interface ExecuteArenaDuelInput {
+  session_id: string;
+  novel_id: string;
+  chapter_id?: string;
+  system_prompt: string;
+  user_prompt: string;
+  slot_a_provider_id?: string;
+  slot_a_model?: string;
+  slot_a_temperature?: number;
+  slot_b_provider_id?: string;
+  slot_b_model?: string;
+  slot_b_temperature?: number;
+  max_tokens?: number;
+}
+
+export interface ArenaDuelResult {
+  session_id: string;
+  slot_a_output: string;
+  slot_a_duration_ms: number;
+  slot_b_output: string;
+  slot_b_duration_ms: number;
+}
+
+export interface MergeArenaOutputsInput {
+  novel_id: string;
+  prompt: string;
+  output_a: string;
+  output_b: string;
+  merge_focus?: string;
+}
+
+// ==========================================
+// V2.5 EPUB EXPORT & TYPESETTER CLEANER TYPES
+// ==========================================
+
+export interface EpubExportResult {
+  file_path: string;
+  file_size: number;
+  chapter_count: number;
+  word_count: number;
+  title: string;
+}
+
+export type TypesetPreset = 'QIDIAN' | 'FANQIE' | 'JINJIANG' | 'GENERAL';
+
+export interface TypesetOptions {
+  indentTwoEm?: boolean;
+  convertPunctuation?: boolean;
+  fixQuotes?: boolean;
+  convertDashesAndEllipsis?: boolean;
+  removeRedundantBlankLines?: boolean;
+  removeTrailingSpaces?: boolean;
+  blankLineBetweenParagraphs?: boolean;
+  censorScan?: boolean;
+}
+
+export interface CensorMatch {
+  word: string;
+  category: 'POLITICS' | 'VIOLENCE' | 'PORN' | 'PLATFORM_BANNED';
+  level: 'HIGH' | 'MEDIUM' | 'LOW';
+  line: number;
+  column: number;
+  suggest?: string;
+}
+
+export interface TypesetResult {
+  cleanedText: string;
+  originalCharCount: number;
+  cleanedCharCount: number;
+  paragraphCount: number;
+  censorMatches: CensorMatch[];
+}
+
 

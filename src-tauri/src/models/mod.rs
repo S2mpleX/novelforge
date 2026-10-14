@@ -1030,3 +1030,93 @@ pub struct FindingRepairResult {
     pub repaired_text: String,
     pub explanation: String,
 }
+
+// ==========================================
+// V2.4 MULTI-MODEL ARENA (双模比稿竞技场)
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelArenaRun {
+    pub id: String,
+    pub novel_id: String,
+    pub chapter_id: Option<String>,
+    pub prompt: String,
+    pub model_a_provider: String,
+    pub model_a_name: String,
+    pub model_a_output: String,
+    pub model_a_duration_ms: i64,
+    pub model_a_tokens: i64,
+    pub model_b_provider: String,
+    pub model_b_name: String,
+    pub model_b_output: String,
+    pub model_b_duration_ms: i64,
+    pub model_b_tokens: i64,
+    pub winner_slot: String, // "A", "B", "TIE", "MERGED", "NONE"
+    pub is_blind: bool,
+    pub merged_output: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveModelArenaRunInput {
+    pub id: Option<String>,
+    pub novel_id: String,
+    pub chapter_id: Option<String>,
+    pub prompt: String,
+    pub model_a_provider: String,
+    pub model_a_name: String,
+    pub model_a_output: String,
+    pub model_a_duration_ms: i64,
+    pub model_a_tokens: i64,
+    pub model_b_provider: String,
+    pub model_b_name: String,
+    pub model_b_output: String,
+    pub model_b_duration_ms: i64,
+    pub model_b_tokens: i64,
+    pub winner_slot: Option<String>,
+    pub is_blind: Option<bool>,
+    pub merged_output: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArenaStreamChunkPayload {
+    pub session_id: String,
+    pub slot: String, // "A" or "B"
+    pub chunk: String,
+    pub is_done: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecuteArenaDuelInput {
+    pub session_id: String,
+    pub novel_id: String,
+    pub chapter_id: Option<String>,
+    pub system_prompt: String,
+    pub user_prompt: String,
+    pub slot_a_provider_id: Option<String>,
+    pub slot_a_model: Option<String>,
+    pub slot_a_temperature: Option<f32>,
+    pub slot_b_provider_id: Option<String>,
+    pub slot_b_model: Option<String>,
+    pub slot_b_temperature: Option<f32>,
+    pub max_tokens: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArenaDuelResult {
+    pub session_id: String,
+    pub slot_a_output: String,
+    pub slot_a_duration_ms: i64,
+    pub slot_b_output: String,
+    pub slot_b_duration_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MergeArenaOutputsInput {
+    pub novel_id: String,
+    pub prompt: String,
+    pub output_a: String,
+    pub output_b: String,
+    pub merge_focus: Option<String>,
+}

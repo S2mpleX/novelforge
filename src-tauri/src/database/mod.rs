@@ -22,7 +22,7 @@ use crate::models::{
     WorkflowTemplate, SaveWorkflowTemplateInput, WorkflowRun, CreateWorkflowRunInput,
     WorkflowStepRecord, AdvanceWorkflowStepInput,
     WorkflowRunDetails, ExecuteToolboxActionInput, ExecuteToolboxActionResult,
-    VoiceProfile, SaveVoiceProfileInput,
+    VoiceProfile, SaveVoiceProfileInput, ModelArenaRun, SaveModelArenaRunInput,
 };
 
 #[derive(Clone)]
@@ -2452,6 +2452,17 @@ impl DbManager {
         Ok(html)
     }
 
+    pub fn export_novel_epub(&self, novel_id: &str, output_path: Option<String>) -> Result<crate::export::EpubExportResult> {
+        let novel = self.get_novel(novel_id)?;
+        let volumes = self.list_volumes(novel_id)?;
+        let chapters = self.list_chapters(novel_id)?;
+
+        let builder = crate::export::EpubBuilder::new(novel, volumes, chapters);
+        builder.export_to_file(output_path).map_err(|e| {
+            rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)))
+        })
+    }
+
     pub fn export_novel_archive(&self, novel_id: &str) -> Result<String> {
         let novel = self.get_novel(novel_id)?;
         let chapters = self.list_chapters(novel_id)?;
@@ -4025,15 +4036,24 @@ impl DbManager {
 
     pub fn list_workflow_templates(&self, novel_id: Option<&str>) -> Result<Vec<WorkflowTemplate>> {
         let conn = self.conn.lock();
-        let mut sql = "SELECT id, novel_id, name, description, category, steps_json, is_builtin, created_at, updated_at
-                       FROM workflow_templates WHERE is_builtin = 1".to_string();
-        if let Some(nid) = novel_id {
-            sql.push_str(&format!(" OR novel_id = '{}'", nid.replace('\'', "''")));
-        }
-        sql.push_str(" ORDER BY is_builtin DESC, created_at ASC");
+        let (sql, params_vec): (&str, Vec<Box<dyn rusqlite::ToSql>>) = match novel_id {
+            Some(nid) => (
+                "SELECT id, novel_id, name, description, category, steps_json, is_builtin, created_at, updated_at
+                 FROM workflow_templates WHERE is_builtin = 1 OR novel_id = ?1
+                 ORDER BY is_builtin DESC, created_at ASC",
+                vec![Box::new(nid.to_string())],
+            ),
+            None => (
+                "SELECT id, novel_id, name, description, category, steps_json, is_builtin, created_at, updated_at
+                 FROM workflow_templates WHERE is_builtin = 1
+                 ORDER BY is_builtin DESC, created_at ASC",
+                vec![],
+            ),
+        };
 
-        let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map([], |r| {
+        let mut stmt = conn.prepare(sql)?;
+        let param_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|b| b.as_ref()).collect();
+        let rows = stmt.query_map(param_refs.as_slice(), |r| {
             Ok(WorkflowTemplate {
                 id: r.get(0)?,
                 novel_id: r.get(1)?,
@@ -4527,6 +4547,14 @@ impl DbManager {
                 ),
                 "insert_editor".to_string(),
             ),
+            "humanizer_polish" => (
+                "你是一名顶级中文小说文学重构与去 AI 味大师 (Humanizer Polisher)。擅长以高密度动作白描消灭 AI 腔调，注入人情味与中式小说呼吸感。".to_string(),
+                format!(
+                    "请运用严格的 Humanizer 规范深度精修重塑以下小说段落：\n【待精修文本】:\n{}\n【作品流派】: {}\n【特定调校要求】: {}\n\n【核心约束】:\n1. 严禁使用'嘴角勾起/眼中闪过/仿佛/深吸一口气/殊不知/不得不说/空气凝固'等一切典型 AI 套话；\n2. 落实 Show Don't Tell，将抽象心理转换为具体生理微反应、物理触觉、环境声色；\n3. 彻底删除说明文议论过渡词；\n4. 直接输出精修后的纯小说正文，严禁带任何前后闲聊客套话。",
+                    if !custom_req.is_empty() { &custom_req } else { &prev_chapter_text }, novel_genre, custom_req
+                ),
+                "insert_editor".to_string(),
+            ),
             _ => (
                 "你是一名专业 AI 创作助手。".to_string(),
                 format!("请协助创作小说《{}》：\n{}", novel_title, custom_req),
@@ -4742,6 +4770,170 @@ impl DbManager {
         } else {
             Ok(None)
         }
+    }
+
+    // --- MODEL ARENA METHODS ---
+
+    pub fn get_provider_by_id(&self, provider_id: &str) -> Result<Option<AiProvider>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, provider_type, base_url, api_key, is_active, created_at, updated_at
+             FROM ai_providers WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![provider_id], |row| {
+            let active_int: i64 = row.get(5)?;
+            Ok(AiProvider {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                provider_type: row.get(2)?,
+                base_url: row.get(3)?,
+                api_key: row.get(4)?,
+                is_active: active_int == 1,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+            })
+        })?;
+
+        if let Some(r) = rows.next() {
+            Ok(Some(r?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_model_by_name(&self, provider_id: &str, model_name: &str) -> Result<Option<AiModel>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, provider_id, model_name, display_name, context_window, max_output_tokens, is_default, created_at
+             FROM ai_models WHERE provider_id = ?1 AND model_name = ?2 LIMIT 1",
+        )?;
+        let mut rows = stmt.query_map(params![provider_id, model_name], |row| {
+            let def_int: i64 = row.get(6)?;
+            Ok(AiModel {
+                id: row.get(0)?,
+                provider_id: row.get(1)?,
+                model_name: row.get(2)?,
+                display_name: row.get(3)?,
+                context_window: row.get(4)?,
+                max_output_tokens: row.get(5)?,
+                is_default: def_int == 1,
+                created_at: row.get(7)?,
+            })
+        })?;
+
+        if let Some(r) = rows.next() {
+            Ok(Some(r?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn save_model_arena_run(&self, input: SaveModelArenaRunInput) -> Result<ModelArenaRun> {
+        let conn = self.conn.lock();
+        let id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
+        let now = chrono::Utc::now().timestamp_millis();
+        let winner_slot = input.winner_slot.unwrap_or_else(|| "NONE".to_string());
+        let is_blind_int = if input.is_blind.unwrap_or(false) { 1 } else { 0 };
+        let merged_output = input.merged_output.unwrap_or_default();
+
+        conn.execute(
+            "INSERT INTO model_arena_runs (
+                id, novel_id, chapter_id, prompt,
+                model_a_provider, model_a_name, model_a_output, model_a_duration_ms, model_a_tokens,
+                model_b_provider, model_b_name, model_b_output, model_b_duration_ms, model_b_tokens,
+                winner_slot, is_blind, merged_output, created_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+             ON CONFLICT(id) DO UPDATE SET
+                winner_slot=excluded.winner_slot,
+                merged_output=excluded.merged_output",
+            params![
+                &id,
+                &input.novel_id,
+                &input.chapter_id,
+                &input.prompt,
+                &input.model_a_provider,
+                &input.model_a_name,
+                &input.model_a_output,
+                input.model_a_duration_ms,
+                input.model_a_tokens,
+                &input.model_b_provider,
+                &input.model_b_name,
+                &input.model_b_output,
+                input.model_b_duration_ms,
+                input.model_b_tokens,
+                &winner_slot,
+                is_blind_int,
+                &merged_output,
+                now,
+            ],
+        )?;
+
+        Ok(ModelArenaRun {
+            id,
+            novel_id: input.novel_id,
+            chapter_id: input.chapter_id,
+            prompt: input.prompt,
+            model_a_provider: input.model_a_provider,
+            model_a_name: input.model_a_name,
+            model_a_output: input.model_a_output,
+            model_a_duration_ms: input.model_a_duration_ms,
+            model_a_tokens: input.model_a_tokens,
+            model_b_provider: input.model_b_provider,
+            model_b_name: input.model_b_name,
+            model_b_output: input.model_b_output,
+            model_b_duration_ms: input.model_b_duration_ms,
+            model_b_tokens: input.model_b_tokens,
+            winner_slot,
+            is_blind: input.is_blind.unwrap_or(false),
+            merged_output,
+            created_at: now,
+        })
+    }
+
+    pub fn list_model_arena_runs(&self, novel_id: &str) -> Result<Vec<ModelArenaRun>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, chapter_id, prompt,
+                    model_a_provider, model_a_name, model_a_output, model_a_duration_ms, model_a_tokens,
+                    model_b_provider, model_b_name, model_b_output, model_b_duration_ms, model_b_tokens,
+                    winner_slot, is_blind, merged_output, created_at
+             FROM model_arena_runs WHERE novel_id = ?1 ORDER BY created_at DESC",
+        )?;
+        let rows = stmt.query_map(params![novel_id], |row| {
+            let blind_int: i64 = row.get(15)?;
+            Ok(ModelArenaRun {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                chapter_id: row.get(2)?,
+                prompt: row.get(3)?,
+                model_a_provider: row.get(4)?,
+                model_a_name: row.get(5)?,
+                model_a_output: row.get(6)?,
+                model_a_duration_ms: row.get(7)?,
+                model_a_tokens: row.get(8)?,
+                model_b_provider: row.get(9)?,
+                model_b_name: row.get(10)?,
+                model_b_output: row.get(11)?,
+                model_b_duration_ms: row.get(12)?,
+                model_b_tokens: row.get(13)?,
+                winner_slot: row.get(14)?,
+                is_blind: blind_int == 1,
+                merged_output: row.get(16)?,
+                created_at: row.get(17)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn delete_model_arena_run(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM model_arena_runs WHERE id = ?1", params![id])?;
+        Ok(())
     }
 }
 

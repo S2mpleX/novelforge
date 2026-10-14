@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
 import type { ReviewReport, FindingRepairResult } from '@/types';
+import { InlineDiffViewer } from '@/components/common/InlineDiffViewer';
 import {
   ShieldCheck,
   Play,
@@ -325,9 +326,10 @@ export const ReviewReportPanel: React.FC = () => {
                                 className="w-full p-2 text-xs rounded border border-amber-800/30 bg-white font-serif focus:outline-none focus:ring-1 focus:ring-amber-800"
                               />
                             ) : (
-                              <div className="p-2 rounded bg-white/90 border border-amber-800/15 font-serif text-xs text-[#2c2825] leading-relaxed">
-                                {editedDrafts[f.id] ?? repair.revised_text_draft}
-                              </div>
+                              <InlineDiffViewer
+                                original={repair.original_quote || ''}
+                                revised={editedDrafts[f.id] ?? repair.revised_text_draft}
+                              />
                             )}
                           </div>
 

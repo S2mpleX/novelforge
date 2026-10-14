@@ -23,6 +23,7 @@ import {
   Wand2,
   GitCommit,
   Feather,
+  Swords,
 } from 'lucide-react';
 
 interface Props {
@@ -37,6 +38,8 @@ interface Props {
   onOpenToolbox?: () => void;
   onOpenWorkflow?: () => void;
   onOpenVoiceProfile?: () => void;
+  onOpenArena?: () => void;
+  onOpenTypesetter?: () => void;
 }
 
 export const CommandPaletteModal: React.FC<Props> = ({
@@ -51,6 +54,8 @@ export const CommandPaletteModal: React.FC<Props> = ({
   onOpenToolbox,
   onOpenWorkflow,
   onOpenVoiceProfile,
+  onOpenArena,
+  onOpenTypesetter,
 }) => {
   const {
     chapters,
@@ -132,6 +137,16 @@ export const CommandPaletteModal: React.FC<Props> = ({
       },
     },
     {
+      id: 'cmd-arena',
+      icon: <Swords className="w-4 h-4 text-amber-800" />,
+      title: '打开多模型同台比稿竞技场 (双模推演/盲测PK/智能融稿)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenArena?.();
+      },
+    },
+    {
       id: 'cmd-format',
       icon: <AlignLeft className="w-4 h-4 text-[#854d0e]" />,
       title: '一键文学规范排版 (首行双全角缩进、清理空行标点)',
@@ -139,6 +154,16 @@ export const CommandPaletteModal: React.FC<Props> = ({
       action: () => {
         onClose();
         onFormatText?.();
+      },
+    },
+    {
+      id: 'cmd-typesetter-cleaner',
+      icon: <Sparkles className="w-4 h-4 text-amber-600" />,
+      title: '打开网文排版清洗机与合规预检 (起点/番茄全角缩进与敏感词)',
+      category: '排版精修',
+      action: () => {
+        onClose();
+        onOpenTypesetter?.();
       },
     },
     {

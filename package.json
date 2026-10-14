@@ -1,7 +1,7 @@
 {
   "name": "novelforge-ai",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.3.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,9 @@
     "tauri": "node scripts/tauri-runner.js",
     "test:docking": "tsx tests/test-docking-workspace.ts",
     "test:updater": "tsx tests/test-updater-system.ts",
+    "test:humanizer": "tsx tests/test-humanizer-engine.ts",
+    "test:arena": "tsx tests/test-model-arena.ts",
+    "test:typesetter": "tsx tests/test-typesetter-engine.ts",
     "check:version": "tsx scripts/check-version-consistency.ts",
     "test:db": "node scripts/tauri-runner.js -- cargo run --manifest-path src-tauri/Cargo.toml --bin db_test"
   },
