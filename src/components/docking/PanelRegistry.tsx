@@ -18,6 +18,7 @@ import {
   FastForward,
   Target,
   Book,
+  Feather,
 } from 'lucide-react';
 
 // Panel components
@@ -41,6 +42,9 @@ import { TokenUsagePanel } from './panels/TokenUsagePanel';
 import { SerializationQueuePanel } from './panels/SerializationQueuePanel';
 import { ChapterGoalsPanel } from './panels/ChapterGoalsPanel';
 import { NovelInfoPanel } from './panels/NovelInfoPanel';
+import { ToolboxPanel } from './panels/ToolboxPanel';
+import { WorkflowPanel } from './panels/WorkflowPanel';
+import { VoiceProfilePanel } from './panels/VoiceProfilePanel';
 
 export const PANEL_METADATA_MAP: Record<PanelType, PanelMeta> = {
   chapters: {
@@ -263,6 +267,39 @@ export const PANEL_METADATA_MAP: Record<PanelType, PanelMeta> = {
     category: 'core',
     description: '书名简介、全书字数看板、HTML5 电子书导出与灾备热备份',
   },
+  novelist_toolbox: {
+    type: 'novelist_toolbox',
+    title: '小说专项工具箱',
+    iconName: 'Wand2',
+    minWidth: 280,
+    minHeight: 300,
+    defaultSize: { width: 400, height: 600 },
+    allowMultiple: false,
+    category: 'ai',
+    description: '8大网文创作专项、设定集深度上下文关联与一键直连模型推演',
+  },
+  workflow_engine: {
+    type: 'workflow_engine',
+    title: '剧情工作流引擎',
+    iconName: 'GitCommit',
+    minWidth: 300,
+    minHeight: 300,
+    defaultSize: { width: 420, height: 600 },
+    allowMultiple: false,
+    category: 'ai',
+    description: '结构化推演流水线、上游输出下游自动消费与卡片原地打磨',
+  },
+  voice_profiles: {
+    type: 'voice_profiles',
+    title: '作者文风档案工作室',
+    iconName: 'Feather',
+    minWidth: 320,
+    minHeight: 300,
+    defaultSize: { width: 520, height: 600 },
+    allowMultiple: false,
+    category: 'ai',
+    description: '作者文风档案建模、节奏语调参数调控、一键试读与全局/单书隔离激活',
+  },
 };
 
 export function getPanelIcon(panelType: PanelType) {
@@ -307,6 +344,12 @@ export function getPanelIcon(panelType: PanelType) {
       return Target;
     case 'novel_info':
       return BookOpen;
+    case 'novelist_toolbox':
+      return Sparkles;
+    case 'workflow_engine':
+      return GitCommit;
+    case 'voice_profiles':
+      return Feather;
     default:
       return BookOpen;
   }
@@ -354,6 +397,12 @@ export function renderPanelComponent(panel: PanelInstance): React.ReactNode {
       return <ChapterGoalsPanel />;
     case 'novel_info':
       return <NovelInfoPanel />;
+    case 'novelist_toolbox':
+      return <ToolboxPanel />;
+    case 'workflow_engine':
+      return <WorkflowPanel />;
+    case 'voice_profiles':
+      return <VoiceProfilePanel />;
     default:
       return (
         <div className="flex-1 flex items-center justify-center text-xs text-[#786f65]">

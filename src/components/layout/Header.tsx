@@ -25,12 +25,18 @@ import {
   Moon,
   ZoomIn,
   ZoomOut,
+  Wand2,
+  GitCommit,
+  Feather,
 } from 'lucide-react';
 import { SettingsModal } from '@/components/modals/SettingsModal';
 import { SerializationModal } from '@/components/modals/SerializationModal';
 import { PublishingModal } from '@/components/modals/PublishingModal';
 import { CommandPaletteModal } from '@/components/modals/CommandPaletteModal';
 import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
+import { NovelistToolboxModal } from '@/components/modals/NovelistToolboxModal';
+import { WorkflowRunnerModal } from '@/components/modals/WorkflowRunnerModal';
+import { VoiceProfileModal } from '@/components/modals/VoiceProfileModal';
 
 import { useUpdateStore } from '@/features/updater/stores/useUpdateStore';
 import { WindowControls } from './WindowControls';
@@ -65,6 +71,9 @@ export const Header: React.FC = () => {
   const [showPublishingModal, setShowPublishingModal] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showCreateChapter, setShowCreateChapter] = useState(false);
+  const [showToolboxModal, setShowToolboxModal] = useState(false);
+  const [showWorkflowModal, setShowWorkflowModal] = useState(false);
+  const [showVoiceProfileModal, setShowVoiceProfileModal] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [showScaleMenu, setShowScaleMenu] = useState(false);
   const scaleMenuRef = useRef<HTMLDivElement | null>(null);
@@ -304,6 +313,36 @@ export const Header: React.FC = () => {
             <span className="hidden 2xl:inline">交付备份</span>
           </button>
 
+          {/* V2.3: Novelist Toolbox */}
+          <button
+            onClick={() => setShowToolboxModal(true)}
+            className="px-2 lg:px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-800/10 hover:bg-amber-800/20 text-amber-800 transition-all flex items-center gap-1.5 border border-amber-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
+            title="打开小说专项工具箱 (8大创作专项/设定关联)"
+          >
+            <Wand2 className="w-3.5 h-3.5 shrink-0 text-amber-700" />
+            <span className="hidden 2xl:inline">专项工具箱</span>
+          </button>
+
+          {/* V2.3: Workflow Engine */}
+          <button
+            onClick={() => setShowWorkflowModal(true)}
+            className="px-2 lg:px-2.5 py-1.5 rounded-lg text-xs font-medium bg-indigo-800/10 hover:bg-indigo-800/20 text-indigo-800 transition-all flex items-center gap-1.5 border border-indigo-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
+            title="打开剧情工作流执行引擎"
+          >
+            <GitCommit className="w-3.5 h-3.5 shrink-0 text-indigo-700" />
+            <span className="hidden 2xl:inline">工作流引擎</span>
+          </button>
+
+          {/* V2.3.1: Voice Profile Studio */}
+          <button
+            onClick={() => setShowVoiceProfileModal(true)}
+            className="px-2 lg:px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-900/10 hover:bg-amber-900/20 text-amber-900 transition-all flex items-center gap-1.5 border border-amber-900/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
+            title="打开作者文风档案工作室 (文风建模/试读/切换)"
+          >
+            <Feather className="w-3.5 h-3.5 shrink-0 text-amber-800" />
+            <span className="hidden 2xl:inline">文风档案</span>
+          </button>
+
           {/* Word count & Save status */}
           {activeChapter && (
             <div className="hidden xl:flex items-center gap-1.5 px-2 py-1 bg-[#e4dcce] rounded-lg border border-[#d5cbb8] text-xs shrink-0 whitespace-nowrap">
@@ -532,6 +571,24 @@ export const Header: React.FC = () => {
       {showCreateChapter && (
         <CreateChapterModal onClose={() => setShowCreateChapter(false)} />
       )}
+      {showToolboxModal && (
+        <NovelistToolboxModal
+          isOpen={showToolboxModal}
+          onClose={() => setShowToolboxModal(false)}
+        />
+      )}
+      {showWorkflowModal && (
+        <WorkflowRunnerModal
+          isOpen={showWorkflowModal}
+          onClose={() => setShowWorkflowModal(false)}
+        />
+      )}
+      {showVoiceProfileModal && (
+        <VoiceProfileModal
+          isOpen={showVoiceProfileModal}
+          onClose={() => setShowVoiceProfileModal(false)}
+        />
+      )}
       <CommandPaletteModal
         isOpen={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
@@ -546,6 +603,9 @@ export const Header: React.FC = () => {
         onOpenSerialization={() => setShowSerializationModal(true)}
         onOpenPublishing={() => setShowPublishingModal(true)}
         onOpenCreateChapter={() => setShowCreateChapter(true)}
+        onOpenToolbox={() => setShowToolboxModal(true)}
+        onOpenWorkflow={() => setShowWorkflowModal(true)}
+        onOpenVoiceProfile={() => setShowVoiceProfileModal(true)}
       />
     </>
   );

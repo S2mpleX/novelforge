@@ -869,6 +869,164 @@ pub struct HierarchicalCreationContext {
     pub formatted_system_prompt: String,
 }
 
+// ==========================================
+// V2.3 WORKFLOW ENGINE & TOOLBOX MODELS
+// ==========================================
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowTemplate {
+    pub id: String,
+    pub novel_id: Option<String>,
+    pub name: String,
+    pub description: String,
+    pub category: String, // general, fantasy, urban, scifi, mystery
+    pub steps_json: String,
+    pub is_builtin: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveWorkflowTemplateInput {
+    pub id: Option<String>,
+    pub novel_id: Option<String>,
+    pub name: String,
+    pub description: Option<String>,
+    pub category: Option<String>,
+    pub steps_json: String,
+}
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowRun {
+    pub id: String,
+    pub template_id: String,
+    pub novel_id: String,
+    pub target_chapter_id: Option<String>,
+    pub status: String, // PENDING, RUNNING, WAITING_STEP, COMPLETED, FAILED, PAUSED
+    pub current_step_index: i64,
+    pub run_mode: String, // AUTO, STEP
+    pub context_bindings_json: String,
+    pub total_tokens: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateWorkflowRunInput {
+    pub template_id: String,
+    pub novel_id: String,
+    pub target_chapter_id: Option<String>,
+    pub run_mode: Option<String>,
+    pub context_bindings_json: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowStepRecord {
+    pub id: String,
+    pub run_id: String,
+    pub step_index: i64,
+    pub step_key: String,
+    pub title: String,
+    pub prompt_rendered: String,
+    pub input_values_json: String,
+    pub raw_output: String,
+    pub edited_output: String,
+    pub status: String, // PENDING, RUNNING, COMPLETED, FAILED
+    pub error_message: String,
+    pub token_usage: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdvanceWorkflowStepInput {
+    pub run_id: String,
+    pub step_index: i64,
+    pub input_values_json: Option<String>,
+    pub auto_advance_next: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateWorkflowStepOutputInput {
+    pub step_record_id: String,
+    pub edited_output: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowRunDetails {
+    pub run: WorkflowRun,
+    pub template: WorkflowTemplate,
+    pub steps: Vec<WorkflowStepRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecuteToolboxActionInput {
+    pub novel_id: String,
+    pub action_type: String, // name, intro, premise, cheat, world_law, gold_opening, chapter_outline, dialogue_polish
+    pub chapter_id: Option<String>,
+    pub custom_input: Option<String>,
+    pub character_ids: Option<Vec<String>>,
+    pub world_rule_ids: Option<Vec<String>>,
+    pub include_prev_chapter: Option<bool>,
+    pub include_memo: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecuteToolboxActionResult {
+    pub action_type: String,
+    pub system_prompt: String,
+    pub user_prompt: String,
+    pub target_destination: String, // insert_editor, save_as_character, save_as_rule, save_as_chapter
+    pub assembled_context_summary: String,
+}
+
+// ==========================================
+// V2.3.1 VOICE PROFILES & REVIEW ARBITRATION
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoiceProfile {
+    pub id: String,
+    pub novel_id: Option<String>,
+    pub name: String,
+    pub description: String,
+    pub sample_text: String,
+    pub sentence_rhythm: String, // FAST_PACED, BALANCED, ELABORATE
+    pub vocabulary_tone: String, // VERNACULAR, CLASSICAL_MODERN, COLD_REALISTIC
+    pub pov_preference: String, // THIRD_LIMITED, THIRD_OMNISCIENT, FIRST_PERSON
+    pub sensory_ratio: String, // VISUAL_FOCUS, ACTION_FOCUS, EMOTIONAL_FOCUS, BALANCED
+    pub custom_rules_json: String,
+    pub is_active: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveVoiceProfileInput {
+    pub id: Option<String>,
+    pub novel_id: Option<String>,
+    pub name: String,
+    pub description: Option<String>,
+    pub sample_text: Option<String>,
+    pub sentence_rhythm: Option<String>,
+    pub vocabulary_tone: Option<String>,
+    pub pov_preference: Option<String>,
+    pub sensory_ratio: Option<String>,
+    pub custom_rules_json: Option<String>,
+    pub is_active: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenerateFindingRepairInput {
+    pub finding_id: String,
+    pub chapter_id: String,
+    pub custom_instruction: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FindingRepairResult {
+    pub finding_id: String,
+    pub original_quote: String,
+    pub repaired_text: String,
+    pub explanation: String,
+}

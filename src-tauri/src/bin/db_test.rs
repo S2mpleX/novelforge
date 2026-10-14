@@ -4,7 +4,8 @@ use novelforge_ai_lib::models::{
     CreateSeriesInput, CreatePartInput, CreateVolumeInput, CreateSceneInput, CreatePlotBeatInput,
     CreateCharacterArcInput, CreateParallelThreadInput, CreatePlotAssociationInput, HierarchyConfig,
     MoveNodeInput, SplitChapterInput, MergeChaptersInput, SplitSceneInput, MergeScenesInput,
-    RenumberHierarchyInput,
+    RenumberHierarchyInput, CreateWorkflowRunInput, AdvanceWorkflowStepInput, ExecuteToolboxActionInput,
+    SaveVoiceProfileInput,
 };
 
 fn main() {
@@ -510,5 +511,113 @@ fn main() {
     println!("40. 验证多 Agent 创作上下文组装:\n--- 上下文片段预览 ---\n{}\n--- 结束预览 ---",
         creation_ctx.formatted_system_prompt);
 
-    println!("=== 100% 测试验证通过！V2.0 小说多层级结构与跨层级独立剧情关系网全业务引擎验证完毕！ ===");
+    // ==========================================
+    // V2.3 NOVELIST WORKFLOW & TOOLBOX TESTS (41 ~ 44)
+    // ==========================================
+
+    // 41. 验证工作流模板与内置播种
+    let templates = db.list_workflow_templates(Some(&novel.id)).expect("获取工作流模板列表失败");
+    assert!(templates.len() >= 2);
+    let builtin_tpl = templates.iter().find(|t| t.is_builtin).expect("未找到内置工作流模板");
+    println!("41. 验证工作流模板与内置播种: 成功加载 {} 套模板，内置示范【{}】(类别: {})",
+        templates.len(), builtin_tpl.name, builtin_tpl.category);
+
+    // 42. 验证工作流运行实例创建与步骤初始化
+    let run_details = db.create_workflow_run(CreateWorkflowRunInput {
+        template_id: builtin_tpl.id.clone(),
+        novel_id: novel.id.clone(),
+        target_chapter_id: Some(ch1.id.clone()),
+        run_mode: Some("STEP".to_string()),
+        context_bindings_json: Some("{\"character_ids\":[\"c1\",\"c2\"]}".to_string()),
+    }).expect("创建工作流运行实例失败");
+
+    assert_eq!(run_details.run.status, "PENDING");
+    assert_eq!(run_details.steps.len(), 3);
+    assert_eq!(run_details.steps[0].step_key, "premise");
+    println!("42. 验证工作流运行创建: 运行 ID【{}】，共 {} 步骤，首步【{}】就绪",
+        run_details.run.id, run_details.steps.len(), run_details.steps[0].title);
+
+    // 43. 验证工作流单步编辑输出与断点流转
+    let step0_id = &run_details.steps[0].id;
+    let updated_step0 = db.update_workflow_step_output(step0_id, "【作者人工原地修改后的金手指设定】: 因果律签到系统，越战越强。")
+        .expect("原地编辑步骤输出失败");
+    assert!(updated_step0.edited_output.contains("因果律签到系统"));
+
+    let advanced_run = db.advance_workflow_step(AdvanceWorkflowStepInput {
+        run_id: run_details.run.id.clone(),
+        step_index: 0,
+        input_values_json: Some("{\"genre\":\"玄幻修仙\"}".to_string()),
+        auto_advance_next: Some(false),
+    }).expect("推进工作流步骤失败");
+
+    assert_eq!(advanced_run.run.status, "WAITING_STEP");
+    assert_eq!(advanced_run.run.current_step_index, 1);
+    assert_eq!(advanced_run.steps[0].status, "COMPLETED");
+    println!("43. 验证工作流单步编辑与流转: 第一步已完成并保留人工修改输出，当前指针推进至第 {} 步【{}】，状态[{}]",
+        advanced_run.run.current_step_index, advanced_run.steps[1].title, advanced_run.run.status);
+
+    // 44. 验证小说专项工具箱 Prompt 动态装配
+    let toolbox_res = db.assemble_toolbox_prompt(ExecuteToolboxActionInput {
+        novel_id: novel.id.clone(),
+        action_type: "gold_opening".to_string(),
+        chapter_id: Some(ch1.id.clone()),
+        custom_input: Some("主角穿越在即将被妖兽吞噬的冰冷雪原上".to_string()),
+        character_ids: Some(vec![character.id.clone(), char2.id.clone()]),
+        world_rule_ids: Some(vec![rule.id.clone()]),
+        include_prev_chapter: Some(true),
+        include_memo: Some(true),
+    }).expect("组装专项工具箱 Prompt 失败");
+
+    assert!(toolbox_res.system_prompt.contains("网文白金作家"));
+    assert!(toolbox_res.user_prompt.contains(&novel.title));
+    assert!(toolbox_res.user_prompt.contains("林远"));
+    assert!(toolbox_res.user_prompt.contains("曲率泡稳定法则"));
+    println!("44. 验证小说专项工具箱 Prompt 动态装配: 动作[{}], 目标[{}], 摘要: {}",
+        toolbox_res.action_type, toolbox_res.target_destination, toolbox_res.assembled_context_summary);
+
+    // 45. 验证文风档案内置播种
+    let voice_profiles = db.list_voice_profiles(None).expect("查询文风档案列表失败");
+    assert!(voice_profiles.len() >= 3);
+    let active_voice = db.get_active_voice_profile(None).expect("获取激活文风失败");
+    assert!(active_voice.is_some());
+    let active_vp = active_voice.unwrap();
+    println!("45. 验证文风档案内置播种: 已内置 {} 套专业文风，当前默认激活【{}】(节奏: {}, 语调: {})",
+        voice_profiles.len(), active_vp.name, active_vp.sentence_rhythm, active_vp.vocabulary_tone);
+
+    // 46. 验证自定义文风档案创建与切换激活
+    let custom_vp = db.save_voice_profile(SaveVoiceProfileInput {
+        id: None,
+        novel_id: Some(novel.id.clone()),
+        name: "专属·冷冽悬疑克制风".to_string(),
+        description: Some("专为本书定制的悬疑暗黑硬派叙事".to_string()),
+        sample_text: Some("风雪刮过破败的钟楼，暗红的血痕在冰层下蔓延。".to_string()),
+        sentence_rhythm: Some("FAST_PACED".to_string()),
+        vocabulary_tone: Some("COLD_REALISTIC".to_string()),
+        pov_preference: Some("THIRD_LIMITED".to_string()),
+        sensory_ratio: Some("VISUAL_FOCUS".to_string()),
+        custom_rules_json: Some("[\"严禁感叹号\", \"减少副词\"]".to_string()),
+        is_active: Some(true),
+    }).expect("创建自定义文风档案失败");
+
+    let novel_active_vp = db.get_active_voice_profile(Some(&novel.id)).expect("获取小说激活文风失败").unwrap();
+    assert_eq!(novel_active_vp.id, custom_vp.id);
+    assert!(novel_active_vp.is_active);
+    println!("46. 验证自定义文风档案创建与激活: 成功为《{}》创建并激活文风【{}】(ID: {})",
+        novel.title, novel_active_vp.name, novel_active_vp.id);
+
+    // 47. 验证审稿发现详情提取 (Finding Retrieval)
+    let finding_detail = db.get_review_finding(&report.findings[0].id).expect("查询审稿发现失败");
+    assert!(finding_detail.is_some());
+    let f = finding_detail.unwrap();
+    println!("47. 验证审稿发现详情提取: 发现ID【{}】，标题【{}】，原文引用【{}】",
+        f.id, f.title, f.evidence_quote);
+
+    // 48. 验证文风切换与隔离持久化
+    db.set_active_voice_profile("profile-scifi-realistic", Some(&novel.id)).expect("切换文风失败");
+    let switched_vp = db.get_active_voice_profile(Some(&novel.id)).expect("获取切换后文风失败").unwrap();
+    assert_eq!(switched_vp.name, "硬核科幻·冷峻考据风");
+    println!("48. 验证文风切换与隔离持久化: 成功切换为【{}】，原自定义文风已自动置为非激活", switched_vp.name);
+
+    println!("=== 100% 测试验证通过！V2.3.1 文风档案建模与审稿仲裁修复等全业务 48 项验证完毕！ ===");
 }
+

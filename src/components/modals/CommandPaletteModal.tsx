@@ -20,6 +20,9 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Wand2,
+  GitCommit,
+  Feather,
 } from 'lucide-react';
 
 interface Props {
@@ -31,6 +34,9 @@ interface Props {
   onOpenPublishing: () => void;
   onOpenCreateChapter: () => void;
   onFormatText?: () => void;
+  onOpenToolbox?: () => void;
+  onOpenWorkflow?: () => void;
+  onOpenVoiceProfile?: () => void;
 }
 
 export const CommandPaletteModal: React.FC<Props> = ({
@@ -42,6 +48,9 @@ export const CommandPaletteModal: React.FC<Props> = ({
   onOpenPublishing,
   onOpenCreateChapter,
   onFormatText,
+  onOpenToolbox,
+  onOpenWorkflow,
+  onOpenVoiceProfile,
 }) => {
   const {
     chapters,
@@ -90,6 +99,36 @@ export const CommandPaletteModal: React.FC<Props> = ({
       action: () => {
         onClose();
         saveCurrentChapter(true, 'COMMAND_PALETTE_SAVE');
+      },
+    },
+    {
+      id: 'cmd-novelist-toolbox',
+      icon: <Wand2 className="w-4 h-4 text-amber-600" />,
+      title: '打开小说专项工具箱 (8大创作专项/设定关联)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenToolbox?.();
+      },
+    },
+    {
+      id: 'cmd-workflow-engine',
+      icon: <GitCommit className="w-4 h-4 text-indigo-600" />,
+      title: '打开剧情工作流执行引擎 (黄金三章/爆款单章流水线)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenWorkflow?.();
+      },
+    },
+    {
+      id: 'cmd-voice-profile',
+      icon: <Feather className="w-4 h-4 text-amber-800" />,
+      title: '打开作者文风档案工作室 (文风建模/节奏语调/现场试读)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenVoiceProfile?.();
       },
     },
     {

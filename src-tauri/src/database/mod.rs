@@ -19,6 +19,10 @@ use crate::models::{
     ParallelThread, CreateParallelThreadInput, PlotAssociation, CreatePlotAssociationInput, PlotAssociationView,
     MoveNodeInput, SplitChapterInput, SplitSceneInput, MergeChaptersInput, MergeScenesInput,
     RenumberHierarchyInput, ContentTreeNode, NovelContentTree, HierarchicalCreationContext,
+    WorkflowTemplate, SaveWorkflowTemplateInput, WorkflowRun, CreateWorkflowRunInput,
+    WorkflowStepRecord, AdvanceWorkflowStepInput,
+    WorkflowRunDetails, ExecuteToolboxActionInput, ExecuteToolboxActionResult,
+    VoiceProfile, SaveVoiceProfileInput,
 };
 
 #[derive(Clone)]
@@ -124,6 +128,12 @@ impl DbManager {
             let _ = Self::seed_sample_novel(&conn);
         }
 
+        // Seed default workflow templates if none exist
+        let _ = Self::seed_default_workflow_templates(&conn);
+
+        // Seed default voice profiles if none exist
+        let _ = Self::seed_default_voice_profiles(&conn);
+
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
             db_path,
@@ -222,6 +232,154 @@ impl DbManager {
              VALUES (?1, ?2, '柯伊伯带突围弧', 'MAIN', '在未知暗区脉冲干扰下完成先驱者号首次超维曲率跃迁', 'IN_PROGRESS', ?3)",
             params![&arc_id, &phase_id, now],
         )?;
+
+        Ok(())
+    }
+
+    fn seed_default_workflow_templates(conn: &Connection) -> Result<()> {
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM workflow_templates WHERE is_builtin = 1",
+            [],
+            |r| r.get(0),
+        ).unwrap_or(0);
+
+        if count > 0 {
+            return Ok(());
+        }
+
+        let now = chrono::Utc::now().timestamp_millis();
+
+        // 1. 爆款黄金开篇工作流 (3步成稿)
+        let tpl1_id = "tpl-gold-opening".to_string();
+        let steps_tpl1 = serde_json::json!([
+            {
+                "stepKey": "premise",
+                "title": "第 1 步：核心脑洞与金手指设计",
+                "description": "确立核心金手指、世界观反差与第一大危机目标",
+                "agentRole": "editor_in_chief",
+                "promptTemplate": "你是一名网文金牌主编。请根据用户提供的题材【{{inputs.genre}}】与核心脑洞构想【{{inputs.concept}}】，设计具有极致张力的核心金手指与主角开局设定。\n包含：1. 金手指激活机制与爽点闭环；2. 主角首要动机与致命危机；3. 核心人设反差。",
+                "inputs": [
+                    { "key": "genre", "label": "小说题材/流派", "type": "select", "options": ["玄幻修仙", "都市神豪", "科幻末世", "悬疑诡秘", "历史架空"], "defaultValue": "玄幻修仙", "required": true },
+                    { "key": "concept", "label": "核心脑洞/灵感简述", "type": "textarea", "placeholder": "例如：穿越到濒死废柴身上，绑定了因果倒转签到系统...", "required": true }
+                ],
+                "contextBindings": { "allowCharacters": true, "allowWorldRules": true }
+            },
+            {
+                "stepKey": "outline",
+                "title": "第 2 步：黄金前三章张力细纲",
+                "description": "拆解黄金前三章的进场冲突、打脸反转与章末悬念钩子",
+                "agentRole": "scene_planner",
+                "promptTemplate": "你是一名专业网文编剧。基于前置设定的金手指与脑洞：\n【设定概要】\n{{premise.output}}\n\n请规划紧凑吸睛的黄金前三章细纲，单章需包含：进场冲突、推演展开、首个爽点释放、章末致命钩子。",
+                "inputs": [],
+                "contextBindings": { "allowCharacters": true, "allowWorldRules": true }
+            },
+            {
+                "stepKey": "prose",
+                "title": "第 3 步：黄金开篇第一章正文成稿",
+                "description": "依据细纲与人设，生成沉浸式、极具现场感的开篇正文",
+                "agentRole": "prose_writer",
+                "promptTemplate": "你是一名顶级网文白金作家。请根据以下大纲与人设，撰写第一章正文：\n【前三章规划】\n{{outline.output}}\n\n要求：拒绝说明文与空洞概括，以动作和环境细节切入，紧扣主角第一人称或受限第三人称视线，文风利落饱满，字数2500~3500字。",
+                "inputs": [
+                    { "key": "chapter_title", "label": "第一章标题", "type": "text", "defaultValue": "第一章：视界边缘的残响", "required": true }
+                ],
+                "contextBindings": { "allowCharacters": true, "allowWorldRules": true, "allowPrevChapters": false }
+            }
+        ]).to_string();
+
+        let _ = conn.execute(
+            "INSERT INTO workflow_templates (id, novel_id, name, description, category, steps_json, is_builtin, created_at, updated_at)
+             VALUES (?1, NULL, '爆款黄金开篇工作流 (3步成稿)', '从核心脑洞、前三章细纲到第一章震撼正文的一体化闭环创作流水线', 'general', ?2, 1, ?3, ?4)",
+            params![&tpl1_id, &steps_tpl1, now, now],
+        );
+
+        // 2. 标准长篇连载分步推演流水线 (4步闭环)
+        let tpl2_id = "tpl-serialized-chapter".to_string();
+        let steps_tpl2 = serde_json::json!([
+            {
+                "stepKey": "scene_beat",
+                "title": "第 1 步：本章场景细纲与节拍拆解",
+                "description": "继承上文因果，拆解本章的 3~4 个场景节拍与冲突目标",
+                "agentRole": "scene_planner",
+                "promptTemplate": "你是一名剧情架构师。请针对本章的核心目标【{{inputs.chapter_goal}}】，结合关联的前文因果与出场角色，拆解为3个紧凑的场景节拍（包含场景目标、冲突点、情绪流向与章末转折）。",
+                "inputs": [
+                    { "key": "chapter_goal", "label": "本章核心推进目标", "type": "textarea", "placeholder": "例如：深入地下矿洞遭遇异兽伏击，被迫动用隐藏底牌...", "required": true }
+                ],
+                "contextBindings": { "allowCharacters": true, "allowWorldRules": true, "allowPrevChapters": true, "allowMemos": true }
+            },
+            {
+                "stepKey": "prose",
+                "title": "第 2 步：沉浸长篇正文成稿",
+                "description": "消费场景节拍与五层长期记忆，生成高质量正文初稿",
+                "agentRole": "prose_writer",
+                "promptTemplate": "你是一名正文作家。依据以下拆解的场景节拍：\n{{scene_beat.output}}\n\n撰写本章正文。保持人物性格言行一致，严格遵循世界观法则，描写注重五感生动细节与对话节奏感。",
+                "inputs": [],
+                "contextBindings": { "allowCharacters": true, "allowWorldRules": true, "allowPrevChapters": true }
+            },
+            {
+                "stepKey": "review",
+                "title": "第 3 步：逻辑因果与设定一致性质检",
+                "description": "审查正文与人物动机、世界法则和伏笔线索的一致性",
+                "agentRole": "continuity_auditor",
+                "promptTemplate": "你是一名逻辑审稿编辑。请严格审查以下正文草稿：\n【正文草稿】\n{{prose.output}}\n\n输出：1. 逻辑与设定健康度评分(0~100)；2. 是否存在前后矛盾、降智或出戏漏洞；3. 整改优化建议。",
+                "inputs": [],
+                "contextBindings": { "allowWorldRules": true, "allowCharacters": true }
+            },
+            {
+                "stepKey": "polish",
+                "title": "第 4 步：文学质感与对话微表情精修",
+                "description": "修饰对话呼吸感、剔除译制腔，输出精修定稿段落",
+                "agentRole": "style_editor",
+                "promptTemplate": "你是一名资深文学润色编辑。请参考审稿意见：\n{{review.output}}\n\n对本章正文进行文学润色与对话提升，剔除 AI 说明文腔调，增强微表情细节与代入感。",
+                "inputs": [],
+                "contextBindings": {}
+            }
+        ]).to_string();
+
+        let _ = conn.execute(
+            "INSERT INTO workflow_templates (id, novel_id, name, description, category, steps_json, is_builtin, created_at, updated_at)
+             VALUES (?1, NULL, '标准长篇连载分步推演流水线 (4步闭环)', '从细纲拆解、正文写作、逻辑审稿到文学润色的专业连载生产流', 'general', ?2, 1, ?3, ?4)",
+            params![&tpl2_id, &steps_tpl2, now, now],
+        );
+
+        Ok(())
+    }
+
+    fn seed_default_voice_profiles(conn: &Connection) -> Result<()> {
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM voice_profiles",
+            [],
+            |r| r.get(0),
+        ).unwrap_or(0);
+
+        if count > 0 {
+            return Ok(());
+        }
+
+        let now = chrono::Utc::now().timestamp_millis();
+
+        // 1. 仙侠古风·沉雄雅致
+        let id1 = "profile-xianxia-classical".to_string();
+        let _ = conn.execute(
+            "INSERT INTO voice_profiles (id, novel_id, name, description, sample_text, sentence_rhythm, vocabulary_tone, pov_preference, sensory_ratio, custom_rules_json, is_active, created_at, updated_at)
+             VALUES (?1, NULL, '仙侠修真·沉雄雅致风', '文字古朴厚重，注重剑意、道心、天象与微表情博弈，句式骈散结合', '细雨沾湿了青石台阶，陆沉驻足在问道阁残破的朱门前。指尖掠过锈蚀的铜环，那一缕沉睡了三百年的太清剑意，如微茫寒星刺入识海。', 'BALANCED', 'CLASSICAL_MODERN', 'THIRD_LIMITED', 'VISUAL_FOCUS', '[\"严禁现代科技词汇\", \"对话保留文言雅致留白\"]', 1, ?2, ?3)",
+            params![&id1, now, now],
+        );
+
+        // 2. 都市异能·爽利快节奏
+        let id2 = "profile-urban-fast".to_string();
+        let _ = conn.execute(
+            "INSERT INTO voice_profiles (id, novel_id, name, description, sample_text, sentence_rhythm, vocabulary_tone, pov_preference, sensory_ratio, custom_rules_json, is_active, created_at, updated_at)
+             VALUES (?1, NULL, '都市异能·爽利快节奏', '短句密集凌厉，对白机锋暗藏，冲突压迫感强，动作招式利落', '电梯停在六十六层。门开的一刹那，三名西装保镖的手同时探入内襟。顾承泽甚至没有抬眼，手中的黑色钛金签字笔在指间转了半圈，笔尖轻点在大理石台面上。', 'FAST_PACED', 'VERNACULAR', 'THIRD_LIMITED', 'ACTION_FOCUS', '[\"严禁大段抒情独白\", \"对峙节奏紧凑明快\"]', 0, ?2, ?3)",
+            params![&id2, now, now],
+        );
+
+        // 3. 硬核科幻·冷峻考据
+        let id3 = "profile-scifi-realistic".to_string();
+        let _ = conn.execute(
+            "INSERT INTO voice_profiles (id, novel_id, name, description, sample_text, sentence_rhythm, vocabulary_tone, pov_preference, sensory_ratio, custom_rules_json, is_active, created_at, updated_at)
+             VALUES (?1, NULL, '硬核科幻·冷峻考据风', '冷峻客观的物理视界，注重机械运转质感、深空压迫与理性克制', '重力井的撕扯力让舰桥龙骨发出沉闷的金属呻吟。示波器上的波形正以万分之一秒的频次发生不可逆畸变，深空中那片沉默的黑体，正在吞噬最后的跃迁信标。', 'BALANCED', 'COLD_REALISTIC', 'THIRD_LIMITED', 'EMOTIONAL_FOCUS', '[\"杜绝软科幻唯心概念\", \"物理量级真实扎实\"]', 0, ?2, ?3)",
+            params![&id3, now, now],
+        );
 
         Ok(())
     }
@@ -3861,6 +4019,729 @@ impl DbManager {
             l3_active_character_profiles: char_profiles,
             formatted_system_prompt: prompt,
         })
+    }
+
+    // --- V2.3 NOVELIST WORKFLOW ENGINE ---
+
+    pub fn list_workflow_templates(&self, novel_id: Option<&str>) -> Result<Vec<WorkflowTemplate>> {
+        let conn = self.conn.lock();
+        let mut sql = "SELECT id, novel_id, name, description, category, steps_json, is_builtin, created_at, updated_at
+                       FROM workflow_templates WHERE is_builtin = 1".to_string();
+        if let Some(nid) = novel_id {
+            sql.push_str(&format!(" OR novel_id = '{}'", nid.replace('\'', "''")));
+        }
+        sql.push_str(" ORDER BY is_builtin DESC, created_at ASC");
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], |r| {
+            Ok(WorkflowTemplate {
+                id: r.get(0)?,
+                novel_id: r.get(1)?,
+                name: r.get(2)?,
+                description: r.get(3)?,
+                category: r.get(4)?,
+                steps_json: r.get(5)?,
+                is_builtin: r.get::<_, i64>(6)? == 1,
+                created_at: r.get(7)?,
+                updated_at: r.get(8)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for item in rows {
+            list.push(item?);
+        }
+        Ok(list)
+    }
+
+    pub fn save_workflow_template(&self, input: SaveWorkflowTemplateInput) -> Result<WorkflowTemplate> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        let id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
+        let description = input.description.unwrap_or_default();
+        let category = input.category.unwrap_or_else(|| "general".to_string());
+
+        conn.execute(
+            "INSERT INTO workflow_templates (id, novel_id, name, description, category, steps_json, is_builtin, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8)
+             ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                description = excluded.description,
+                category = excluded.category,
+                steps_json = excluded.steps_json,
+                updated_at = excluded.updated_at",
+            params![
+                &id,
+                &input.novel_id,
+                &input.name,
+                &description,
+                &category,
+                &input.steps_json,
+                now,
+                now
+            ],
+        )?;
+
+        Ok(WorkflowTemplate {
+            id,
+            novel_id: input.novel_id,
+            name: input.name,
+            description,
+            category,
+            steps_json: input.steps_json,
+            is_builtin: false,
+            created_at: now,
+            updated_at: now,
+        })
+    }
+
+    pub fn create_workflow_run(&self, input: CreateWorkflowRunInput) -> Result<WorkflowRunDetails> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        let run_id = Uuid::new_v4().to_string();
+        let run_mode = input.run_mode.unwrap_or_else(|| "STEP".to_string());
+        let context_bindings = input.context_bindings_json.unwrap_or_else(|| "{}".to_string());
+
+        // 1. Fetch template
+        let template: WorkflowTemplate = conn.query_row(
+            "SELECT id, novel_id, name, description, category, steps_json, is_builtin, created_at, updated_at
+             FROM workflow_templates WHERE id = ?1",
+            params![&input.template_id],
+            |r| {
+                Ok(WorkflowTemplate {
+                    id: r.get(0)?,
+                    novel_id: r.get(1)?,
+                    name: r.get(2)?,
+                    description: r.get(3)?,
+                    category: r.get(4)?,
+                    steps_json: r.get(5)?,
+                    is_builtin: r.get::<_, i64>(6)? == 1,
+                    created_at: r.get(7)?,
+                    updated_at: r.get(8)?,
+                })
+            },
+        )?;
+
+        // 2. Insert workflow_run
+        conn.execute(
+            "INSERT INTO workflow_runs (id, template_id, novel_id, target_chapter_id, status, current_step_index, run_mode, context_bindings_json, total_tokens, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, 'PENDING', 0, ?5, ?6, 0, ?7, ?8)",
+            params![
+                &run_id,
+                &template.id,
+                &input.novel_id,
+                &input.target_chapter_id,
+                &run_mode,
+                &context_bindings,
+                now,
+                now
+            ],
+        )?;
+
+        // 3. Parse steps_json and initialize workflow_step_records
+        let steps_val: serde_json::Value = serde_json::from_str(&template.steps_json)
+            .unwrap_or_else(|_| serde_json::json!([]));
+        let steps_arr = steps_val.as_array().cloned().unwrap_or_default();
+
+        let mut step_records = Vec::new();
+        for (idx, step_obj) in steps_arr.iter().enumerate() {
+            let step_id = Uuid::new_v4().to_string();
+            let step_key = step_obj.get("stepKey").and_then(|v| v.as_str()).unwrap_or("step");
+            let title = step_obj.get("title").and_then(|v| v.as_str()).unwrap_or("步骤");
+            let prompt_tpl = step_obj.get("promptTemplate").and_then(|v| v.as_str()).unwrap_or("");
+
+            conn.execute(
+                "INSERT INTO workflow_step_records (id, run_id, step_index, step_key, title, prompt_rendered, input_values_json, raw_output, edited_output, status, error_message, token_usage, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, '{}', '', '', 'PENDING', '', 0, ?7, ?8)",
+                params![
+                    &step_id,
+                    &run_id,
+                    idx as i64,
+                    step_key,
+                    title,
+                    prompt_tpl,
+                    now,
+                    now
+                ],
+            )?;
+
+            step_records.push(WorkflowStepRecord {
+                id: step_id,
+                run_id: run_id.clone(),
+                step_index: idx as i64,
+                step_key: step_key.to_string(),
+                title: title.to_string(),
+                prompt_rendered: prompt_tpl.to_string(),
+                input_values_json: "{}".to_string(),
+                raw_output: "".to_string(),
+                edited_output: "".to_string(),
+                status: "PENDING".to_string(),
+                error_message: "".to_string(),
+                token_usage: 0,
+                created_at: now,
+                updated_at: now,
+            });
+        }
+
+        let run = WorkflowRun {
+            id: run_id,
+            template_id: template.id.clone(),
+            novel_id: input.novel_id,
+            target_chapter_id: input.target_chapter_id,
+            status: "PENDING".to_string(),
+            current_step_index: 0,
+            run_mode,
+            context_bindings_json: context_bindings,
+            total_tokens: 0,
+            created_at: now,
+            updated_at: now,
+        };
+
+        Ok(WorkflowRunDetails {
+            run,
+            template,
+            steps: step_records,
+        })
+    }
+
+    pub fn get_workflow_run_details(&self, run_id: &str) -> Result<WorkflowRunDetails> {
+        let conn = self.conn.lock();
+        let run: WorkflowRun = conn.query_row(
+            "SELECT id, template_id, novel_id, target_chapter_id, status, current_step_index, run_mode, context_bindings_json, total_tokens, created_at, updated_at
+             FROM workflow_runs WHERE id = ?1",
+            params![run_id],
+            |r| {
+                Ok(WorkflowRun {
+                    id: r.get(0)?,
+                    template_id: r.get(1)?,
+                    novel_id: r.get(2)?,
+                    target_chapter_id: r.get(3)?,
+                    status: r.get(4)?,
+                    current_step_index: r.get(5)?,
+                    run_mode: r.get(6)?,
+                    context_bindings_json: r.get(7)?,
+                    total_tokens: r.get(8)?,
+                    created_at: r.get(9)?,
+                    updated_at: r.get(10)?,
+                })
+            },
+        )?;
+
+        let template: WorkflowTemplate = conn.query_row(
+            "SELECT id, novel_id, name, description, category, steps_json, is_builtin, created_at, updated_at
+             FROM workflow_templates WHERE id = ?1",
+            params![&run.template_id],
+            |r| {
+                Ok(WorkflowTemplate {
+                    id: r.get(0)?,
+                    novel_id: r.get(1)?,
+                    name: r.get(2)?,
+                    description: r.get(3)?,
+                    category: r.get(4)?,
+                    steps_json: r.get(5)?,
+                    is_builtin: r.get::<_, i64>(6)? == 1,
+                    created_at: r.get(7)?,
+                    updated_at: r.get(8)?,
+                })
+            },
+        )?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, run_id, step_index, step_key, title, prompt_rendered, input_values_json, raw_output, edited_output, status, error_message, token_usage, created_at, updated_at
+             FROM workflow_step_records WHERE run_id = ?1 ORDER BY step_index ASC",
+        )?;
+        let rows = stmt.query_map(params![run_id], |r| {
+            Ok(WorkflowStepRecord {
+                id: r.get(0)?,
+                run_id: r.get(1)?,
+                step_index: r.get(2)?,
+                step_key: r.get(3)?,
+                title: r.get(4)?,
+                prompt_rendered: r.get(5)?,
+                input_values_json: r.get(6)?,
+                raw_output: r.get(7)?,
+                edited_output: r.get(8)?,
+                status: r.get(9)?,
+                error_message: r.get(10)?,
+                token_usage: r.get(11)?,
+                created_at: r.get(12)?,
+                updated_at: r.get(13)?,
+            })
+        })?;
+
+        let mut steps = Vec::new();
+        for s in rows {
+            steps.push(s?);
+        }
+
+        Ok(WorkflowRunDetails {
+            run,
+            template,
+            steps,
+        })
+    }
+
+    pub fn list_workflow_runs(&self, novel_id: &str) -> Result<Vec<WorkflowRun>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, template_id, novel_id, target_chapter_id, status, current_step_index, run_mode, context_bindings_json, total_tokens, created_at, updated_at
+             FROM workflow_runs WHERE novel_id = ?1 ORDER BY created_at DESC",
+        )?;
+        let rows = stmt.query_map(params![novel_id], |r| {
+            Ok(WorkflowRun {
+                id: r.get(0)?,
+                template_id: r.get(1)?,
+                novel_id: r.get(2)?,
+                target_chapter_id: r.get(3)?,
+                status: r.get(4)?,
+                current_step_index: r.get(5)?,
+                run_mode: r.get(6)?,
+                context_bindings_json: r.get(7)?,
+                total_tokens: r.get(8)?,
+                created_at: r.get(9)?,
+                updated_at: r.get(10)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for item in rows {
+            list.push(item?);
+        }
+        Ok(list)
+    }
+
+    pub fn update_workflow_step_output(&self, step_record_id: &str, edited_output: &str) -> Result<WorkflowStepRecord> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE workflow_step_records SET edited_output = ?1, updated_at = ?2 WHERE id = ?3",
+            params![edited_output, now, step_record_id],
+        )?;
+
+        let record: WorkflowStepRecord = conn.query_row(
+            "SELECT id, run_id, step_index, step_key, title, prompt_rendered, input_values_json, raw_output, edited_output, status, error_message, token_usage, created_at, updated_at
+             FROM workflow_step_records WHERE id = ?1",
+            params![step_record_id],
+            |r| {
+                Ok(WorkflowStepRecord {
+                    id: r.get(0)?,
+                    run_id: r.get(1)?,
+                    step_index: r.get(2)?,
+                    step_key: r.get(3)?,
+                    title: r.get(4)?,
+                    prompt_rendered: r.get(5)?,
+                    input_values_json: r.get(6)?,
+                    raw_output: r.get(7)?,
+                    edited_output: r.get(8)?,
+                    status: r.get(9)?,
+                    error_message: r.get(10)?,
+                    token_usage: r.get(11)?,
+                    created_at: r.get(12)?,
+                    updated_at: r.get(13)?,
+                })
+            },
+        )?;
+        Ok(record)
+    }
+
+    pub fn advance_workflow_step(&self, input: AdvanceWorkflowStepInput) -> Result<WorkflowRunDetails> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+
+        // 1. Fetch step record
+        let step_record_id: String = conn.query_row(
+            "SELECT id FROM workflow_step_records WHERE run_id = ?1 AND step_index = ?2",
+            params![&input.run_id, input.step_index],
+            |r| r.get(0),
+        )?;
+
+        if let Some(inputs_json) = input.input_values_json {
+            conn.execute(
+                "UPDATE workflow_step_records SET input_values_json = ?1, status = 'COMPLETED', updated_at = ?2 WHERE id = ?3",
+                params![&inputs_json, now, &step_record_id],
+            )?;
+        } else {
+            conn.execute(
+                "UPDATE workflow_step_records SET status = 'COMPLETED', updated_at = ?1 WHERE id = ?2",
+                params![now, &step_record_id],
+            )?;
+        }
+
+        // Check if there are more steps
+        let total_steps: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM workflow_step_records WHERE run_id = ?1",
+            params![&input.run_id],
+            |r| r.get(0),
+        )?;
+
+        let next_step = input.step_index + 1;
+        if next_step >= total_steps {
+            conn.execute(
+                "UPDATE workflow_runs SET status = 'COMPLETED', current_step_index = ?1, updated_at = ?2 WHERE id = ?3",
+                params![input.step_index, now, &input.run_id],
+            )?;
+        } else {
+            conn.execute(
+                "UPDATE workflow_runs SET status = 'WAITING_STEP', current_step_index = ?1, updated_at = ?2 WHERE id = ?3",
+                params![next_step, now, &input.run_id],
+            )?;
+        }
+
+        drop(conn);
+        self.get_workflow_run_details(&input.run_id)
+    }
+
+    pub fn assemble_toolbox_prompt(&self, input: ExecuteToolboxActionInput) -> Result<ExecuteToolboxActionResult> {
+        let conn = self.conn.lock();
+        let (novel_title, novel_genre, novel_desc, novel_style): (String, String, String, String) = conn.query_row(
+            "SELECT title, genre_profile, description, writing_style FROM novels WHERE id = ?1",
+            params![&input.novel_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        )?;
+
+        // Build selected character context
+        let mut char_contexts = Vec::new();
+        if let Some(cids) = &input.character_ids {
+            for cid in cids {
+                if let Ok(c) = conn.query_row(
+                    "SELECT name, profile, personality, motivation FROM characters WHERE id = ?1",
+                    params![cid],
+                    |r| Ok(format!("- 【{}】身份设定: {}, 性格: {}, 核心动机: {}", r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?)),
+                ) {
+                    char_contexts.push(c);
+                }
+            }
+        }
+
+        // Build selected world rule context
+        let mut rule_contexts = Vec::new();
+        if let Some(rids) = &input.world_rule_ids {
+            for rid in rids {
+                if let Ok(r) = conn.query_row(
+                    "SELECT title, rule_content FROM world_rules WHERE id = ?1",
+                    params![rid],
+                    |r| Ok(format!("- 《{}》: {}", r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+                ) {
+                    rule_contexts.push(r);
+                }
+            }
+        }
+
+        // Build prev chapter context if requested
+        let mut prev_chapter_text = String::new();
+        if input.include_prev_chapter == Some(true) {
+            if let Some(cid) = &input.chapter_id {
+                if let Ok(content) = conn.query_row(
+                    "SELECT content FROM chapters WHERE id = ?1",
+                    params![cid],
+                    |r| r.get::<_, String>(0),
+                ) {
+                    let stripped = content.replace("<p>", "").replace("</p>", "\n");
+                    let tail = if stripped.chars().count() > 800 {
+                        stripped.chars().skip(stripped.chars().count().saturating_sub(800)).collect()
+                    } else {
+                        stripped
+                    };
+                    prev_chapter_text = format!("【关联前序章节文末】:\n{}", tail);
+                }
+            }
+        }
+
+        let mut summary_parts = Vec::new();
+        summary_parts.push(format!("作品: 《{}》 ({})", novel_title, novel_genre));
+        if !char_contexts.is_empty() {
+            summary_parts.push(format!("关联角色 {} 位", char_contexts.len()));
+        }
+        if !rule_contexts.is_empty() {
+            summary_parts.push(format!("关联法则 {} 项", rule_contexts.len()));
+        }
+        if !prev_chapter_text.is_empty() {
+            summary_parts.push("已挂载前文因果".to_string());
+        }
+
+        let assembled_summary = summary_parts.join(" · ");
+        let custom_req = input.custom_input.unwrap_or_default();
+
+        let (system_prompt, user_prompt, dest) = match input.action_type.as_str() {
+            "name" => (
+                "你是一名网文金牌编辑与起名大师。擅长根据题材、金手指与反差感，设计具备极致点击率的爆款书名。".to_string(),
+                format!(
+                    "请为小说《{}》（题材：{}）构思 10 个爆款书名。\n文风基调：{}\n设定参考：\n{}\n{}\n创作者补充要求：{}\n\n请按【悬念钩子流】、【反差金手指流】、【极简意境流】分类输出，附带核心卖点说明。",
+                    novel_title, novel_genre, novel_style, char_contexts.join("\n"), rule_contexts.join("\n"), custom_req
+                ),
+                "copy_only".to_string(),
+            ),
+            "intro" => (
+                "你是一名爆款网文简介设计专家。精通番茄双钩子、起点三段式文案技巧。".to_string(),
+                format!(
+                    "请为小说《{}》（题材：{}）撰写 3 款极具吸引力的简介：\n1. 番茄快节奏打脸悬念款；\n2. 起点沉浸宏大世界观款；\n3. 极简一句话核心卖点款。\n\n作品背景：{}\n出场角色：\n{}\n世界观规则：\n{}\n补充诉求：{}",
+                    novel_title, novel_genre, novel_desc, char_contexts.join("\n"), rule_contexts.join("\n"), custom_req
+                ),
+                "copy_only".to_string(),
+            ),
+            "premise" => (
+                "你是一名网文剧情总监与脑洞架构师。擅长推演故事核心矛盾与戏剧性设定。".to_string(),
+                format!(
+                    "请为小说《{}》（题材：{}）设计核心脑洞与金手指机制。\n【出场角色】:\n{}\n【法则公理】:\n{}\n【作者创意输入】:\n{}\n\n请输出：\n1. 核心金手指机制与成长数值曲线；\n2. 主角的首要致命危机；\n3. 第一个大剧情反转高潮点。",
+                    novel_title, novel_genre, char_contexts.join("\n"), rule_contexts.join("\n"), custom_req
+                ),
+                "save_as_rule".to_string(),
+            ),
+            "world_law" => (
+                "你是一名奇幻科幻世界观架构专家。擅长设计逻辑自洽、层次分明的力量体系与地理法则。".to_string(),
+                format!(
+                    "请为小说《{}》（题材：{}）设计严密自洽的战力/世界观法则。\n已有法则：\n{}\n出场核心人物：\n{}\n需求补充：{}\n\n请输出：\n1. 境界/位阶划分与突破瓶颈；\n2. 消耗代价与禁忌法则（越级战斗的代价）；\n3. 适合存入系统作为 CANON 权威规则的条目文本。",
+                    novel_title, novel_genre, rule_contexts.join("\n"), char_contexts.join("\n"), custom_req
+                ),
+                "save_as_rule".to_string(),
+            ),
+            "character_design" => (
+                "你是一名长篇小说人设大师。擅长塑造有血有肉、动机强烈、具备微动作与鲜明声口的人物。".to_string(),
+                format!(
+                    "请为小说《{}》设计一名新角色。\n作品题材：{}\n已有核心人物：\n{}\n世界观法则：\n{}\n人设要求：{}\n\n请输出：\n- 姓名与别名；\n- 身份与阵营归属；\n- 性格底色与外貌微表情；\n- 核心动机与致命执念；\n- 不为人知的核心秘密（伏笔）。",
+                    novel_title, novel_genre, char_contexts.join("\n"), rule_contexts.join("\n"), custom_req
+                ),
+                "save_as_character".to_string(),
+            ),
+            "chapter_outline" => (
+                "你是一名网文剧情编剧。擅长拆解紧凑张弛有度的单章细纲与场景节拍。".to_string(),
+                format!(
+                    "请为小说《{}》规划单章细纲。\n题材：{}\n前文因果：\n{}\n关联人物：\n{}\n世界法则：\n{}\n本章创作目标：{}\n\n请输出 3 个具体场景节拍：\n- 场景目标\n- 进场冲突\n- 推演博弈\n- 爽点或危机转折\n- 章末悬念钩子",
+                    novel_title, novel_genre, prev_chapter_text, char_contexts.join("\n"), rule_contexts.join("\n"), custom_req
+                ),
+                "insert_editor".to_string(),
+            ),
+            "gold_opening" => (
+                "你是一名网文白金作家。擅长撰写张力极强、瞬间抓住读者的黄金开篇。".to_string(),
+                format!(
+                    "请为小说《{}》（{}）撰写黄金开篇第一章正文。\n文风要求：{}\n登场角色：\n{}\n核心法则：\n{}\n创作指令：{}\n\n要求：以动作和环境危机直接切入，拒绝大段背景说明，主角动机清晰，字数约 2500~3000 字。",
+                    novel_title, novel_genre, novel_style, char_contexts.join("\n"), rule_contexts.join("\n"), custom_req
+                ),
+                "insert_editor".to_string(),
+            ),
+            "dialogue_polish" => (
+                "你是一名专业文学精修编辑与台词大师。擅长去除 AI 译制腔与机械感，增强对话潜台词与微表情呼吸感。".to_string(),
+                format!(
+                    "请精修润色以下段落中的对话与交锋：\n【待精修文本/前文】:\n{}\n【出场角色特质】:\n{}\n【作者调校重点】:\n{}\n\n要求：\n1. 对话富有市井烟火气或角色专属声口，多用微动作与潜台词展现心理博弈；\n2. 给出【精修润色正文】与【修改理由说明】。",
+                    if !custom_req.is_empty() { &custom_req } else { &prev_chapter_text }, char_contexts.join("\n"), custom_req
+                ),
+                "insert_editor".to_string(),
+            ),
+            _ => (
+                "你是一名专业 AI 创作助手。".to_string(),
+                format!("请协助创作小说《{}》：\n{}", novel_title, custom_req),
+                "insert_editor".to_string(),
+            ),
+        };
+
+        Ok(ExecuteToolboxActionResult {
+            action_type: input.action_type,
+            system_prompt,
+            user_prompt,
+            target_destination: dest,
+            assembled_context_summary: assembled_summary,
+        })
+    }
+
+    // --- V2.3.1 VOICE PROFILES ---
+
+    pub fn list_voice_profiles(&self, novel_id: Option<&str>) -> Result<Vec<VoiceProfile>> {
+        let conn = self.conn.lock();
+        let mut profiles = Vec::new();
+
+        let (sql, params_vec): (&str, Vec<Box<dyn rusqlite::ToSql>>) = match novel_id {
+            Some(nid) => (
+                "SELECT id, novel_id, name, description, sample_text, sentence_rhythm, vocabulary_tone, pov_preference, sensory_ratio, custom_rules_json, is_active, created_at, updated_at
+                 FROM voice_profiles WHERE novel_id IS NULL OR novel_id = ?1 ORDER BY is_active DESC, updated_at DESC",
+                vec![Box::new(nid.to_string())],
+            ),
+            None => (
+                "SELECT id, novel_id, name, description, sample_text, sentence_rhythm, vocabulary_tone, pov_preference, sensory_ratio, custom_rules_json, is_active, created_at, updated_at
+                 FROM voice_profiles ORDER BY is_active DESC, updated_at DESC",
+                vec![],
+            ),
+        };
+
+        let mut stmt = conn.prepare(sql)?;
+        let param_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|b| b.as_ref()).collect();
+        let rows = stmt.query_map(param_refs.as_slice(), |row| {
+            Ok(VoiceProfile {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                name: row.get(2)?,
+                description: row.get(3)?,
+                sample_text: row.get(4)?,
+                sentence_rhythm: row.get(5)?,
+                vocabulary_tone: row.get(6)?,
+                pov_preference: row.get(7)?,
+                sensory_ratio: row.get(8)?,
+                custom_rules_json: row.get(9)?,
+                is_active: row.get::<_, i64>(10)? == 1,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
+            })
+        })?;
+
+        for r in rows {
+            if let Ok(vp) = r {
+                profiles.push(vp);
+            }
+        }
+
+        Ok(profiles)
+    }
+
+    pub fn get_active_voice_profile(&self, novel_id: Option<&str>) -> Result<Option<VoiceProfile>> {
+        let list = self.list_voice_profiles(novel_id)?;
+        if let Some(nid) = novel_id {
+            if let Some(p) = list.iter().find(|p| p.novel_id.as_deref() == Some(nid) && p.is_active) {
+                return Ok(Some(p.clone()));
+            }
+        }
+        Ok(list.into_iter().find(|p| p.is_active))
+    }
+
+    pub fn save_voice_profile(&self, input: SaveVoiceProfileInput) -> Result<VoiceProfile> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        let id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
+        let is_active_int = if input.is_active.unwrap_or(false) { 1 } else { 0 };
+
+        if is_active_int == 1 {
+            match &input.novel_id {
+                Some(nid) => {
+                    let _ = conn.execute(
+                        "UPDATE voice_profiles SET is_active = 0 WHERE novel_id = ?1",
+                        params![nid],
+                    );
+                }
+                None => {
+                    let _ = conn.execute(
+                        "UPDATE voice_profiles SET is_active = 0 WHERE novel_id IS NULL",
+                        [],
+                    );
+                }
+            }
+        }
+
+        conn.execute(
+            "INSERT INTO voice_profiles (id, novel_id, name, description, sample_text, sentence_rhythm, vocabulary_tone, pov_preference, sensory_ratio, custom_rules_json, is_active, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+             ON CONFLICT(id) DO UPDATE SET
+                novel_id = excluded.novel_id,
+                name = excluded.name,
+                description = excluded.description,
+                sample_text = excluded.sample_text,
+                sentence_rhythm = excluded.sentence_rhythm,
+                vocabulary_tone = excluded.vocabulary_tone,
+                pov_preference = excluded.pov_preference,
+                sensory_ratio = excluded.sensory_ratio,
+                custom_rules_json = excluded.custom_rules_json,
+                is_active = excluded.is_active,
+                updated_at = excluded.updated_at",
+            params![
+                &id,
+                &input.novel_id,
+                &input.name,
+                input.description.as_deref().unwrap_or(""),
+                input.sample_text.as_deref().unwrap_or(""),
+                input.sentence_rhythm.as_deref().unwrap_or("BALANCED"),
+                input.vocabulary_tone.as_deref().unwrap_or("CLASSICAL_MODERN"),
+                input.pov_preference.as_deref().unwrap_or("THIRD_LIMITED"),
+                input.sensory_ratio.as_deref().unwrap_or("BALANCED"),
+                input.custom_rules_json.as_deref().unwrap_or("[]"),
+                is_active_int,
+                now,
+                now,
+            ],
+        )?;
+
+        Ok(VoiceProfile {
+            id,
+            novel_id: input.novel_id,
+            name: input.name,
+            description: input.description.unwrap_or_default(),
+            sample_text: input.sample_text.unwrap_or_default(),
+            sentence_rhythm: input.sentence_rhythm.unwrap_or_else(|| "BALANCED".to_string()),
+            vocabulary_tone: input.vocabulary_tone.unwrap_or_else(|| "CLASSICAL_MODERN".to_string()),
+            pov_preference: input.pov_preference.unwrap_or_else(|| "THIRD_LIMITED".to_string()),
+            sensory_ratio: input.sensory_ratio.unwrap_or_else(|| "BALANCED".to_string()),
+            custom_rules_json: input.custom_rules_json.unwrap_or_else(|| "[]".to_string()),
+            is_active: is_active_int == 1,
+            created_at: now,
+            updated_at: now,
+        })
+    }
+
+    pub fn set_active_voice_profile(&self, id: &str, novel_id: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock();
+        let target_novel_id: Option<String> = match conn.query_row(
+            "SELECT novel_id FROM voice_profiles WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        ) {
+            Ok(v) => v,
+            Err(_) => None,
+        };
+
+        if target_novel_id.is_some() {
+            let nid = target_novel_id.as_ref().unwrap();
+            let _ = conn.execute(
+                "UPDATE voice_profiles SET is_active = 0 WHERE novel_id = ?1",
+                params![nid],
+            );
+        } else {
+            if let Some(nid) = novel_id {
+                let _ = conn.execute(
+                    "UPDATE voice_profiles SET is_active = 0 WHERE novel_id = ?1",
+                    params![nid],
+                );
+            }
+            let _ = conn.execute(
+                "UPDATE voice_profiles SET is_active = 0 WHERE novel_id IS NULL",
+                [],
+            );
+        }
+
+        conn.execute(
+            "UPDATE voice_profiles SET is_active = 1, updated_at = ?2 WHERE id = ?1",
+            params![id, chrono::Utc::now().timestamp_millis()],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_voice_profile(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM voice_profiles WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn get_review_finding(&self, finding_id: &str) -> Result<Option<ReviewFinding>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, report_id, severity, category, title, description, evidence_quote, suggestion, status, created_at
+             FROM review_findings WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![finding_id], |row| {
+            Ok(ReviewFinding {
+                id: row.get(0)?,
+                report_id: row.get(1)?,
+                severity: row.get(2)?,
+                category: row.get(3)?,
+                title: row.get(4)?,
+                description: row.get(5)?,
+                evidence_quote: row.get(6)?,
+                suggestion: row.get(7)?,
+                status: row.get(8)?,
+                created_at: row.get(9)?,
+            })
+        })?;
+
+        if let Some(res) = rows.next() {
+            Ok(Some(res?))
+        } else {
+            Ok(None)
+        }
     }
 }
 

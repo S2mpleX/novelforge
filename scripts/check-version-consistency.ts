@@ -6,18 +6,18 @@ function checkVersions() {
 
   // 1. package.json
   const pkgPath = path.join(rootDir, 'package.json');
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8').replace(/^\uFEFF/, ''));
   const pkgVersion = pkg.version;
 
   // 2. src-tauri/Cargo.toml
   const cargoPath = path.join(rootDir, 'src-tauri', 'Cargo.toml');
-  const cargoContent = fs.readFileSync(cargoPath, 'utf8');
+  const cargoContent = fs.readFileSync(cargoPath, 'utf8').replace(/^\uFEFF/, '');
   const cargoMatch = cargoContent.match(/version\s*=\s*"([^"]+)"/);
   const cargoVersion = cargoMatch ? cargoMatch[1] : null;
 
   // 3. src-tauri/tauri.conf.json
   const tauriPath = path.join(rootDir, 'src-tauri', 'tauri.conf.json');
-  const tauri = JSON.parse(fs.readFileSync(tauriPath, 'utf8'));
+  const tauri = JSON.parse(fs.readFileSync(tauriPath, 'utf8').replace(/^\uFEFF/, ''));
   const tauriVersion = tauri.version;
 
   console.log(`[Version Check] package.json:        ${pkgVersion}`);

@@ -1,19 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
-import type { ReviewReport } from '@/types';
+import type { ReviewReport, FindingRepairResult } from '@/types';
 import {
   ShieldCheck,
   Play,
   RotateCcw,
   FileText,
+  Sparkles,
+  Check,
+  X,
+  EyeOff,
+  Feather,
+  Edit3,
 } from 'lucide-react';
 
 export const ReviewReportPanel: React.FC = () => {
-  const { activeChapter } = useNovelStore();
+  const { activeNovel, activeChapter, editorContent, updateEditorContent, saveCurrentChapter } = useNovelStore();
   const [report, setReport] = useState<ReviewReport | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  // V2.3.1 审稿修复闭环状态
+  const [repairResults, setRepairResults] = useState<Record<string, FindingRepairResult>>({});
+  const [repairLoading, setRepairLoading] = useState<Record<string, boolean>>({});
+  const [acceptedFindings, setAcceptedFindings] = useState<Set<string>>(new Set());
+  const [ignoredFindings, setIgnoredFindings] = useState<Set<string>>(new Set());
+  const [editedDrafts, setEditedDrafts] = useState<Record<string, string>>({});
+  const [isEditingDraft, setIsEditingDraft] = useState<Record<string, boolean>>({});
 
   const loadReport = async () => {
     if (!activeChapter) return;
@@ -27,6 +41,9 @@ export const ReviewReportPanel: React.FC = () => {
 
   useEffect(() => {
     loadReport();
+    setRepairResults({});
+    setAcceptedFindings(new Set());
+    setIgnoredFindings(new Set());
   }, [activeChapter?.id]);
 
   const handleRunAudit = async () => {
@@ -42,6 +59,61 @@ export const ReviewReportPanel: React.FC = () => {
     } finally {
       setIsAuditing(false);
     }
+  };
+
+  const handleGenerateRepair = async (findingId: string) => {
+    if (!activeNovel || !activeChapter) return;
+    setRepairLoading((prev) => ({ ...prev, [findingId]: true }));
+    try {
+      const result = await api.generateFindingRepair({
+        novel_id: activeNovel.id,
+        chapter_id: activeChapter.id,
+        finding_id: findingId,
+      });
+      setRepairResults((prev) => ({ ...prev, [findingId]: result }));
+      setEditedDrafts((prev) => ({ ...prev, [findingId]: result.revised_text_draft }));
+    } catch (e) {
+      console.error('生成修复草案失败:', e);
+      setMessage(`修复生成失败: ${e}`);
+    } finally {
+      setRepairLoading((prev) => ({ ...prev, [findingId]: false }));
+    }
+  };
+
+  const handleApplyRepair = async (findingId: string) => {
+    if (!activeChapter) return;
+    const repair = repairResults[findingId];
+    if (!repair) return;
+
+    const draftText = (editedDrafts[findingId] || repair.revised_text_draft).trim();
+    const currentText = editorContent || activeChapter.content || '';
+    const quote = repair.original_quote.trim();
+
+    let newContent = currentText;
+    if (quote && currentText.includes(quote)) {
+      newContent = currentText.replace(quote, draftText);
+    } else {
+      // 若原文本已被修改或未完全匹配，在章节末尾补充替换
+      newContent = `${currentText}\n\n【审稿修订】${draftText}`;
+    }
+
+    updateEditorContent(newContent);
+    await saveCurrentChapter(true, 'AUDIT_REPAIR');
+
+    setAcceptedFindings((prev) => new Set([...prev, findingId]));
+    setMessage(`已成功将【${repair.finding_title}】的修订草案替换入正文，并已自动生成版本快照！`);
+  };
+
+  const handleIgnoreFinding = (findingId: string) => {
+    setIgnoredFindings((prev) => new Set([...prev, findingId]));
+  };
+
+  const handleDiscardRepair = (findingId: string) => {
+    setRepairResults((prev) => {
+      const copy = { ...prev };
+      delete copy[findingId];
+      return copy;
+    });
   };
 
   const getSeverityBadge = (severity: string) => {
@@ -111,8 +183,11 @@ export const ReviewReportPanel: React.FC = () => {
       </div>
 
       {message && (
-        <div className="px-3 py-1.5 bg-amber-800/10 text-amber-900 border-b border-amber-800/20 text-[11px] font-medium">
-          {message}
+        <div className="px-3 py-1.5 bg-amber-800/10 text-amber-900 border-b border-amber-800/20 text-[11px] font-medium flex items-center justify-between">
+          <span>{message}</span>
+          <button onClick={() => setMessage(null)} className="text-amber-800 hover:text-amber-950">
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
 
@@ -150,30 +225,162 @@ export const ReviewReportPanel: React.FC = () => {
                   🎉 本章未检测出与设定冲突的逻辑矛盾，情节因果严密自洽！
                 </div>
               ) : (
-                report.findings.map((f) => (
-                  <div
-                    key={f.id}
-                    className="bg-[#fdfbf7] border border-[#dcd3c1] rounded-lg p-3 space-y-2 shadow-xs"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-[#854d0e]">{f.title}</span>
-                      {getSeverityBadge(f.severity)}
+                report.findings.map((f) => {
+                  const isAccepted = acceptedFindings.has(f.id);
+                  const isIgnored = ignoredFindings.has(f.id);
+                  const repair = repairResults[f.id];
+                  const isLoadingRepair = repairLoading[f.id];
+                  const isEditing = isEditingDraft[f.id];
+
+                  if (isIgnored) {
+                    return (
+                      <div
+                        key={f.id}
+                        className="p-2 rounded bg-[#ebe4d6] border border-[#ded5c4] text-[#8e8579] flex items-center justify-between opacity-60"
+                      >
+                        <span className="line-through">{f.title} (已忽略)</span>
+                        <button
+                          onClick={() => setIgnoredFindings((prev) => {
+                            const next = new Set(prev);
+                            next.delete(f.id);
+                            return next;
+                          })}
+                          className="text-[10px] text-amber-800 hover:underline"
+                        >
+                          恢复展示
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={f.id}
+                      className={`bg-[#fdfbf7] border rounded-lg p-3 space-y-2.5 shadow-xs transition-colors ${
+                        isAccepted ? 'border-emerald-700/40 bg-emerald-50/30' : 'border-[#dcd3c1]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-[#854d0e]">{f.title}</span>
+                          {isAccepted && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-800/10 text-emerald-800 border border-emerald-800/30 font-bold flex items-center gap-0.5">
+                              <Check className="w-2.5 h-2.5" /> 已采纳替换
+                            </span>
+                          )}
+                        </div>
+                        {getSeverityBadge(f.severity)}
+                      </div>
+
+                      <p className="text-[11px] text-[#4b4337] font-serif leading-relaxed">
+                        {f.description}
+                      </p>
+
+                      {f.evidence_quote && (
+                        <div className="p-2 rounded bg-[#f7f2e7] border-l-2 border-amber-800 font-serif text-[11px] text-[#6b583f] italic">
+                          “{f.evidence_quote}”
+                        </div>
+                      )}
+
+                      {f.suggestion && (
+                        <div className="text-[11px] text-[#854d0e] font-serif font-medium">
+                          <strong>修改建议：</strong>{f.suggestion}
+                        </div>
+                      )}
+
+                      {/* V2.3.1 差异修复与草案仲裁卡片 */}
+                      {repair && !isAccepted && (
+                        <div className="mt-2.5 p-2.5 rounded-md bg-[#f5ede0] border border-amber-800/20 space-y-2">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <div className="flex items-center gap-1.5 font-medium text-amber-900">
+                              <Feather className="w-3 h-3 text-amber-800" />
+                              <span>文风档案对齐：</span>
+                              <span className="px-1.5 py-0.2 bg-amber-800/10 rounded text-amber-800 font-bold">
+                                {repair.voice_profile_used}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-[#8e8579]">{repair.diff_summary}</span>
+                          </div>
+
+                          {/* 修订文本预览与对比 */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[10px] text-[#786f65]">
+                              <span>修订草案比对（可直接编辑微调）：</span>
+                              <button
+                                onClick={() => setIsEditingDraft((prev) => ({ ...prev, [f.id]: !prev[f.id] }))}
+                                className="flex items-center gap-0.5 text-amber-800 hover:underline"
+                              >
+                                <Edit3 className="w-2.5 h-2.5" />
+                                {isEditing ? '完成微调' : '直接编辑草案'}
+                              </button>
+                            </div>
+
+                            {isEditing ? (
+                              <textarea
+                                value={editedDrafts[f.id] ?? repair.revised_text_draft}
+                                onChange={(e) =>
+                                  setEditedDrafts((prev) => ({ ...prev, [f.id]: e.target.value }))
+                                }
+                                rows={3}
+                                className="w-full p-2 text-xs rounded border border-amber-800/30 bg-white font-serif focus:outline-none focus:ring-1 focus:ring-amber-800"
+                              />
+                            ) : (
+                              <div className="p-2 rounded bg-white/90 border border-amber-800/15 font-serif text-xs text-[#2c2825] leading-relaxed">
+                                {editedDrafts[f.id] ?? repair.revised_text_draft}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 仲裁按钮栏 */}
+                          <div className="flex items-center justify-end gap-2 pt-1 border-t border-amber-800/10">
+                            <button
+                              onClick={() => handleDiscardRepair(f.id)}
+                              className="px-2 py-1 rounded border border-[#ded5c4] bg-[#efe9dc] text-[#554b3e] hover:bg-[#e4dcce] text-[11px] font-medium"
+                            >
+                              放弃草案
+                            </button>
+                            <button
+                              onClick={() => handleApplyRepair(f.id)}
+                              className="px-3 py-1 rounded bg-emerald-800 hover:bg-emerald-700 text-white font-medium text-[11px] flex items-center gap-1 shadow-xs"
+                            >
+                              <Check className="w-3 h-3" />
+                              采纳并替换入正文 (留存快照)
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 底部功能条 */}
+                      {!isAccepted && !repair && (
+                        <div className="flex items-center justify-between pt-1 border-t border-[#eee6d7]">
+                          <button
+                            onClick={() => handleIgnoreFinding(f.id)}
+                            className="text-[10px] text-[#8e8579] hover:text-[#554b3e] flex items-center gap-1"
+                          >
+                            <EyeOff className="w-2.5 h-2.5" /> 忽略/误报
+                          </button>
+                          <button
+                            onClick={() => handleGenerateRepair(f.id)}
+                            disabled={isLoadingRepair}
+                            className="px-2.5 py-1 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium text-[11px] flex items-center gap-1 shadow-xs disabled:opacity-40"
+                          >
+                            {isLoadingRepair ? (
+                              <>
+                                <RotateCcw className="w-3 h-3 animate-spin" />
+                                正在推演精准修复草案...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-3 h-3" />
+                                一键生成修复草案 (对齐文风)
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-[11px] text-[#4b4337] font-serif leading-relaxed">
-                      {f.description}
-                    </p>
-                    {f.evidence_quote && (
-                      <div className="p-2 rounded bg-[#f7f2e7] border-l-2 border-amber-800 font-serif text-[11px] text-[#6b583f] italic">
-                        “{f.evidence_quote}”
-                      </div>
-                    )}
-                    {f.suggestion && (
-                      <div className="text-[11px] text-[#854d0e] font-serif font-medium">
-                        <strong>修改建议：</strong>{f.suggestion}
-                      </div>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </>
@@ -182,3 +389,4 @@ export const ReviewReportPanel: React.FC = () => {
     </div>
   );
 };
+

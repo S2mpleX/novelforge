@@ -1,0 +1,17 @@
+{
+  "models": [
+    "deepseek",
+    "kimi",
+    "claude"
+  ],
+  "wfTerms": {
+    "nodes": 0,
+    "edges": 0,
+    "steps": 0,
+    "params": 2,
+    "variables": 0,
+    "template": 0,
+    "prompt_template": 0
+  },
+  "wfMatches": []
+}

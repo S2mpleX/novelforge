@@ -147,6 +147,22 @@ pub fn run() {
             commands::renumber_hierarchy,
             commands::get_novel_content_tree,
             commands::assemble_hierarchical_creation_context,
+            // V2.3 Workflow Engine & Toolbox
+            commands::list_workflow_templates,
+            commands::save_workflow_template,
+            commands::create_workflow_run,
+            commands::get_workflow_run_details,
+            commands::list_workflow_runs,
+            commands::update_workflow_step_output,
+            commands::advance_workflow_step,
+            commands::assemble_toolbox_prompt,
+            commands::execute_llm_chat,
+            // V2.3.1 Voice Profiles & Review Repair
+            commands::list_voice_profiles,
+            commands::save_voice_profile,
+            commands::set_active_voice_profile,
+            commands::delete_voice_profile,
+            commands::generate_finding_repair,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovelForge AI application");

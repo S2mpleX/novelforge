@@ -220,6 +220,92 @@ export const FREE_CUSTOM_LAYOUT: WorkspaceLayout = {
   },
 };
 
+export const CONCEPT_WORKSHOP_LAYOUT: WorkspaceLayout = {
+  version: 1,
+  activePresetKey: 'concept_workshop',
+  maximizedInstanceId: null,
+  floatingPanels: [],
+  root: {
+    type: 'split',
+    id: 'split_concept_root',
+    orientation: 'horizontal',
+    sizes: [22, 48, 30],
+    children: [
+      {
+        type: 'tabs',
+        id: 'tab_concept_left',
+        panels: [
+          { instanceId: 'chapters_main', panelType: 'chapters', title: '章节目录' },
+          { instanceId: 'novel_info_main', panelType: 'novel_info', title: '作品信息' },
+        ],
+        activeInstanceId: 'chapters_main',
+      },
+      {
+        type: 'tabs',
+        id: 'tab_concept_center',
+        panels: [
+          { instanceId: 'novelist_toolbox_main', panelType: 'novelist_toolbox', title: '小说专项工具箱' },
+          { instanceId: 'voice_profiles_main', panelType: 'voice_profiles', title: '作者文风工作室' },
+        ],
+        activeInstanceId: 'novelist_toolbox_main',
+      },
+      {
+        type: 'tabs',
+        id: 'tab_concept_right',
+        panels: [
+          { instanceId: 'world_settings_main', panelType: 'world_settings', title: '世界观设定' },
+          { instanceId: 'character_profiles_main', panelType: 'character_profiles', title: '角色档案' },
+          { instanceId: 'memory_engine_main', panelType: 'memory_engine', title: '长期记忆' },
+        ],
+        activeInstanceId: 'world_settings_main',
+      },
+    ],
+  },
+};
+
+export const WORKFLOW_PIPELINE_LAYOUT: WorkspaceLayout = {
+  version: 1,
+  activePresetKey: 'workflow_pipeline',
+  maximizedInstanceId: null,
+  floatingPanels: [],
+  root: {
+    type: 'split',
+    id: 'split_pipeline_root',
+    orientation: 'horizontal',
+    sizes: [32, 42, 26],
+    children: [
+      {
+        type: 'tabs',
+        id: 'tab_pipeline_left',
+        panels: [
+          { instanceId: 'workflow_engine_main', panelType: 'workflow_engine', title: '剧情工作流引擎' },
+          { instanceId: 'chapters_main', panelType: 'chapters', title: '章节目录' },
+        ],
+        activeInstanceId: 'workflow_engine_main',
+      },
+      {
+        type: 'tabs',
+        id: 'tab_pipeline_center',
+        panels: [
+          { instanceId: 'editor_main', panelType: 'editor', title: '正文编辑器' },
+          { instanceId: 'review_report_main', panelType: 'review_report', title: '审稿质检与修复' },
+        ],
+        activeInstanceId: 'editor_main',
+      },
+      {
+        type: 'tabs',
+        id: 'tab_pipeline_right',
+        panels: [
+          { instanceId: 'editor_in_chief_main', panelType: 'editor_in_chief', title: 'AI 主编控制台' },
+          { instanceId: 'voice_profiles_main', panelType: 'voice_profiles', title: '作者文风工作室' },
+          { instanceId: 'model_logs_main', panelType: 'model_logs', title: '模型调用日志' },
+        ],
+        activeInstanceId: 'editor_in_chief_main',
+      },
+    ],
+  },
+};
+
 export const BUILTIN_WORKSPACE_PRESETS: Record<string, WorkspacePreset> = {
   focus_writing: {
     id: 'focus_writing',
@@ -227,6 +313,20 @@ export const BUILTIN_WORKSPACE_PRESETS: Record<string, WorkspacePreset> = {
     description: '正文编辑器占据大部分空间，左侧章节目录，右侧 AI 助手，适合高效码字与心流沉浸。',
     isBuiltIn: true,
     layout: FOCUS_WRITING_LAYOUT,
+  },
+  concept_workshop: {
+    id: 'concept_workshop',
+    name: '小说构思工坊',
+    description: '专注新书开局构思与金手指设计，融合 8 大网文专项生成器与作者文风档案建模。',
+    isBuiltIn: true,
+    layout: CONCEPT_WORKSHOP_LAYOUT,
+  },
+  workflow_pipeline: {
+    id: 'workflow_pipeline',
+    name: '工作流流水线',
+    description: '多步骤剧情流水线模式，单步审查修改、直接注入正文编辑，并联动逻辑审稿与文风仲裁闭环。',
+    isBuiltIn: true,
+    layout: WORKFLOW_PIPELINE_LAYOUT,
   },
   agent_collaboration: {
     id: 'agent_collaboration',
@@ -252,7 +352,7 @@ export const BUILTIN_WORKSPACE_PRESETS: Record<string, WorkspacePreset> = {
   free_custom: {
     id: 'free_custom',
     name: '自由布局',
-    description: '自由组合所有 20 个工作模块，随意拆分、停靠、合并与悬浮，满足个性化工作流。',
+    description: '自由组合所有 23 个工作模块，随意拆分、停靠、合并与悬浮，满足个性化工作流。',
     isBuiltIn: true,
     layout: FREE_CUSTOM_LAYOUT,
   },

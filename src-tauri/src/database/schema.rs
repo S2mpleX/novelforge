@@ -413,6 +413,77 @@ CREATE TABLE IF NOT EXISTS plot_associations (
     FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
 );
 
+-- ==========================================
+-- V2.3 NOVELIST WORKFLOW ENGINE SYSTEM
+-- ==========================================
+
+-- Workflow Templates (工作流模板定义表)
+CREATE TABLE IF NOT EXISTS workflow_templates (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT,                    -- 可为空（全局模板）或绑定特定小说
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    category TEXT DEFAULT 'general',  -- general, fantasy, urban, scifi, mystery
+    steps_json TEXT NOT NULL,         -- JSON 数组定义步骤及插槽
+    is_builtin INTEGER DEFAULT 0,     -- 1 为系统内置, 0 为自定义
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
+
+-- Workflow Runs (工作流运行实例表)
+CREATE TABLE IF NOT EXISTS workflow_runs (
+    id TEXT PRIMARY KEY,
+    template_id TEXT NOT NULL,
+    novel_id TEXT NOT NULL,
+    target_chapter_id TEXT,           -- 目标关联章节
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, RUNNING, WAITING_STEP, COMPLETED, FAILED, PAUSED
+    current_step_index INTEGER DEFAULT 0,
+    run_mode TEXT DEFAULT 'STEP',     -- AUTO, STEP
+    context_bindings_json TEXT DEFAULT '{}',
+    total_tokens INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
+
+-- Workflow Step Records (工作流步骤执行记录表)
+CREATE TABLE IF NOT EXISTS workflow_step_records (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    step_index INTEGER NOT NULL,
+    step_key TEXT NOT NULL,
+    title TEXT NOT NULL,
+    prompt_rendered TEXT DEFAULT '',
+    input_values_json TEXT DEFAULT '{}',
+    raw_output TEXT DEFAULT '',
+    edited_output TEXT DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, RUNNING, COMPLETED, FAILED
+    error_message TEXT DEFAULT '',
+    token_usage INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(run_id) REFERENCES workflow_runs(id) ON DELETE CASCADE
+);
+
+-- Voice Profiles (作者文风档案建模表)
+CREATE TABLE IF NOT EXISTS voice_profiles (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT, -- NULL 为全局通用文风
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    sample_text TEXT DEFAULT '',
+    sentence_rhythm TEXT DEFAULT 'BALANCED', -- FAST_PACED (短促快节奏), BALANCED (抑扬顿挫), ELABORATE (铺陈华丽)
+    vocabulary_tone TEXT DEFAULT 'CLASSICAL_MODERN', -- VERNACULAR (通俗直白), CLASSICAL_MODERN (典雅现代), COLD_REALISTIC (冷硬写实)
+    pov_preference TEXT DEFAULT 'THIRD_LIMITED', -- THIRD_LIMITED, THIRD_OMNISCIENT, FIRST_PERSON
+    sensory_ratio TEXT DEFAULT 'BALANCED', -- VISUAL_FOCUS, ACTION_FOCUS, EMOTIONAL_FOCUS, BALANCED
+    custom_rules_json TEXT DEFAULT '[]', -- 负面禁用词、口癖偏好 JSON 数组
+    is_active INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
+
 -- Create indexes for high performance
 CREATE INDEX IF NOT EXISTS idx_chapters_novel_id ON chapters(novel_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_volume_id ON chapters(volume_id);
@@ -437,6 +508,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_plot_assoc_unique ON plot_associations(rel
 CREATE INDEX IF NOT EXISTS idx_plot_assoc_novel_rel ON plot_associations(novel_id, relation_type);
 CREATE INDEX IF NOT EXISTS idx_plot_assoc_target ON plot_associations(target_type, target_id);
 CREATE INDEX IF NOT EXISTS idx_plot_assoc_entity ON plot_associations(entity_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_templates_novel ON workflow_templates(novel_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_novel ON workflow_runs(novel_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_step_records_run ON workflow_step_records(run_id, step_index);
+CREATE INDEX IF NOT EXISTS idx_voice_profiles_novel ON voice_profiles(novel_id);
 "#;
 
 pub const FTS5_SCHEMA: &str = r#"

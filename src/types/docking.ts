@@ -18,7 +18,10 @@ export type PanelType =
   | 'token_usage'          // 17. Token 消耗统计
   | 'serialization_queue'  // 18. 自动连载任务队列
   | 'chapter_goals'        // 19. 章节目标与创作提示
-  | 'novel_info';          // 20. 作品信息面板
+  | 'novel_info'           // 20. 作品信息面板
+  | 'novelist_toolbox'     // 21. 小说专项工具箱 (V2.3)
+  | 'workflow_engine'      // 22. 剧情工作流引擎 (V2.3)
+  | 'voice_profiles';      // 23. 作者文风档案工作室 (V2.3.1)
 
 export interface PanelInstance {
   instanceId: string;

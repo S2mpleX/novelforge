@@ -22,6 +22,13 @@ import type {
   DatabaseHealthReport,
   ReviewReport,
   StylePolishResponse,
+  WorkflowTemplate,
+  WorkflowRun,
+  WorkflowStepRecord,
+  VoiceProfile,
+  SaveVoiceProfileInput,
+  GenerateFindingRepairInput,
+  FindingRepairResult,
 } from '@/types';
 import { emitWebStreamChunk } from './tauriBridge';
 
@@ -154,6 +161,131 @@ export function ensureWebSeedData(): void {
       },
     ];
     setStorage('providers', initialProviders);
+
+    const initialWorkflowTemplates: WorkflowTemplate[] = [
+      {
+        id: 'builtin-gold-three',
+        novel_id: null,
+        name: '网文黄金三章开篇推演',
+        description: '从核心脑洞、金手指设计到黄金三章大纲与情绪曲线规划的结构化连贯推演',
+        category: 'general',
+        steps_json: JSON.stringify([
+          {
+            step_key: 'brainstorm_cheat',
+            title: '1. 核心脑洞与金手指设计',
+            agent_role: 'WorldArchitect',
+            description: '提炼小说颠覆性脑洞、核心金手指运转逻辑与成长兑换体系',
+            prompt_template: '请根据作品背景设定，为本作量身打造具备强吸引力的核心脑洞与金手指体系。包括：金手指名称、运行机制、初始红利、代价或限制。',
+          },
+          {
+            step_key: 'chapter1_hook',
+            title: '2. 第一章切入点与矛盾激发',
+            agent_role: 'PlotEngineer',
+            description: '设计第一章危机开局、核心矛盾爆发点及主角身份认同冲击',
+            prompt_template: '基于上一步的金手指：{{step_1_output}}，设计第一章的切入镜头与开门杀危机。',
+          },
+          {
+            step_key: 'three_chapter_arc',
+            title: '3. 黄金三章大纲与情绪曲线规划',
+            agent_role: 'Director',
+            description: '制定前三章节奏节拍、连续爽点布置与首卷主线钩子',
+            prompt_template: '整合上述内容：脑洞设定【{{step_1_output}}】，首章切入【{{step_2_output}}】，规划第1-3章的详细事件节拍与期待感钩子。',
+          },
+        ]),
+        is_builtin: true,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      },
+      {
+        id: 'builtin-climax-explosion',
+        novel_id: null,
+        name: '高潮单章精细爆破',
+        description: '单章情绪张力极限推演：从危机逼仄、逆转打脸到正文草案',
+        category: 'general',
+        steps_json: JSON.stringify([
+          {
+            step_key: 'climax_pressure',
+            title: '1. 单章张力目标与情境压迫',
+            agent_role: 'PlotEngineer',
+            description: '定义本章不可退让的核心目标与敌对势力的绝境压迫',
+            prompt_template: '分析当前章节情境，梳理主角与反派/危机不可调和的矛盾爆发点，营造步步紧逼的压迫氛围。',
+          },
+          {
+            step_key: 'reversal_beats',
+            title: '2. 打脸与情绪反转节拍',
+            agent_role: 'Director',
+            description: '设计反转爆发点、观众/配角反应对比与情绪过山车',
+            prompt_template: '基于危机压迫【{{step_1_output}}】，规划3个情绪反转递进阶梯及主角绝境翻盘的具体手段。',
+          },
+          {
+            step_key: 'draft_and_punchline',
+            title: '3. 爆点正文起草与金句提炼',
+            agent_role: 'Writer',
+            description: '撰写具有视听冲击力的核心对决正文片段并提炼点睛金句',
+            prompt_template: '结合上述节拍【{{step_2_output}}】，起草该高潮单章的核心冲突正文与情绪收束金句。',
+          },
+        ]),
+        is_builtin: true,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      },
+    ];
+    setStorage('workflow_templates', initialWorkflowTemplates);
+  }
+
+  const voiceProfiles = getStorage<VoiceProfile[]>('voice_profiles', []);
+  if (voiceProfiles.length === 0) {
+    const initialProfiles: VoiceProfile[] = [
+      {
+        id: 'profile-xianxia-classical',
+        novel_id: null,
+        name: '仙侠修真·沉雄雅致风',
+        description: '典雅含蓄、意境深远，偏重环境与心境交融，四字成语与古风造词丰富',
+        sample_text: '山风掠过青苍峭壁，松针落入寒潭，漾开一圈圈青碧涟漪。李观棋持剑立于危崖之上，眸光微敛，指尖拂过剑锋处淡淡的冰霜。',
+        sentence_rhythm: 'BALANCED',
+        vocabulary_tone: 'CLASSICAL_MODERN',
+        pov_preference: 'THIRD_LIMITED',
+        sensory_ratio: 'SENSORY_RICH',
+        custom_rules_json: JSON.stringify(['多用动静相衬', '融情入景', '避免网络流行俚语']),
+        is_active: true,
+        is_builtin: true,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      },
+      {
+        id: 'profile-urban-fast',
+        novel_id: null,
+        name: '都市异能·爽利快节奏',
+        description: '短句为主、动作凌厉，强冲突即时反馈，突出压迫感与干脆利落的爽感',
+        sample_text: '咔哒。打火机火苗窜起，照亮了昏暗逼仄的地下车库。陆辰掐灭烟头，没有给对面三人任何拔枪的机会，整个人如猎豹般撕裂雨幕。',
+        sentence_rhythm: 'FAST_PACED',
+        vocabulary_tone: 'CASUAL_MODERN',
+        pov_preference: 'THIRD_LIMITED',
+        sensory_ratio: 'ACTION_CENTRIC',
+        custom_rules_json: JSON.stringify(['段落不超过三行', '句尾减少冗余修饰', '注重动作打击感']),
+        is_active: false,
+        is_builtin: true,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      },
+      {
+        id: 'profile-scifi-realistic',
+        novel_id: null,
+        name: '硬核科幻·冷峻考据风',
+        description: '客观克制、细节扎实，严密遵循物理与技术设定，营造深空孤寂与危机紧迫感',
+        sample_text: '主屏幕上的引力波频谱发生畸变，偏转角突破了0.04度临界阈值。反物质约束场发生器的温度曲线在十秒内陡增300开尔文。林远没有抬头，手指在操纵面板上敲击出三组应急指令。',
+        sentence_rhythm: 'DENSE_ATMOSPHERIC',
+        vocabulary_tone: 'FORMAL_TECHNICAL',
+        pov_preference: 'THIRD_LIMITED',
+        sensory_ratio: 'SENSORY_RICH',
+        custom_rules_json: JSON.stringify(['遵循物理世界观法则', '减少抒情', '术语统一严密']),
+        is_active: false,
+        is_builtin: true,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      },
+    ];
+    setStorage('voice_profiles', initialProfiles);
   }
 }
 
@@ -1077,6 +1209,340 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         l3_active_character_profiles: [],
         formatted_system_prompt: `## 【当前创作层级定位与连续性上下文】\n- **作品**：《${novel?.title || ''}》\n- **章节**：第 ${chapter?.chapter_number || 1} 章《${chapter?.title || ''}》`,
       };
+    }
+
+    // --- V2.3: WORKFLOW ENGINE & TOOLBOX ---
+    case 'list_workflow_templates': {
+      const templates = getStorage<WorkflowTemplate[]>('workflow_templates', []);
+      if (!args?.novelId) return templates;
+      return templates.filter((t) => !t.novel_id || t.novel_id === args.novelId);
+    }
+
+    case 'save_workflow_template': {
+      const templates = getStorage<WorkflowTemplate[]>('workflow_templates', []);
+      const input = args.input;
+      if (input.id) {
+        const idx = templates.findIndex((t) => t.id === input.id);
+        if (idx !== -1) {
+          templates[idx] = {
+            ...templates[idx],
+            name: input.name,
+            description: input.description || templates[idx].description,
+            category: input.category || templates[idx].category,
+            steps_json: input.steps_json,
+            updated_at: Date.now(),
+          };
+          setStorage('workflow_templates', templates);
+          return templates[idx];
+        }
+      }
+      const newTpl: WorkflowTemplate = {
+        id: 'wf_tpl_' + Date.now(),
+        novel_id: input.novel_id || null,
+        name: input.name,
+        description: input.description || '',
+        category: input.category || 'general',
+        steps_json: input.steps_json,
+        is_builtin: false,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+      templates.push(newTpl);
+      setStorage('workflow_templates', templates);
+      return newTpl;
+    }
+
+    case 'create_workflow_run': {
+      const runs = getStorage<WorkflowRun[]>('workflow_runs', []);
+      const templates = getStorage<WorkflowTemplate[]>('workflow_templates', []);
+      const input = args.input;
+      const tpl = templates.find((t) => t.id === input.template_id);
+      if (!tpl) throw new Error('Template not found');
+
+      const runId = 'wf_run_' + Date.now();
+      const newRun: WorkflowRun = {
+        id: runId,
+        template_id: input.template_id,
+        novel_id: input.novel_id,
+        target_chapter_id: input.target_chapter_id || null,
+        status: 'PENDING',
+        current_step_index: 0,
+        run_mode: input.run_mode || 'STEP',
+        context_bindings_json: input.context_bindings_json || '{}',
+        total_tokens: 0,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+      runs.push(newRun);
+      setStorage('workflow_runs', runs);
+
+      const stepsParsed = JSON.parse(tpl.steps_json || '[]');
+      const stepRecords = getStorage<WorkflowStepRecord[]>('workflow_step_records', []);
+      stepsParsed.forEach((s: any, idx: number) => {
+        stepRecords.push({
+          id: `wf_rec_${runId}_${idx}`,
+          run_id: runId,
+          step_index: idx,
+          step_key: s.step_key || `step_${idx}`,
+          title: s.title || `步骤 ${idx + 1}`,
+          prompt_rendered: s.prompt_template || '',
+          input_values_json: '{}',
+          raw_output: '',
+          edited_output: '',
+          status: 'PENDING',
+          error_message: '',
+          token_usage: 0,
+          created_at: Date.now(),
+          updated_at: Date.now(),
+        });
+      });
+      setStorage('workflow_step_records', stepRecords);
+      return newRun;
+    }
+
+    case 'get_workflow_run_details': {
+      const runs = getStorage<WorkflowRun[]>('workflow_runs', []);
+      const templates = getStorage<WorkflowTemplate[]>('workflow_templates', []);
+      const stepRecords = getStorage<WorkflowStepRecord[]>('workflow_step_records', []);
+
+      const run = runs.find((r) => r.id === args.runId);
+      if (!run) throw new Error('Run not found');
+      const template = templates.find((t) => t.id === run.template_id);
+      if (!template) throw new Error('Template not found');
+      const steps = stepRecords
+        .filter((s) => s.run_id === run.id)
+        .sort((a, b) => a.step_index - b.step_index);
+
+      return { run, template, steps };
+    }
+
+    case 'list_workflow_runs': {
+      const runs = getStorage<WorkflowRun[]>('workflow_runs', []);
+      return runs
+        .filter((r) => r.novel_id === args.novelId)
+        .sort((a, b) => b.created_at - a.created_at);
+    }
+
+    case 'update_workflow_step_output': {
+      const stepRecords = getStorage<WorkflowStepRecord[]>('workflow_step_records', []);
+      const rec = stepRecords.find((s) => s.id === args.input.step_record_id);
+      if (rec) {
+        rec.edited_output = args.input.edited_output;
+        rec.updated_at = Date.now();
+        setStorage('workflow_step_records', stepRecords);
+      }
+      return null;
+    }
+
+    case 'advance_workflow_step': {
+      const runs = getStorage<WorkflowRun[]>('workflow_runs', []);
+      const stepRecords = getStorage<WorkflowStepRecord[]>('workflow_step_records', []);
+      const templates = getStorage<WorkflowTemplate[]>('workflow_templates', []);
+
+      const run = runs.find((r) => r.id === args.input.run_id);
+      if (!run) throw new Error('Run not found');
+      const template = templates.find((t) => t.id === run.template_id);
+      if (!template) throw new Error('Template not found');
+
+      const rec = stepRecords.find(
+        (s) => s.run_id === run.id && s.step_index === args.input.step_index
+      );
+      if (rec) {
+        rec.status = 'COMPLETED';
+        rec.updated_at = Date.now();
+      }
+
+      const totalSteps = stepRecords.filter((s) => s.run_id === run.id).length;
+      if (args.input.step_index + 1 < totalSteps) {
+        run.current_step_index = args.input.step_index + 1;
+        run.status = args.input.auto_advance_next ? 'RUNNING' : 'WAITING_STEP';
+      } else {
+        run.status = 'COMPLETED';
+      }
+      run.updated_at = Date.now();
+
+      setStorage('workflow_runs', runs);
+      setStorage('workflow_step_records', stepRecords);
+
+      const steps = stepRecords
+        .filter((s) => s.run_id === run.id)
+        .sort((a, b) => a.step_index - b.step_index);
+
+      return { run, template, steps };
+    }
+
+    case 'assemble_toolbox_prompt': {
+      const novel = getStorage<Novel[]>('novels', []).find((n) => n.id === args.input.novel_id);
+      const characters = getStorage<Character[]>('characters', []);
+      const rules = getStorage<WorldRule[]>('world_rules', []);
+      const chapters = getStorage<Chapter[]>('chapters', []);
+
+      const charSummary = (args.input.character_ids || [])
+        .map((cid: string) => {
+          const c = characters.find((char) => char.id === cid);
+          return c ? `【${c.name}】(${c.personality || '无设定'}): ${c.profile || ''}` : '';
+        })
+        .filter(Boolean)
+        .join('\n');
+
+      const ruleSummary = (args.input.world_rule_ids || [])
+        .map((rid: string) => {
+          const r = rules.find((rule) => rule.id === rid);
+          return r ? `【${r.title}】: ${r.rule_content}` : '';
+        })
+        .filter(Boolean)
+        .join('\n');
+
+      let prevChText = '';
+      if (args.input.include_prev_chapter && args.input.chapter_id) {
+        const curCh = chapters.find((c) => c.id === args.input.chapter_id);
+        if (curCh) {
+          const prev = chapters.find(
+            (c) => c.novel_id === curCh.novel_id && c.chapter_number === curCh.chapter_number - 1
+          );
+          if (prev) {
+            prevChText = `前一章正文片段：${(prev.content || '').slice(0, 500)}`;
+          }
+        }
+      }
+
+      const assembledContextSummary = [
+        charSummary ? `关联角色：\n${charSummary}` : '',
+        ruleSummary ? `关联设定：\n${ruleSummary}` : '',
+        prevChText,
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      let targetDestination: 'insert_editor' | 'save_as_character' | 'save_as_rule' | 'save_as_chapter' = 'insert_editor';
+      if (args.input.action_type === 'name') targetDestination = 'save_as_character';
+      else if (args.input.action_type === 'world_law' || args.input.action_type === 'cheat') targetDestination = 'save_as_rule';
+      else if (args.input.action_type === 'gold_opening' || args.input.action_type === 'chapter_outline') targetDestination = 'save_as_chapter';
+
+      return {
+        action_type: args.input.action_type,
+        system_prompt: `你是一名顶级网文专家。当前服务作品《${novel?.title || '长篇小说'}》，文风：${novel?.writing_style || '沉稳细腻'}。`,
+        user_prompt: `【任务要求】针对【${args.input.action_type}】，输入需求：${args.input.custom_input || '生成专业网文要素'}\n\n${assembledContextSummary}`,
+        target_destination: targetDestination,
+        assembled_context_summary: assembledContextSummary,
+      };
+    }
+
+    case 'execute_llm_chat': {
+      return `【AI 生成成果】针对输入内容：\n“${args.user_prompt.slice(0, 80)}...”\n\n已完成构思推演。情节扣人心弦，文风贴合长篇沉浸感，细节自然流动。`;
+    }
+
+    // --- V2.3.1: Voice Profiles & Finding Repair ---
+    case 'list_voice_profiles': {
+      const profiles = getStorage<VoiceProfile[]>('voice_profiles', []);
+      const novelId = args.novelId;
+      if (novelId) {
+        return profiles.filter((p) => !p.novel_id || p.novel_id === novelId);
+      }
+      return profiles;
+    }
+
+    case 'save_voice_profile': {
+      const profiles = getStorage<VoiceProfile[]>('voice_profiles', []);
+      const input: SaveVoiceProfileInput = args.input;
+      const now = Date.now();
+      const id = input.id || 'voice_' + now;
+
+      // 如果设为 active，则同一 novel_id（或全局）下其他置为 false
+      let updatedList = profiles.map((p) => {
+        if (input.is_active && ((input.novel_id && p.novel_id === input.novel_id) || (!input.novel_id && !p.novel_id))) {
+          return { ...p, is_active: false };
+        }
+        return p;
+      });
+
+      const existingIndex = updatedList.findIndex((p) => p.id === id);
+      const newProfile: VoiceProfile = {
+        id,
+        novel_id: input.novel_id || null,
+        name: input.name,
+        description: input.description || '',
+        sample_text: input.sample_text || '',
+        sentence_rhythm: input.sentence_rhythm || 'BALANCED',
+        vocabulary_tone: input.vocabulary_tone || 'CLASSICAL_MODERN',
+        pov_preference: input.pov_preference || 'THIRD_LIMITED',
+        sensory_ratio: input.sensory_ratio || 'BALANCED',
+        custom_rules_json: input.custom_rules_json || '[]',
+        is_active: input.is_active ?? false,
+        is_builtin: false,
+        created_at: existingIndex >= 0 ? updatedList[existingIndex].created_at : now,
+        updated_at: now,
+      };
+
+      if (existingIndex >= 0) {
+        updatedList[existingIndex] = newProfile;
+      } else {
+        updatedList.push(newProfile);
+      }
+
+      setStorage('voice_profiles', updatedList);
+      return newProfile;
+    }
+
+    case 'set_active_voice_profile': {
+      const profiles = getStorage<VoiceProfile[]>('voice_profiles', []);
+      const target = profiles.find((p) => p.id === args.id);
+      if (!target) return;
+
+      const isNovelScoped = Boolean(target.novel_id);
+      const updated = profiles.map((p) => {
+        if (p.id === args.id) {
+          return { ...p, is_active: true, updated_at: Date.now() };
+        }
+        if (isNovelScoped && p.novel_id === target.novel_id) {
+          return { ...p, is_active: false };
+        }
+        if (!isNovelScoped) {
+          if (!p.novel_id) return { ...p, is_active: false };
+          if (args.novelId && p.novel_id === args.novelId) return { ...p, is_active: false };
+        }
+        return p;
+      });
+      setStorage('voice_profiles', updated);
+      return;
+    }
+
+    case 'delete_voice_profile': {
+      const profiles = getStorage<VoiceProfile[]>('voice_profiles', []);
+      const filtered = profiles.filter((p) => p.id !== args.id);
+      setStorage('voice_profiles', filtered);
+      return;
+    }
+
+    case 'generate_finding_repair': {
+      const { finding_id, custom_instructions } = args.input as GenerateFindingRepairInput;
+      const reports = getStorage<ReviewReport[]>('review_reports', []);
+      let targetFinding: any = null;
+      for (const r of reports) {
+        const found = r.findings?.find((f) => f.id === finding_id);
+        if (found) {
+          targetFinding = found;
+          break;
+        }
+      }
+
+      const originalQuote = targetFinding?.evidence_quote || '巨大的反物质引擎在寒夜中发出沉闷的轰鸣';
+      const suggestion = targetFinding?.suggestion || '建议补充主引擎从静默到全功率运作的耗时描述';
+      const findingTitle = targetFinding?.title || '反物质引擎预热时间细节补充';
+
+      const revisedDraft = `${originalQuote}。淡蓝色的电弧在导流环表面跳跃，高能粒子注入器以极高转速运转，倒计时读数在视网膜投影上稳定闪烁。`;
+
+      const result: FindingRepairResult = {
+        finding_id,
+        finding_title: findingTitle,
+        severity: targetFinding?.severity || 'MINOR',
+        original_quote: originalQuote,
+        repair_suggestion: suggestion,
+        revised_text_draft: revisedDraft,
+        diff_summary: `扩充了引力透镜与电弧细节，补充临场压迫倒计时（${custom_instructions || '严格遵照当前文风'}）`,
+        voice_profile_used: '仙侠修真·沉雄雅致风',
+      };
+      return result;
     }
 
     default:

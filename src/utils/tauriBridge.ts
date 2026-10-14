@@ -48,6 +48,19 @@ import type {
   RenumberHierarchyInput,
   NovelContentTree,
   HierarchicalCreationContext,
+  WorkflowTemplate,
+  SaveWorkflowTemplateInput,
+  WorkflowRun,
+  CreateWorkflowRunInput,
+  AdvanceWorkflowStepInput,
+  UpdateWorkflowStepOutputInput,
+  WorkflowRunDetails,
+  ExecuteToolboxActionInput,
+  ExecuteToolboxActionResult,
+  VoiceProfile,
+  SaveVoiceProfileInput,
+  GenerateFindingRepairInput,
+  FindingRepairResult,
 } from '@/types';
 
 /**
@@ -456,4 +469,40 @@ export const api = {
     safeInvoke<NovelContentTree>('get_novel_content_tree', { novelId }),
   assembleHierarchicalCreationContext: (novelId: string, chapterId: string, sceneId?: string) =>
     safeInvoke<HierarchicalCreationContext>('assemble_hierarchical_creation_context', { novelId, chapterId, sceneId }),
+
+  // --- V2.3: Workflow Engine & Novelist Toolbox ---
+  listWorkflowTemplates: (novelId?: string) =>
+    safeInvoke<WorkflowTemplate[]>('list_workflow_templates', { novelId }),
+  saveWorkflowTemplate: (input: SaveWorkflowTemplateInput) =>
+    safeInvoke<WorkflowTemplate>('save_workflow_template', { input }),
+  createWorkflowRun: (input: CreateWorkflowRunInput) =>
+    safeInvoke<WorkflowRun>('create_workflow_run', { input }),
+  getWorkflowRunDetails: (runId: string) =>
+    safeInvoke<WorkflowRunDetails>('get_workflow_run_details', { runId }),
+  listWorkflowRuns: (novelId: string) =>
+    safeInvoke<WorkflowRun[]>('list_workflow_runs', { novelId }),
+  updateWorkflowStepOutput: (input: UpdateWorkflowStepOutputInput) =>
+    safeInvoke<void>('update_workflow_step_output', { input }),
+  advanceWorkflowStep: (input: AdvanceWorkflowStepInput) =>
+    safeInvoke<WorkflowRunDetails>('advance_workflow_step', { input }),
+  assembleToolboxPrompt: (input: ExecuteToolboxActionInput) =>
+    safeInvoke<ExecuteToolboxActionResult>('assemble_toolbox_prompt', { input }),
+  executeLlmChat: (input: {
+    system_prompt: string;
+    user_prompt: string;
+    temperature?: number;
+    max_tokens?: number;
+  }) => safeInvoke<string>('execute_llm_chat', input),
+
+  // --- V2.3.1: Voice Profiles & Finding Repair ---
+  listVoiceProfiles: (novelId?: string) =>
+    safeInvoke<VoiceProfile[]>('list_voice_profiles', { novelId }),
+  saveVoiceProfile: (input: SaveVoiceProfileInput) =>
+    safeInvoke<VoiceProfile>('save_voice_profile', { input }),
+  setActiveVoiceProfile: (id: string, novelId?: string) =>
+    safeInvoke<void>('set_active_voice_profile', { id, novelId }),
+  deleteVoiceProfile: (id: string) =>
+    safeInvoke<void>('delete_voice_profile', { id }),
+  generateFindingRepair: (input: GenerateFindingRepairInput) =>
+    safeInvoke<FindingRepairResult>('generate_finding_repair', { input }),
 };

@@ -553,5 +553,177 @@ export interface HierarchicalCreationContext {
   formatted_system_prompt: string;
 }
 
+// ==========================================
+// V2.3 WORKFLOW ENGINE & TOOLBOX TYPES
+// ==========================================
 
+export interface WorkflowStepConfig {
+  step_key: string;
+  title: string;
+  agent_role: string;
+  description?: string;
+  prompt_template: string;
+  input_schema?: Record<string, unknown>;
+  output_schema?: Record<string, unknown>;
+}
+
+export interface WorkflowTemplate {
+  id: string;
+  novel_id?: string | null;
+  name: string;
+  description: string;
+  category: string;
+  steps_json: string;
+  is_builtin: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface SaveWorkflowTemplateInput {
+  id?: string;
+  novel_id?: string | null;
+  name: string;
+  description?: string;
+  category?: string;
+  steps_json: string;
+}
+
+export interface WorkflowRun {
+  id: string;
+  template_id: string;
+  novel_id: string;
+  target_chapter_id?: string | null;
+  status: 'PENDING' | 'RUNNING' | 'WAITING_STEP' | 'COMPLETED' | 'FAILED' | 'PAUSED';
+  current_step_index: number;
+  run_mode: 'AUTO' | 'STEP';
+  context_bindings_json: string;
+  total_tokens: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CreateWorkflowRunInput {
+  template_id: string;
+  novel_id: string;
+  target_chapter_id?: string | null;
+  run_mode?: 'AUTO' | 'STEP';
+  context_bindings_json?: string;
+}
+
+export interface WorkflowStepRecord {
+  id: string;
+  run_id: string;
+  step_index: number;
+  step_key: string;
+  title: string;
+  prompt_rendered: string;
+  input_values_json: string;
+  raw_output: string;
+  edited_output: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  error_message: string;
+  token_usage: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface AdvanceWorkflowStepInput {
+  run_id: string;
+  step_index: number;
+  input_values_json?: string;
+  auto_advance_next?: boolean;
+}
+
+export interface UpdateWorkflowStepOutputInput {
+  step_record_id: string;
+  edited_output: string;
+}
+
+export interface WorkflowRunDetails {
+  run: WorkflowRun;
+  template: WorkflowTemplate;
+  steps: WorkflowStepRecord[];
+}
+
+export type ToolboxActionType =
+  | 'name'
+  | 'intro'
+  | 'premise'
+  | 'cheat'
+  | 'world_law'
+  | 'gold_opening'
+  | 'chapter_outline'
+  | 'dialogue_polish';
+
+export interface ExecuteToolboxActionInput {
+  novel_id: string;
+  action_type: ToolboxActionType;
+  chapter_id?: string | null;
+  custom_input?: string | null;
+  character_ids?: string[] | null;
+  world_rule_ids?: string[] | null;
+  include_prev_chapter?: boolean | null;
+  include_memo?: boolean | null;
+}
+
+export interface ExecuteToolboxActionResult {
+  action_type: string;
+  system_prompt: string;
+  user_prompt: string;
+  target_destination: 'insert_editor' | 'save_as_character' | 'save_as_rule' | 'save_as_chapter';
+  assembled_context_summary: string;
+}
+
+// ==========================================
+// V2.3.1 VOICE PROFILES & FINDING REPAIR TYPES
+// ==========================================
+
+export interface VoiceProfile {
+  id: string;
+  novel_id?: string | null;
+  name: string;
+  description: string;
+  sample_text: string;
+  sentence_rhythm: string;
+  vocabulary_tone: string;
+  pov_preference: string;
+  sensory_ratio: string;
+  custom_rules_json: string;
+  is_active: boolean;
+  is_builtin: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface SaveVoiceProfileInput {
+  id?: string;
+  novel_id?: string | null;
+  name: string;
+  description?: string;
+  sample_text?: string;
+  sentence_rhythm?: string;
+  vocabulary_tone?: string;
+  pov_preference?: string;
+  sensory_ratio?: string;
+  custom_rules_json?: string;
+  is_active?: boolean;
+}
+
+export interface GenerateFindingRepairInput {
+  novel_id: string;
+  chapter_id: string;
+  finding_id: string;
+  custom_instructions?: string;
+}
+
+export interface FindingRepairResult {
+  finding_id: string;
+  finding_title: string;
+  severity: string;
+  original_quote: string;
+  repair_suggestion: string;
+  revised_text_draft: string;
+  diff_summary: string;
+  voice_profile_used: string;
+}
 

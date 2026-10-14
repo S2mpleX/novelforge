@@ -16,6 +16,10 @@ use crate::models::{
     CreateParallelThreadInput, PlotAssociation, CreatePlotAssociationInput, PlotAssociationView,
     MoveNodeInput, SplitChapterInput, SplitSceneInput, MergeChaptersInput, MergeScenesInput,
     RenumberHierarchyInput, NovelContentTree, HierarchicalCreationContext,
+    WorkflowTemplate, SaveWorkflowTemplateInput, WorkflowRun, CreateWorkflowRunInput,
+    WorkflowStepRecord, AdvanceWorkflowStepInput, UpdateWorkflowStepOutputInput,
+    WorkflowRunDetails, ExecuteToolboxActionInput, ExecuteToolboxActionResult,
+    VoiceProfile, SaveVoiceProfileInput, GenerateFindingRepairInput, FindingRepairResult,
 };
 use crate::providers::{
     ChatMessage, ChatCompletionRequest, ConnectionTestResult, OpenAIClient,
@@ -1575,6 +1579,182 @@ pub fn assemble_hierarchical_creation_context(
         .map_err(|e| e.to_string())
 }
 
+// --- V2.3 WORKFLOW ENGINE & TOOLBOX COMMANDS ---
 
+#[tauri::command]
+pub fn list_workflow_templates(db: State<DbManager>, novel_id: Option<String>) -> Result<Vec<WorkflowTemplate>, String> {
+    db.list_workflow_templates(novel_id.as_deref()).map_err(|e| e.to_string())
+}
 
+#[tauri::command]
+pub fn save_workflow_template(db: State<DbManager>, input: SaveWorkflowTemplateInput) -> Result<WorkflowTemplate, String> {
+    db.save_workflow_template(input).map_err(|e| e.to_string())
+}
 
+#[tauri::command]
+pub fn create_workflow_run(db: State<DbManager>, input: CreateWorkflowRunInput) -> Result<WorkflowRunDetails, String> {
+    db.create_workflow_run(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_workflow_run_details(db: State<DbManager>, run_id: String) -> Result<WorkflowRunDetails, String> {
+    db.get_workflow_run_details(&run_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_workflow_runs(db: State<DbManager>, novel_id: String) -> Result<Vec<WorkflowRun>, String> {
+    db.list_workflow_runs(&novel_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_workflow_step_output(db: State<DbManager>, input: UpdateWorkflowStepOutputInput) -> Result<WorkflowStepRecord, String> {
+    db.update_workflow_step_output(&input.step_record_id, &input.edited_output).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn advance_workflow_step(db: State<DbManager>, input: AdvanceWorkflowStepInput) -> Result<WorkflowRunDetails, String> {
+    db.advance_workflow_step(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn assemble_toolbox_prompt(db: State<DbManager>, input: ExecuteToolboxActionInput) -> Result<ExecuteToolboxActionResult, String> {
+    db.assemble_toolbox_prompt(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn execute_llm_chat(
+    db: State<'_, DbManager>,
+    system_prompt: String,
+    user_prompt: String,
+    temperature: Option<f32>,
+    max_tokens: Option<i64>,
+) -> Result<String, String> {
+    let (provider, model) = db
+        .get_active_provider_and_model()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "未找到已激活的 AI 服务商，请先在模型设置中配置并激活 API".to_string())?;
+
+    let client = OpenAIClient::new();
+    let req = ChatCompletionRequest {
+        model: model.model_name,
+        messages: vec![
+            ChatMessage { role: "system".to_string(), content: system_prompt },
+            ChatMessage { role: "user".to_string(), content: user_prompt },
+        ],
+        temperature,
+        max_tokens,
+        stream: false,
+    };
+
+    client.chat_completion(&provider.base_url, &provider.api_key, req).await
+}
+
+// --- V2.3.1 VOICE PROFILES & REVIEW REPAIR ---
+
+#[tauri::command]
+pub fn list_voice_profiles(db: State<DbManager>, novel_id: Option<String>) -> Result<Vec<VoiceProfile>, String> {
+    db.list_voice_profiles(novel_id.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_voice_profile(db: State<DbManager>, input: SaveVoiceProfileInput) -> Result<VoiceProfile, String> {
+    db.save_voice_profile(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_active_voice_profile(db: State<DbManager>, id: String, novel_id: Option<String>) -> Result<(), String> {
+    db.set_active_voice_profile(&id, novel_id.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_voice_profile(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_voice_profile(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn generate_finding_repair(
+    db: State<'_, DbManager>,
+    input: GenerateFindingRepairInput,
+) -> Result<FindingRepairResult, String> {
+    let finding = db
+        .get_review_finding(&input.finding_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("未找到指定的审稿发现: {}", input.finding_id))?;
+
+    let chapter = db.get_chapter(&input.chapter_id).map_err(|e| e.to_string())?;
+    let novel = db.get_novel(&chapter.novel_id).map_err(|e| e.to_string())?;
+    let voice_profile = db.get_active_voice_profile(Some(&novel.id)).unwrap_or(None);
+
+    let (provider, model) = db
+        .get_active_provider_and_model()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "未找到已激活的 AI 服务商，请先在模型设置中配置并激活 API".to_string())?;
+
+    let voice_req = match voice_profile {
+        Some(vp) => format!(
+            "【文风档案规范】:\n- 调性: {}\n- 句子节奏: {}\n- 遣词倾向: {}\n- 负面规约: {}\n",
+            vp.vocabulary_tone, vp.sentence_rhythm, vp.pov_preference, vp.custom_rules_json
+        ),
+        None => format!("文风要求: {}\n", novel.writing_style),
+    };
+
+    let system_prompt = format!(
+        "你是一名顶级小说审稿修复专家与文学润色编辑。\n\
+         当前作品：《{}》\n\
+         {}\n\
+         【职责】针对审稿质检发现的问题点与原文缺陷引用，给出精准的无逻辑矛盾、叙事自然的新替换段落。\n\
+         【输出格式】必须输出纯合法 JSON，严禁聊天客套话：\n\
+         {{\n\
+           \"repaired_text\": \"修复后的替换段落全文\",\n\
+           \"explanation\": \"简要说明为何这样修改以及如何化解了原冲突\"\n\
+         }}",
+        novel.title, voice_req
+    );
+
+    let user_prompt = format!(
+        "【问题标题】: {}\n\
+         【冲突阐述】: {}\n\
+         【原文缺陷引用 (待替换)】:\n{}\n\
+         【审稿整改建议】: {}\n\
+         【作者补充指导】: {}\n\n\
+         请根据上述要求，直接重写并输出修复后的段落 JSON。",
+        finding.title,
+        finding.description,
+        finding.evidence_quote,
+        finding.suggestion,
+        input.custom_instruction.unwrap_or_else(|| "顺畅修复逻辑冲突，保持文风统一".to_string())
+    );
+
+    let client = OpenAIClient::new();
+    let req = ChatCompletionRequest {
+        model: model.model_name,
+        messages: vec![
+            ChatMessage { role: "system".to_string(), content: system_prompt },
+            ChatMessage { role: "user".to_string(), content: user_prompt },
+        ],
+        temperature: Some(0.7),
+        max_tokens: Some(2000),
+        stream: false,
+    };
+
+    let raw_resp = client.chat_completion(&provider.base_url, &provider.api_key, req).await?;
+    let json_str = extract_json_block(&raw_resp);
+
+    #[derive(serde::Deserialize)]
+    struct RepairPayload {
+        repaired_text: String,
+        explanation: String,
+    }
+
+    let parsed: RepairPayload = serde_json::from_str(json_str).unwrap_or(RepairPayload {
+        repaired_text: json_str.to_string(),
+        explanation: "已根据审稿建议完成修复重写。".to_string(),
+    });
+
+    Ok(FindingRepairResult {
+        finding_id: input.finding_id,
+        original_quote: finding.evidence_quote,
+        repaired_text: parsed.repaired_text,
+        explanation: parsed.explanation,
+    })
+}

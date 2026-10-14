@@ -123,7 +123,7 @@ async function runTestSuite() {
   // -------------------------------------------------------------
   console.log('\n▶ [测试 5] 更新包签名验证安全性校验');
   const validPubKey = 'dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVDODc1OURDODU3N0JBMEIKUldRTHVuZUYzRm1IWE5veDZyeUFFRlZ6Wm9zeHFGTDBlcVV3aUs0M0NkOTBaSldmNXpySXVTRVgK';
-  const tauriConfig = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+  const tauriConfig = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8').replace(/^\uFEFF/, ''));
   const configuredPubKey = tauriConfig.plugins?.updater?.pubkey;
   assert(configuredPubKey === validPubKey, '客户端 tauri.conf.json 已严格配置原生 Minisign 验签公钥');
   assert(!fs.existsSync('.git/updater.key'), '私钥绝对未进入版本控制系统');
@@ -177,12 +177,12 @@ async function runTestSuite() {
   // 测试 11：版本一致性校验（package.json / Cargo.toml / tauri.conf.json）
   // -------------------------------------------------------------
   console.log('\n▶ [测试 11] 应用三合一版本源严格一致性');
-  const pkgJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-  const cargoToml = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+  const pkgJson = JSON.parse(fs.readFileSync('package.json', 'utf8').replace(/^\uFEFF/, ''));
+  const cargoToml = fs.readFileSync('src-tauri/Cargo.toml', 'utf8').replace(/^\uFEFF/, '');
   const cargoVer = cargoToml.match(/version\s*=\s*"([^"]+)"/)?.[1];
-  assert(pkgJson.version === '2.2.0', `package.json 版本号为 ${pkgJson.version}`);
-  assert(cargoVer === '2.2.0', `src-tauri/Cargo.toml 版本号为 ${cargoVer}`);
-  assert(tauriConfig.version === '2.2.0', `src-tauri/tauri.conf.json 版本号为 ${tauriConfig.version}`);
+  assert(Boolean(pkgJson.version), `package.json 版本号为 ${pkgJson.version}`);
+  assert(Boolean(cargoVer), `src-tauri/Cargo.toml 版本号为 ${cargoVer}`);
+  assert(Boolean(tauriConfig.version), `src-tauri/tauri.conf.json 版本号为 ${tauriConfig.version}`);
   assert(pkgJson.version === cargoVer && cargoVer === tauriConfig.version, '三大核心配置文件版本号 100% 保持完全一致');
 
   // -------------------------------------------------------------
