@@ -7,78 +7,135 @@ export const WindowControls: React.FC = () => {
   const [inTauri, setInTauri] = useState(() => isTauri());
 
   useEffect(() => {
-    if (!isTauri()) return;
-    setInTauri(true);
-
     let isMounted = true;
     let unlisten: (() => void) | undefined;
-    (async () => {
-      try {
-        const { getCurrentWindow } = await import('@tauri-apps/api/window');
-        const appWindow = getCurrentWindow();
-        const max = await appWindow.isMaximized();
-        if (isMounted) setIsMaximized(max);
-        const fn = await appWindow.onResized(async () => {
-          if (isMounted) {
-            setIsMaximized(await appWindow.isMaximized());
+
+    const initListeners = async () => {
+      const desktop = isTauri() || (typeof window !== 'undefined' && Boolean((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__));
+      if (desktop) {
+        if (isMounted) setInTauri(true);
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          const appWindow = getCurrentWindow();
+          const max = await appWindow.isMaximized();
+          const full = await appWindow.isFullscreen();
+          if (isMounted) setIsMaximized(max || full);
+
+          const fn = await appWindow.onResized(async () => {
+            if (isMounted) {
+              const curMax = await appWindow.isMaximized();
+              const curFull = await appWindow.isFullscreen();
+              setIsMaximized(curMax || curFull);
+            }
+          });
+          if (!isMounted) {
+            if (typeof fn === 'function') fn();
+          } else {
+            unlisten = fn;
           }
-        });
-        if (!isMounted) {
-          if (typeof fn === 'function') fn();
-        } else {
-          unlisten = fn;
+        } catch (err) {
+          console.warn('[WindowControls] Tauri window init fallback:', err);
         }
-      } catch (err) {
-        console.warn('[WindowControls] Failed to attach window listeners:', err);
+      } else {
+        // 浏览器环境：同步监听原生全屏状态变更
+        const handleFullscreenChange = () => {
+          if (isMounted) {
+            setIsMaximized(Boolean(document.fullscreenElement));
+          }
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => {
+          document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        };
       }
-    })();
+    };
+
+    const cleanup = initListeners();
 
     return () => {
       isMounted = false;
-      if (unlisten) {
-        unlisten();
+      if (unlisten) unlisten();
+      if (cleanup && typeof (cleanup as any).then === 'function') {
+        (cleanup as any).then((cleanFn: any) => {
+          if (typeof cleanFn === 'function') cleanFn();
+        });
       }
     };
   }, []);
 
-  if (!inTauri) return null;
-
   const handleMinimize = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().minimize();
-    } catch (err) {
-      console.error('[WindowControls] Failed to minimize window:', err);
+    if (inTauri) {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().minimize();
+      } catch (err) {
+        console.error('[WindowControls] Failed to minimize window:', err);
+      }
+    } else {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
     }
   };
 
   const handleToggleMaximize = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      const appWindow = getCurrentWindow();
-      await appWindow.toggleMaximize();
-      setIsMaximized(await appWindow.isMaximized());
-    } catch (err) {
-      console.error('[WindowControls] Failed to toggle maximize:', err);
+    if (inTauri) {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const appWindow = getCurrentWindow();
+        const isFull = await appWindow.isFullscreen();
+        if (isFull) {
+          await appWindow.setFullscreen(false);
+          setIsMaximized(await appWindow.isMaximized());
+        } else {
+          await appWindow.toggleMaximize();
+          setIsMaximized(await appWindow.isMaximized());
+        }
+      } catch (err) {
+        console.error('[WindowControls] Failed to toggle maximize:', err);
+      }
+    } else {
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          setIsMaximized(false);
+        } else {
+          await document.documentElement.requestFullscreen();
+          setIsMaximized(true);
+        }
+      } catch (err) {
+        console.warn('[WindowControls] Browser fullscreen toggle failed:', err);
+      }
     }
   };
 
   const handleClose = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().close();
-    } catch (err) {
-      console.error('[WindowControls] Failed to close window:', err);
+    if (inTauri) {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().close();
+      } catch (err) {
+        console.error('[WindowControls] Failed to close window:', err);
+      }
+    } else {
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+        }
+        window.close();
+      } catch (err) {
+        console.warn('[WindowControls] Browser close window failed:', err);
+      }
     }
   };
 
   return (
     <div
       className={`flex items-center ml-1.5 pl-1.5 border-l border-[#ded5c4] dark:border-stone-700/60 shrink-0 z-50 select-none ${
-        isMaximized ? 'pr-1' : 'pr-2.5'
+        isMaximized ? 'pr-3' : 'pr-2'
       }`}
       data-tauri-drag-region="false"
     >
@@ -87,7 +144,7 @@ export const WindowControls: React.FC = () => {
         type="button"
         onClick={handleMinimize}
         className="w-9 h-8 flex items-center justify-center rounded-md text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce] active:bg-[#d8cebe] dark:text-stone-300 dark:hover:text-stone-100 dark:hover:bg-stone-700/60 transition cursor-pointer shrink-0"
-        title="最小化"
+        title={inTauri ? "最小化窗口" : "最小化 / 退出全屏"}
         aria-label="最小化窗口"
       >
         <Minus className="w-3.5 h-3.5" />
@@ -98,7 +155,7 @@ export const WindowControls: React.FC = () => {
         type="button"
         onClick={handleToggleMaximize}
         className="w-9 h-8 flex items-center justify-center rounded-md text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce] active:bg-[#d8cebe] dark:text-stone-300 dark:hover:text-stone-100 dark:hover:bg-stone-700/60 transition cursor-pointer shrink-0"
-        title={isMaximized ? '向下还原' : '最大化'}
+        title={isMaximized ? '向下还原 (退出全屏)' : '窗口最大化'}
         aria-label={isMaximized ? '向下还原窗口' : '最大化窗口'}
       >
         {isMaximized ? (

@@ -122,7 +122,7 @@ async function runTestSuite() {
   // 测试 5：更新包签名机制与非对称校验
   // -------------------------------------------------------------
   console.log('\n▶ [测试 5] 更新包签名验证安全性校验');
-  const validPubKey = 'dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVDODc1OURDODU3N0JBMEIKUldRTHVuZUYzRm1IWE5veDZyeUFFRlZ6Wm9zeHFGTDBlcVV3aUs0M0NkOTBaSldmNXpySXVTRVgK';
+  const validPubKey = 'dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM1MjIwRDE5ODFCMEQ2M0MKUldRODFyQ0JHUTBpeFh4RHM4MlMwNmJucUZQSUIra1NMcTZTUUJLWDdqaTdGeGlzc0Nma3JrVkkK';
   const tauriConfig = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8').replace(/^\uFEFF/, ''));
   const configuredPubKey = tauriConfig.plugins?.updater?.pubkey;
   assert(configuredPubKey === validPubKey, '客户端 tauri.conf.json 已严格配置原生 Minisign 验签公钥');

@@ -13,8 +13,12 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot\..
 
-# 设置终端输出为 UTF-8，防止控制台中文乱码
+# 设置终端输入/输出与管道为 UTF-8，防止控制台中文乱码与子进程通讯乱码
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+$OutputEncoding           = [System.Text.Encoding]::UTF8
+$env:PYTHONIOENCODING     = 'utf-8'
+$env:LANG                 = 'zh_CN.UTF-8'
 
 Write-Host ''
 Write-Host '╔══════════════════════════════════════════════════╗' -ForegroundColor Cyan
@@ -184,8 +188,10 @@ if (-not (Test-Path $keyPath)) {
 $key = (Get-Content $keyPath -Raw).Trim()
 $env:TAURI_SIGNING_PRIVATE_KEY = $key
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ''
+$env:CI = 'true'
 
-pnpm tauri build
+Write-Host '     正在进行免密签名与打包构建，请稍候...' -ForegroundColor Cyan
+pnpm tauri build --ci
 if ($LASTEXITCODE -ne 0) {
     Write-Host '构建失败' -ForegroundColor Red
     exit 1

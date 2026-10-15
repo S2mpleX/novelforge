@@ -10,6 +10,7 @@ const newPath = currentPath.includes(mingwBin) ? currentPath : `${mingwBin};${cu
 const env = {
   ...process.env,
   PATH: newPath,
+  WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS || '--disable-gpu --disable-gpu-compositing',
 };
 
 let cmd = 'tauri';

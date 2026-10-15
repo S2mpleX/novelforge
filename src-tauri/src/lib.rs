@@ -9,6 +9,13 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+
+    // 规避 Windows 下 NVIDIA 驱动（NvMemMapStoragex.dll 0xc0000005）与 WebView2 GPU 渲染崩溃冲突
+    if std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").is_err() {
+        unsafe {
+            std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-gpu --disable-gpu-compositing");
+        }
+    }
     println!("[NovelForge] 1. Initializing SQLite DbManager...");
     let db = DbManager::new().expect("Failed to initialize SQLite database");
     println!("[NovelForge] 2. SQLite DbManager initialized successfully.");
@@ -22,6 +29,7 @@ pub fn run() {
             println!("[NovelForge] 4. App setup hook triggered!");
             if let Some(window) = app.get_webview_window("main") {
                 println!("[NovelForge] 5. Successfully found 'main' window. Showing and focusing window...");
+                let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
             } else {

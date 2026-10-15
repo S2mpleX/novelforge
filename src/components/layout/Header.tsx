@@ -290,10 +290,10 @@ export const Header: React.FC = () => {
           </button>
         </div>
 
-        {/* Right - Unified Action & System Controls (Permanent Right Anchor, Zero Overflow) */}
-        <div className="flex items-center ml-auto h-full shrink-0 min-w-0">
-          {/* Action & Tools Container (Responsive, shrinkable, never pushes WindowControls) */}
-          <div className="flex items-center gap-1 lg:gap-1.5 shrink min-w-0 pr-1">
+        {/* Right - Flexible Action Tools & Permanent Far-Right System Controls */}
+        <div className="flex items-center ml-auto h-full min-w-0">
+          {/* Middle-Right: Action & Workflow Tools (Responsive, shrinkable, min-w-0) */}
+          <div className="flex items-center gap-1 lg:gap-1.5 shrink min-w-0 justify-end mx-1">
             {/* Quick Command Palette Search Button */}
             <button
               onClick={() => setShowCommandPalette(true)}
@@ -314,7 +314,7 @@ export const Header: React.FC = () => {
               title={`当前活跃模型：${activeProvider?.name || '未配置'}${activeModel ? ` (${activeModel.model_name})` : ''}\n点击快速配置或切换`}
             >
               <Cpu className="w-3.5 h-3.5 text-amber-800 shrink-0" />
-              <span className="max-w-[160px] truncate text-[#3d362e]">
+              <span className="max-w-[150px] truncate text-[#3d362e]">
                 {activeProvider
                   ? `${activeProvider.name}${activeModel ? ` · ${activeModel.model_name}` : ''}`
                   : '未配置模型'}
@@ -331,8 +331,19 @@ export const Header: React.FC = () => {
               <span className="hidden xl:inline">自动连载</span>
             </button>
 
-            {/* 1. 常规与小屏幕下的【创作工坊】折叠下拉菜单 (在 < 2xl 屏幕呈现，避免超宽拥挤) */}
-            <div ref={workshopMenuRef} className="relative flex 2xl:hidden items-center shrink-0">
+            {/* Word 文档导入专属快捷入口 (高频重点功能) */}
+            <button
+              type="button"
+              onClick={() => setShowWordImportModal(true)}
+              className="hidden sm:flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium bg-blue-800/10 hover:bg-blue-800/20 text-blue-900 transition border border-blue-800/20 shadow-xs shrink-0 whitespace-nowrap cursor-pointer"
+              title="导入 Microsoft Word (.docx) 文档并自动智能分章"
+            >
+              <FileText className="w-3.5 h-3.5 shrink-0 text-blue-700" />
+              <span className="hidden xl:inline">Word导入</span>
+            </button>
+
+            {/* 【创作工坊】折叠下拉菜单 (常驻呈现，涵盖百宝箱、工作流、文风、竞技场、排版、交付备份) */}
+            <div ref={workshopMenuRef} className="relative flex items-center shrink-0">
               <button
                 type="button"
                 onClick={() => setShowWorkshopMenu(!showWorkshopMenu)}
@@ -422,72 +433,6 @@ export const Header: React.FC = () => {
               )}
             </div>
 
-            {/* 2. 超大屏幕 (>= 2xl) 下直接平铺各专项快捷按钮 */}
-            <div className="hidden 2xl:flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => setShowWordImportModal(true)}
-                className="px-2 py-1.5 rounded-lg text-xs font-medium bg-blue-800/10 hover:bg-blue-800/20 text-blue-900 transition flex items-center gap-1 border border-blue-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
-                title="导入 Microsoft Word (.docx) 文档并自动智能分章"
-              >
-                <FileText className="w-3.5 h-3.5 shrink-0 text-blue-700" />
-                <span>Word导入</span>
-              </button>
-
-              <button
-                onClick={() => setShowToolboxModal(true)}
-                className="px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-800/10 hover:bg-amber-800/20 text-amber-800 transition flex items-center gap-1 border border-amber-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
-                title="打开小说专项工具箱 (8大创作专项/设定关联)"
-              >
-                <Wand2 className="w-3.5 h-3.5 shrink-0 text-amber-700" />
-                <span>百宝箱</span>
-              </button>
-
-              <button
-                onClick={() => setShowWorkflowModal(true)}
-                className="px-2 py-1.5 rounded-lg text-xs font-medium bg-indigo-800/10 hover:bg-indigo-800/20 text-indigo-800 transition flex items-center gap-1 border border-indigo-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
-                title="打开剧情工作流执行引擎"
-              >
-                <GitCommit className="w-3.5 h-3.5 shrink-0 text-indigo-700" />
-                <span>工作流</span>
-              </button>
-
-              <button
-                onClick={() => setShowVoiceProfileModal(true)}
-                className="px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-900/10 hover:bg-amber-900/20 text-amber-900 transition flex items-center gap-1 border border-amber-900/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
-                title="打开作者文风档案工作室 (文风建模/试读/切换)"
-              >
-                <Feather className="w-3.5 h-3.5 shrink-0 text-amber-800" />
-                <span>文风</span>
-              </button>
-
-              <button
-                onClick={() => setShowArenaModal(true)}
-                className="px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-800/10 hover:bg-amber-800/20 text-amber-900 transition flex items-center gap-1 border border-amber-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
-                title="打开多模型同台比稿竞技场 (双模推演/盲测PK/智能融稿)"
-              >
-                <Swords className="w-3.5 h-3.5 shrink-0 text-amber-800" />
-                <span>竞技</span>
-              </button>
-
-              <button
-                onClick={() => setShowTypesetterModal(true)}
-                className="px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-800/10 hover:bg-amber-800/20 text-amber-900 transition flex items-center gap-1 border border-amber-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
-                title="打开网文平台排版清洗机 (起点/番茄全角缩进与敏感词预检)"
-              >
-                <Sparkles className="w-3.5 h-3.5 shrink-0 text-amber-800" />
-                <span>排版</span>
-              </button>
-
-              <button
-                onClick={() => setShowPublishingModal(true)}
-                className="px-2 py-1.5 rounded-lg text-xs font-medium bg-emerald-800/10 hover:bg-emerald-800/20 text-emerald-800 transition flex items-center gap-1 border border-emerald-800/20 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
-                title="打开发布交付中心与数据库灾备"
-              >
-                <Archive className="w-3.5 h-3.5 shrink-0" />
-                <span>交付备份</span>
-              </button>
-            </div>
-
             {/* Word count & Save status */}
             {activeChapter && (
               <div className="hidden xl:flex items-center gap-1.5 px-2 py-1 bg-[#e4dcce] rounded-lg border border-[#d5cbb8] text-xs shrink-0 whitespace-nowrap">
@@ -542,8 +487,10 @@ export const Header: React.FC = () => {
                 全本
               </button>
             </div>
-            <div className="hidden sm:block w-px h-4 bg-[#ded5c4] shrink-0" />
+          </div>
 
+          {/* Far-Right: Permanent System & Window Controls (Anchor Far Right, Zero Overflow, Never Clipped) */}
+          <div className="flex items-center shrink-0 ml-auto h-full z-40 bg-[#efe9dc] pl-1 select-none">
             {/* Global UI Scale Stepper */}
             <div ref={scaleMenuRef} className="relative flex items-center shrink-0">
               <div className="flex items-center gap-0.5 bg-[#e4dcce] p-0.5 rounded-lg border border-[#d5cbb8] shadow-2xs">
@@ -628,7 +575,7 @@ export const Header: React.FC = () => {
             <button
               type="button"
               onClick={toggleThemeMode}
-              className={`p-2 rounded-lg transition-all duration-200 cursor-pointer shrink-0 ${
+              className={`p-2 rounded-lg transition-all duration-200 cursor-pointer shrink-0 ml-0.5 ${
                 themeMode === 'dark'
                   ? 'text-amber-400 bg-amber-400/15 border border-amber-400/30 shadow-xs'
                   : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
@@ -638,8 +585,6 @@ export const Header: React.FC = () => {
             >
               {themeMode === 'dark' ? <Sun className="w-4 h-4 text-amber-400 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
             </button>
-
-            <div className="w-px h-4 bg-[#ded5c4] shrink-0" />
 
             {/* Zen Mode Toggle */}
             <button
@@ -684,10 +629,10 @@ export const Header: React.FC = () => {
             >
               {rightPanelOpen ? <PanelRightClose className="w-4 h-4 shrink-0" /> : <PanelRightOpen className="w-4 h-4 shrink-0" />}
             </button>
-          </div>
 
-          {/* Frameless Desktop Window Controls (Min, Max/Restore, Close - Permanently Anchored to Absolute Right) */}
-          <WindowControls />
+            {/* Frameless Desktop Window Controls (Min, Max/Restore, Close - 绝对置顶常驻) */}
+            <WindowControls />
+          </div>
         </div>
       </header>
 

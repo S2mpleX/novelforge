@@ -168,6 +168,7 @@ export const NovelEditor: React.FC = () => {
     streamText,
     isGenerating,
     zenMode,
+    toggleZenMode,
     themeMode,
     setThemeMode,
   } = useNovelStore();
@@ -482,19 +483,48 @@ export const NovelEditor: React.FC = () => {
         isFullScreen ? 'fixed inset-0 z-50 bg-[#f4efe6] p-6' : ''
       }`}
     >
+      {/* 全屏模式下右上角固定常驻退出/关闭控制器（无论工具栏横向滚动或缩放，始终绝对置顶于屏幕右上角，绝对显眼） */}
+      {isFullScreen && (
+        <div className="fixed top-3 right-4 z-[999] flex items-center gap-2 bg-[#efe9dc]/95 dark:bg-stone-800/95 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-[#ded5c4] dark:border-stone-700 shadow-xl select-none animate-in fade-in zoom-in-95 duration-150">
+          <button
+            type="button"
+            onClick={() => setIsFullScreen(false)}
+            className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-serif font-semibold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer group"
+            title="退出全屏专注模式 (Esc / 点击关闭)"
+            aria-label="退出全屏"
+          >
+            <X className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+            <span>退出全屏 (Esc)</span>
+          </button>
+          <WindowControls />
+        </div>
+      )}
+
       {/* Editor Formatting Floating Toolbar */}
       <div className="h-12 border-b border-[#ded5c4] px-2.5 md:px-4 flex items-center justify-between bg-[#efe9dc]/95 backdrop-blur-xl select-none shrink-0 z-10 shadow-sm gap-1.5 overflow-hidden min-w-0">
         {/* Left: Text Formatting Controls & Zen Mode Indicator */}
         <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto scrollbar-none py-1">
           {zenMode && (
-            <span className="mr-2 px-2 py-0.5 rounded bg-amber-800/10 text-amber-800 border border-amber-800/20 text-[10px] font-serif font-bold shrink-0 whitespace-nowrap">
-              禅意专注 (Esc退出)
-            </span>
+            <button
+              type="button"
+              onClick={toggleZenMode}
+              className="mr-2 px-2 py-0.5 rounded bg-amber-800/10 hover:bg-amber-800/20 text-amber-800 border border-amber-800/20 text-[10px] font-serif font-bold shrink-0 whitespace-nowrap flex items-center gap-1 transition cursor-pointer"
+              title="点击退出禅意专注模式 (Esc)"
+            >
+              <X className="w-3 h-3" />
+              <span>禅意专注 (Esc退出)</span>
+            </button>
           )}
           {isFullScreen && (
-            <span className="mr-2 px-2 py-0.5 rounded bg-amber-800/10 text-amber-800 border border-amber-800/20 text-[10px] font-serif font-bold shrink-0 whitespace-nowrap">
-              全屏专注 (Esc退出)
-            </span>
+            <button
+              type="button"
+              onClick={() => setIsFullScreen(false)}
+              className="mr-2 px-2 py-0.5 rounded bg-rose-700/10 hover:bg-rose-700/20 text-rose-800 border border-rose-700/20 text-[10px] font-serif font-bold shrink-0 whitespace-nowrap flex items-center gap-1 transition cursor-pointer"
+              title="点击退出全屏模式 (Esc)"
+            >
+              <X className="w-3 h-3" />
+              <span>全屏专注 (Esc退出)</span>
+            </button>
           )}
           <button
             onClick={() => editor?.chain().focus().undo().run()}
@@ -776,7 +806,7 @@ export const NovelEditor: React.FC = () => {
           {isFullScreen ? (
             <button
               onClick={() => setIsFullScreen(false)}
-              className="px-2.5 py-1 rounded-lg bg-rose-700/10 hover:bg-rose-700 hover:text-white text-rose-800 border border-rose-700/25 text-xs font-serif font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer group"
+              className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-serif font-semibold text-xs flex items-center gap-1.5 transition shadow-xs shrink-0 cursor-pointer group"
               title="退出全屏专注模式 (Esc / 点击关闭)"
             >
               <X className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />

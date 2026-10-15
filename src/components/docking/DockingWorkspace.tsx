@@ -7,7 +7,7 @@ import { WorkspaceToolbar } from './WorkspaceToolbar';
 import { PanelWrapper } from './PanelWrapper';
 import { PANEL_METADATA_MAP } from './PanelRegistry';
 import { allPanelsInTree } from '@/utils/dockingTree';
-import { Minimize2 } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export const DockingWorkspace: React.FC = () => {
   const {
@@ -66,10 +66,10 @@ export const DockingWorkspace: React.FC = () => {
               </span>
               <button
                 onClick={() => toggleMaximizePanel(null)}
-                className="px-2.5 py-0.5 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium transition flex items-center gap-1.5 text-[11px] cursor-pointer shadow-xs active:scale-95"
+                className="px-2.5 py-0.5 rounded bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-medium transition flex items-center gap-1.5 text-[11px] cursor-pointer shadow-xs active:scale-95 group"
                 title="退出最大化独占模式 (Esc / 点击恢复)"
               >
-                <Minimize2 className="w-3 h-3" />
+                <X className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                 <span>退出最大化 (Esc)</span>
               </button>
             </div>

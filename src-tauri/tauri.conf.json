@@ -43,7 +43,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVDODc1OURDODU3N0JBMEIKUldRTHVuZUYzRm1IWE5veDZyeUFFRlZ6Wm9zeHFGTDBlcVV3aUs0M0NkOTBaSldmNXpySXVTRVgK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM1MjIwRDE5ODFCMEQ2M0MKUldRODFyQ0JHUTBpeFh4RHM4MlMwNmJucUZQSUIra1NMcTZTUUJLWDdqaTdGeGlzc0Nma3JrVkkK",
       "endpoints": [
         "https://github.com/S2mpleX/novelforge/releases/latest/download/latest.json",
         "https://ghfast.top/https://github.com/S2mpleX/novelforge/releases/latest/download/latest.json"
