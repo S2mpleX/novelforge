@@ -13,6 +13,9 @@
     "test:humanizer": "tsx tests/test-humanizer-engine.ts",
     "test:arena": "tsx tests/test-model-arena.ts",
     "test:typesetter": "tsx tests/test-typesetter-engine.ts",
+    "test:memory": "tsx tests/test-memory-engine.ts",
+    "test:provider": "tsx tests/test-provider-model.ts",
+    "test:word": "tsx tests/test-word-import.ts",
     "check:version": "tsx scripts/check-version-consistency.ts",
     "test:db": "node scripts/tauri-runner.js -- cargo run --manifest-path src-tauri/Cargo.toml --bin db_test"
   },

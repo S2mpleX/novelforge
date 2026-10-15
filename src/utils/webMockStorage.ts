@@ -728,10 +728,10 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
 
     // --- CANON FACTS & MEMORY ---
     case 'list_canon_facts': {
-      return getStorage<CanonFact[]>('canon_facts', [
+      const all = getStorage<CanonFact[]>('canon_facts', [
         {
           id: 'fact-001',
-          novel_id: SEED_NOVEL_ID,
+          novel_id: args?.novelId || SEED_NOVEL_ID,
           subject_id: '先驱者号',
           predicate: '搭载了',
           object_value: '第三号反物质曲率核心',
@@ -744,12 +744,24 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
           created_at: Date.now() - 86400000,
         },
       ]);
+      const novelId = args?.novelId;
+      const query = (args?.query || '').trim().toLowerCase();
+      let filtered = novelId ? all.filter((f) => f.novel_id === novelId) : all;
+      if (query) {
+        filtered = filtered.filter(
+          (f) =>
+            f.subject_id.toLowerCase().includes(query) ||
+            f.predicate.toLowerCase().includes(query) ||
+            f.object_value.toLowerCase().includes(query)
+        );
+      }
+      return filtered;
     }
 
     case 'create_canon_fact': {
       const facts = getStorage<CanonFact[]>('canon_facts', []);
       const f: CanonFact = {
-        id: 'fact_' + Date.now(),
+        id: 'fact_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
         novel_id: args.input.novel_id,
         subject_id: args.input.subject_id || '',
         predicate: args.input.predicate,
@@ -767,8 +779,22 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
       return f;
     }
 
-    case 'list_character_state_events':
-      return getStorage<CharacterStateEvent[]>('character_state_events', []);
+    case 'delete_canon_fact': {
+      const id = args?.id;
+      const facts = getStorage<CanonFact[]>('canon_facts', []);
+      const updated = facts.filter((f) => f.id !== id);
+      setStorage('canon_facts', updated);
+      return;
+    }
+
+    case 'list_character_state_events': {
+      const charId = args?.characterId;
+      const all = getStorage<CharacterStateEvent[]>('character_state_events', []);
+      if (charId) {
+        return all.filter((e) => e.character_id === charId);
+      }
+      return all;
+    }
 
     case 'create_character_state_event': {
       const evs = getStorage<CharacterStateEvent[]>('character_state_events', []);
