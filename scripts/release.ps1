@@ -1,4 +1,4 @@
-﻿# NovelForge AI — 一键版本发布脚本
+# NovelForge AI — 一键版本发布脚本
 # 用法：
 #   .\scripts\release.ps1 patch   → 2.2.0 → 2.2.1（修 Bug）
 #   .\scripts\release.ps1 minor   → 2.2.0 → 2.3.0（加功能）
@@ -234,99 +234,25 @@ if ($exeName) {
         git push origin main --tags --force
         Write-Host '     ✅ Git 代码与标签已同步至 GitHub' -ForegroundColor Green
 
-        Write-Host "     正在直接发布到 GitHub Releases ..." -ForegroundColor Yellow
+        Write-Host "     正在发布资产到 GitHub Releases ..." -ForegroundColor Yellow
         try {
-            $token = ""
-            $gcmCandidates = @(
-                "C:\Program Files\Git\mingw64\bin\git-credential-manager.exe",
-                "C:\Program Files\Git\bin\git-credential-manager.exe"
-            )
-            foreach ($gcm in $gcmCandidates) {
-                if (Test-Path $gcm) {
-                    $cred = "protocol=https`nhost=github.com`n`n" | & $gcm get 2>$null
-                    $pwLine = ($cred | Select-String 'password=')
-                    if ($pwLine) {
-                        $token = $pwLine.ToString().Replace('password=', '').Trim()
-                        break
-                    }
+            $uploadScript = Join-Path $PSScriptRoot "upload-release.cjs"
+            if (Test-Path $uploadScript) {
+                & node $uploadScript $newVersion
+                if ($LASTEXITCODE -ne 0) {
+                    throw "upload-release.cjs 退出码为 $LASTEXITCODE"
                 }
+            } else {
+                throw "未找到上传工具脚本 scripts/upload-release.cjs"
             }
-            if ([string]::IsNullOrWhiteSpace($token)) {
-                $cred = "protocol=https`nhost=github.com`n`n" | git credential fill 2>$null
-                $pwLine = ($cred | Select-String 'password=')
-                if ($pwLine) {
-                    $token = $pwLine.ToString().Replace('password=', '').Trim()
-                }
-            }
-            if ([string]::IsNullOrWhiteSpace($token)) {
-                throw "未能从 Git 凭据管理器中读取到 GitHub Token，请确保在系统 Git 中已登录 GitHub"
-            }
-
-            $headers = @{
-                'Authorization' = "token $token"
-                'User-Agent' = 'NovelForge-Deploy'
-                'Accept' = 'application/vnd.github.v3+json'
-            }
-
-            # 提取签名内容
-            $sigContent = (Get-Content ($exeName.FullName + '.sig') -Raw).Trim()
-
-            # 生成 latest.json
-            $latestMeta = @{
-                version = $newVersion
-                notes = '## NovelForge AI v' + $newVersion + "`n`n" + '详细变更请参阅 CHANGELOG.md.'
-                pub_date = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')
-                platforms = @{
-                    'windows-x86_64' = @{
-                        signature = $sigContent
-                        url = 'https://github.com/S2mpleX/novelforge/releases/download/v' + $newVersion + '/NovelForge.AI_' + $newVersion + '_x64-setup.exe'
-                    }
-                }
-            } | ConvertTo-Json -Depth 4
-            $latestJsonPath = $destDir + '\latest.json'
-            $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-            [System.IO.File]::WriteAllText($latestJsonPath, $latestMeta, $utf8NoBom)
-
-            # 创建 GitHub Release
-            $relPayload = @{
-                tag_name = 'v' + $newVersion
-                target_commitish = 'main'
-                name = 'NovelForge AI v' + $newVersion
-                body = '## NovelForge AI v' + $newVersion + ' 正式发布' + "`n`n" + '请通过应用内自动更新或下载随附安装包升级.'
-                draft = $false
-                prerelease = $false
-            } | ConvertTo-Json
-            
-            $relResp = Invoke-RestMethod -Uri 'https://api.github.com/repos/S2mpleX/novelforge/releases' -Method Post -Headers $headers -Body ([System.Text.Encoding]::UTF8.GetBytes($relPayload))
-            $uploadBase = 'https://uploads.github.com/repos/S2mpleX/novelforge/releases/' + $relResp.id + '/assets'
-
-            # 上传最新清单
-            $jsonBytes = [System.IO.File]::ReadAllBytes($latestJsonPath)
-            $uUri = $uploadBase + '?name=latest.json'
-            $headers['Content-Type'] = 'application/json'
-            Invoke-RestMethod -Uri $uUri -Method Post -Headers $headers -Body $jsonBytes | Out-Null
-            Write-Host '     ✅ 已上传 latest.json 更新清单' -ForegroundColor Green
-
-            # 上传签名
-            $sigBytes = [System.IO.File]::ReadAllBytes($exeName.FullName + '.sig')
-            $uUri = $uploadBase + '?name=NovelForge.AI_' + $newVersion + '_x64-setup.exe.sig'
-            $headers['Content-Type'] = 'text/plain'
-            Invoke-RestMethod -Uri $uUri -Method Post -Headers $headers -Body $sigBytes | Out-Null
-            Write-Host '     ✅ 已上传更新包签名' -ForegroundColor Green
-
-            # 上传安装包
-            $exeBytes = [System.IO.File]::ReadAllBytes($exeName.FullName)
-            $uUri = $uploadBase + '?name=NovelForge.AI_' + $newVersion + '_x64-setup.exe'
-            $headers['Content-Type'] = 'application/octet-stream'
-            Invoke-RestMethod -Uri $uUri -Method Post -Headers $headers -Body $exeBytes | Out-Null
-            Write-Host '     ✅ 已上传 Windows NSIS 安装包' -ForegroundColor Green
-
-            Write-Host ''
-            Write-Host ('🎉 恭喜！v' + $newVersion + ' 已正式发布到 GitHub !') -ForegroundColor Green
-            Write-Host '所有已安装客户端在打开软件时，将自动检测到该新版本并提示一键升级 !' -ForegroundColor Cyan
         } catch {
-            Write-Host "⚠️ 直接上传 Release 时遇到异常: $_" -ForegroundColor Yellow
-            Write-Host "请检查 GitHub 访问网络或稍后在网页端手动上传桌面产物" -ForegroundColor Gray
+            Write-Host ''
+            Write-Host "⚠️ 直接上传 GitHub Release 时遇到网络异常: $_" -ForegroundColor Yellow
+            Write-Host "【重要提示】：若因网络受限导致上传未完成，新版本安装包已完整保存在桌面：" -ForegroundColor Cyan
+            Write-Host "  📂 桌面目录: $destDir" -ForegroundColor White
+            Write-Host "  1. 本机直接升级：双击运行桌面上的 $($exeName.Name) 即可立即升级至 v$newVersion ！" -ForegroundColor Green
+            Write-Host "  2. 重新上传：可随时执行 `node scripts/upload-release.cjs $newVersion` 重试上传。" -ForegroundColor Cyan
+            Write-Host "  3. 网页端发布：亦可打开 https://github.com/S2mpleX/novelforge/releases/new ，将桌面目录下的 3 个文件拖拽上传发布。" -ForegroundColor White
         }
     }
 } else {
