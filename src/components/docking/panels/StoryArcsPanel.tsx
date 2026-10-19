@@ -7,7 +7,7 @@ export const StoryArcsPanel: React.FC = () => {
 
   if (!activeNovel) {
     return (
-      <div className="flex-1 flex items-center justify-center text-xs text-[#786f65] p-6 text-center">
+      <div className="flex-1 flex items-center justify-center text-xs text-ink-2 p-6 text-center">
         请选择或创建小说项目以管理故事弧
       </div>
     );

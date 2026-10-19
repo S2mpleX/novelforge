@@ -74,13 +74,25 @@ interface NovelState {
     description?: string;
     genre_profile?: string;
     chapter_target_length?: number;
+    cover_url?: string;
   }) => Promise<Novel>;
   deleteNovel: (id: string) => Promise<void>;
+  updateNovel: (input: {
+    id: string;
+    title: string;
+    description?: string;
+    genre_profile?: string;
+    writing_style?: string;
+    cover_url?: string;
+  }) => Promise<Novel>;
 
   loadChapters: (novelId: string) => Promise<void>;
   selectChapter: (chapter: Chapter) => Promise<void>;
-  createChapter: (input: { title: string; initial_content?: string }) => Promise<Chapter>;
+  createChapter: (input: { title: string; initial_content?: string; volume_id?: string }) => Promise<Chapter>;
+  updateChapterTitle: (chapterId: string, title: string) => Promise<Chapter>;
   updateEditorContent: (content: string) => void;
+  flushEditorSync?: () => string | null;
+  registerFlushEditorSync: (fn?: () => string | null) => void;
   saveCurrentChapter: (createNewVersion?: boolean, sourceType?: string) => Promise<void>;
   loadVersions: (chapterId: string) => Promise<void>;
   restoreVersion: (version: ChapterVersion) => Promise<void>;
@@ -97,6 +109,9 @@ interface NovelState {
   updateHierarchyConfig: (config: HierarchyConfig) => Promise<void>;
   loadContentTree: (novelId?: string) => Promise<void>;
   loadHierarchyPartsAndVolumes: (novelId: string) => Promise<void>;
+  createVolume: (input: { title: string; summary?: string; order_index?: number }) => Promise<Volume>;
+  updateVolume: (input: { id: string; title: string; summary?: string }) => Promise<Volume>;
+  deleteVolume: (volumeId: string) => Promise<void>;
   loadScenesForChapter: (chapterId: string) => Promise<void>;
   selectScene: (scene: Scene) => Promise<void>;
   loadPlotBeats: (sceneId: string) => Promise<void>;
@@ -109,12 +124,16 @@ interface NovelState {
   renumberHierarchy: () => Promise<void>;
 }
 
+let pendingSaveRequest: { createNewVersion: boolean; sourceType: string } | null = null;
+
 export const useNovelStore = create<NovelState>((set, get) => ({
   novels: [],
   activeNovel: null,
   chapters: [],
   activeChapter: null,
   editorContent: '',
+  flushEditorSync: undefined,
+  registerFlushEditorSync: (fn) => set({ flushEditorSync: fn }),
   saveStatus: 'SAVED',
   isGenerating: false,
   streamText: '',
@@ -237,19 +256,36 @@ export const useNovelStore = create<NovelState>((set, get) => ({
   },
 
   deleteNovel: async (id) => {
-    await api.deleteNovel(id);
-    const novels = await api.listNovels();
-    set({
-      novels,
-      activeNovel: novels.length > 0 ? novels[0] : null,
-      activeChapter: null,
-      editorContent: '',
-      chapters: [],
-      contentTree: null,
-    });
-    if (novels.length > 0) {
-      await get().loadChapters(novels[0].id);
+    try {
+      localStorage.removeItem(`novelforge_map_${id}`);
+      localStorage.removeItem(`novelforge_notes_${id}`);
+    } catch (e) {
+      console.warn('清理作品本地缓存失败:', e);
     }
+
+    await api.deleteNovel(id);
+    let novels = await api.listNovels();
+    if (novels.length === 0) {
+      const fresh = await api.createNovel({
+        title: '新作品项目',
+        description: '全新的创作项目',
+        genre_profile: '未分类',
+        language: 'zh-CN',
+      });
+      novels = [fresh];
+    }
+    set({ novels });
+    await get().selectNovel(novels[0]);
+  },
+
+  updateNovel: async (input) => {
+    const updated = await api.updateNovel(input);
+    const novels = await api.listNovels();
+    set((state) => ({
+      novels,
+      activeNovel: state.activeNovel?.id === updated.id ? updated : state.activeNovel,
+    }));
+    return updated;
   },
 
   loadChapters: async (novelId) => {
@@ -265,9 +301,21 @@ export const useNovelStore = create<NovelState>((set, get) => ({
   },
 
   selectChapter: async (chapter) => {
-    // If dirty, save first
-    if (get().saveStatus === 'DIRTY' && get().activeChapter) {
-      await get().saveCurrentChapter(false);
+    const { flushEditorSync, activeChapter, saveStatus } = get();
+    // 若从不同章节切换过来，优先刷新并提交上一章编辑器的待存内容
+    if (activeChapter && activeChapter.id !== chapter.id) {
+      if (flushEditorSync) {
+        const latestHtml = flushEditorSync();
+        if (latestHtml !== null && latestHtml !== (activeChapter.content || '')) {
+          try {
+            await api.saveChapterContent(activeChapter.id, latestHtml, false, 'USER_EDIT');
+          } catch (e) {
+            console.error('切换章节前自动保存失败:', e);
+          }
+        }
+      } else if (saveStatus === 'DIRTY') {
+        await get().saveCurrentChapter(false);
+      }
     }
 
     try {
@@ -291,15 +339,33 @@ export const useNovelStore = create<NovelState>((set, get) => ({
     const activeNovel = get().activeNovel;
     if (!activeNovel) throw new Error('未选择小说');
 
+    // 若未显式传入 volume_id 且当前小说存在分卷，则自动关联到第一卷/默认卷
+    const volumeId = input.volume_id || (get().volumes.length > 0 ? get().volumes[0].id : undefined);
+
     const created = await api.createChapter({
       novel_id: activeNovel.id,
+      volume_id: volumeId,
       title: input.title,
       initial_content: input.initial_content || '',
     });
 
     await get().loadChapters(activeNovel.id);
+    await get().loadContentTree(activeNovel.id);
     await get().selectChapter(created);
     return created;
+  },
+
+  updateChapterTitle: async (chapterId, title) => {
+    const activeNovel = get().activeNovel;
+    const updated = await api.updateChapterTitle(chapterId, title);
+    set((state) => ({
+      activeChapter: state.activeChapter?.id === chapterId ? updated : state.activeChapter,
+      chapters: state.chapters.map((ch) => (ch.id === chapterId ? updated : ch)),
+    }));
+    if (activeNovel) {
+      await get().loadContentTree(activeNovel.id);
+    }
+    return updated;
   },
 
   updateEditorContent: (content) => {
@@ -309,7 +375,14 @@ export const useNovelStore = create<NovelState>((set, get) => ({
   saveCurrentChapter: async (createNewVersion = false, sourceType = 'USER_EDIT') => {
     const { activeChapter, editorContent, saveStatus } = get();
     if (!activeChapter) return;
-    if (saveStatus === 'SAVING') return;
+    if (saveStatus === 'SAVING') {
+      // 合并排队请求，若有任何一次请求要求生成版本快照，则保留快照要求
+      pendingSaveRequest = {
+        createNewVersion: createNewVersion || (pendingSaveRequest?.createNewVersion ?? false),
+        sourceType: createNewVersion ? sourceType : (pendingSaveRequest?.sourceType ?? sourceType),
+      };
+      return;
+    }
 
     set({ saveStatus: 'SAVING' });
     try {
@@ -319,20 +392,25 @@ export const useNovelStore = create<NovelState>((set, get) => ({
         createNewVersion,
         sourceType
       );
-      set({
+      set((state) => ({
         activeChapter: updated,
         saveStatus: 'SAVED',
-      });
-      // Refresh chapter list word count
-      const activeNovel = get().activeNovel;
-      if (activeNovel) {
-        const chapters = await api.listChapters(activeNovel.id);
-        set({ chapters });
+        chapters: state.chapters.map((ch) => (ch.id === updated.id ? updated : ch)),
+      }));
+
+      // Only reload version history if a new version snapshot was actually committed
+      if (createNewVersion) {
+        await get().loadVersions(activeChapter.id);
       }
-      await get().loadVersions(activeChapter.id);
     } catch (e) {
       console.error('保存正文失败:', e);
       set({ saveStatus: 'ERROR' });
+    } finally {
+      if (pendingSaveRequest) {
+        const next = pendingSaveRequest;
+        pendingSaveRequest = null;
+        await get().saveCurrentChapter(next.createNewVersion, next.sourceType);
+      }
     }
   },
 
@@ -350,18 +428,35 @@ export const useNovelStore = create<NovelState>((set, get) => ({
     if (!activeChapter) return;
     set({ editorContent: version.content });
     await get().saveCurrentChapter(true, 'RESTORE_VERSION');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('novelforge:force-editor-reload'));
+    }
   },
 
   deleteChapter: async (chapterId) => {
     await api.deleteChapter(chapterId);
-    const activeNovel = get().activeNovel;
+    const { activeNovel, activeChapter } = get();
     if (activeNovel) {
       const chapters = await api.listChapters(activeNovel.id);
-      set({
-        chapters,
-        activeChapter: chapters.length > 0 ? chapters[0] : null,
-        editorContent: chapters.length > 0 ? chapters[0].content || '' : '',
-      });
+      const isCurrentActive = activeChapter?.id === chapterId;
+      if (isCurrentActive) {
+        if (chapters.length > 0) {
+          await get().selectChapter(chapters[0]);
+        } else {
+          set({
+            chapters: [],
+            activeChapter: null,
+            editorContent: '',
+            versions: [],
+            scenes: [],
+            activeScene: null,
+            plotBeats: [],
+          });
+        }
+      } else {
+        set({ chapters });
+      }
+      await get().loadContentTree(activeNovel.id);
     }
   },
 
@@ -473,6 +568,42 @@ export const useNovelStore = create<NovelState>((set, get) => ({
     } catch (e) {
       console.error('加载部与分卷失败:', e);
     }
+  },
+
+  createVolume: async (input) => {
+    const activeNovel = get().activeNovel;
+    if (!activeNovel) throw new Error('未选择小说');
+
+    const created = await api.createVolume({
+      novel_id: activeNovel.id,
+      title: input.title,
+      summary: input.summary,
+      order_index: input.order_index,
+    });
+
+    await get().loadHierarchyPartsAndVolumes(activeNovel.id);
+    await get().loadContentTree(activeNovel.id);
+    return created;
+  },
+
+  updateVolume: async (input) => {
+    const activeNovel = get().activeNovel;
+    const updated = await api.updateVolume(input);
+    if (activeNovel) {
+      await get().loadHierarchyPartsAndVolumes(activeNovel.id);
+      await get().loadContentTree(activeNovel.id);
+    }
+    return updated;
+  },
+
+  deleteVolume: async (volumeId: string) => {
+    const activeNovel = get().activeNovel;
+    if (!activeNovel) return;
+
+    await api.deleteVolume(volumeId);
+    await get().loadHierarchyPartsAndVolumes(activeNovel.id);
+    await get().loadChapters(activeNovel.id);
+    await get().loadContentTree(activeNovel.id);
   },
 
   loadScenesForChapter: async (chapterId) => {

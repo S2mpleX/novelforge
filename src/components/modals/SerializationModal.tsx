@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
 import type { SerializationJob, StartSerializationJobInput } from '@/types';
+import { confirmDialog } from '@/utils/dialog';
 import {
   X,
   Play,
@@ -29,6 +30,7 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
   const [loading, setLoading] = useState(false);
   const [stepLoading, setStepLoading] = useState(false);
   const [isAutoRunning, setIsAutoRunning] = useState(false);
+  const isAutoRunningRef = useRef(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // New Job Configuration Form
@@ -36,6 +38,12 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
   const [chapterTargetWords, setChapterTargetWords] = useState<number>(3000);
   const [autoApprove, setAutoApprove] = useState<boolean>(false);
   const [budgetTokens, setBudgetTokens] = useState<number>(200000);
+
+  useEffect(() => {
+    return () => {
+      isAutoRunningRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (activeNovel) {
@@ -103,33 +111,32 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
     }
   };
 
-  // Continuous Auto Run loop
+  // Continuous Auto Run loop (基于 ref 严控循环状态，杜绝闭包陷阱)
   const handleToggleAutoRun = async () => {
-    if (isAutoRunning) {
+    if (isAutoRunningRef.current) {
+      isAutoRunningRef.current = false;
       setIsAutoRunning(false);
       setStatusMessage('已停止自动循环推进。');
       return;
     }
 
     if (!currentJob) return;
+    isAutoRunningRef.current = true;
     setIsAutoRunning(true);
     setStatusMessage('启动连续连载推进流...');
 
     try {
       let jobState = currentJob;
       while (
+        isAutoRunningRef.current &&
         jobState.status !== 'COMPLETED' &&
         jobState.status !== 'CANCELLED' &&
         jobState.status !== 'FAILED' &&
         jobState.completed_chapters_count < jobState.target_chapters_count
       ) {
-        if (!isAutoRunning && jobState !== currentJob) {
-          // If stopped
-          break;
-        }
         setStatusMessage(`正在自动编排第 ${jobState.completed_chapters_count + 1} 章...`);
         const nextJob = await handleAdvanceStep();
-        if (!nextJob) break;
+        if (!nextJob || !isAutoRunningRef.current) break;
         jobState = nextJob;
 
         // If not auto_approve and waiting review, pause loop for user confirmation
@@ -144,6 +151,7 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
     } catch (e: any) {
       console.error('连续推进中断:', e);
     } finally {
+      isAutoRunningRef.current = false;
       setIsAutoRunning(false);
     }
   };
@@ -161,7 +169,7 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
 
   const handleCancelJob = async () => {
     if (!currentJob) return;
-    if (!confirm('确定要取消该连载任务吗？已生成章节将安全保留。')) return;
+    if (!await confirmDialog('确定要取消该连载任务吗？已生成章节将安全保留。')) return;
     try {
       await api.cancelSerializationJob(currentJob.id);
       setStatusMessage('连载任务已安全终止。');
@@ -204,81 +212,81 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className="bg-[#fdfbf7] border border-[#ded5c4] rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-[#ded5c4] bg-[#efe9dc]">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-line bg-surface-2">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-xl bg-[#854d0e] flex items-center justify-center text-[#fdfbf7] shadow-xs">
               <TrendingUp className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-serif font-bold text-[#2b2621]">自动连载控制台 · Serialization Engine</h2>
-                <span className="px-2.5 py-0.5 text-[11px] font-serif font-semibold bg-[#f4efe6] text-[#854d0e] border border-[#ded5c4] rounded-full">
+                <h2 className="text-base font-serif font-bold text-ink">自动连载控制台 · Serialization Engine</h2>
+                <span className="px-2.5 py-0.5 text-[11px] font-serif font-semibold bg-canvas text-primary border border-line rounded-full">
                   多 Agent 连载流水线
                 </span>
               </div>
-              <p className="text-xs text-[#685f54] font-serif mt-0.5">
+              <p className="text-xs text-ink-2 font-serif mt-0.5">
                 主编宏观大纲 ➔ 编剧场景节拍 ➔ 正文作家结合五层记忆写作 ➔ 逻辑严密审稿 ➔ 长期记忆沉淀
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#685f54] hover:text-[#2b2621] hover:bg-[#e5ded0] transition"
+            className="p-1.5 rounded-lg text-ink-2 hover:text-ink hover:bg-surface-3-hover transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#fdfbf7]">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-surface">
           {/* Active Novel Summary */}
           {activeNovel ? (
-            <div className="bg-[#f7f2e7] p-4 rounded-xl border border-[#ded5c4] flex items-center justify-between shadow-2xs">
+            <div className="bg-surface p-4 rounded-xl border border-line flex items-center justify-between shadow-2xs">
               <div>
-                <span className="text-xs text-[#685f54] font-serif font-medium">当前连载作品</span>
-                <div className="text-sm font-serif font-bold text-[#2b2621] flex items-center gap-2 mt-1">
+                <span className="text-xs text-ink-2 font-serif font-medium">当前连载作品</span>
+                <div className="text-sm font-serif font-bold text-ink flex items-center gap-2 mt-1">
                   <span>{activeNovel.title}</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#efe9dc] text-[#854d0e] border border-[#ded5c4] font-serif font-medium">
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-surface-2 text-primary border border-line font-serif font-medium">
                     {activeNovel.genre_profile || '长篇'}
                   </span>
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-xs text-[#685f54] font-serif font-medium">现有已建章节</span>
-                <div className="text-base font-serif font-bold text-[#2b2621] font-mono mt-0.5">{chapters.length} 章</div>
+                <span className="text-xs text-ink-2 font-serif font-medium">现有已建章节</span>
+                <div className="text-base font-serif font-bold text-ink font-mono mt-0.5">{chapters.length} 章</div>
               </div>
             </div>
           ) : (
-            <div className="p-4 bg-[#fef3c7] border border-[#fde68a] rounded-lg text-[#92400e] text-xs font-serif">
+            <div className="p-4 bg-[#fef3c7] border border-[#fde68a] rounded-lg text-primary text-xs font-serif">
               请先在左侧选择或创建一部小说。
             </div>
           )}
 
           {/* Current Active Job Status Card */}
           {currentJob ? (
-            <div className="bg-[#f7f2e7] p-5 rounded-xl border border-[#ded5c4] shadow-xs space-y-4">
+            <div className="bg-surface p-5 rounded-xl border border-line shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-serif font-semibold text-[#685f54]">当前任务状态:</span>
+                  <span className="text-xs font-serif font-semibold text-ink-2">当前任务状态:</span>
                   {getStatusBadge(currentJob.status)}
-                  <span className="text-xs text-[#786f65] ml-2 font-mono">ID: {currentJob.id.slice(0, 8)}...</span>
+                  <span className="text-xs text-ink-2 ml-2 font-mono">ID: {currentJob.id.slice(0, 8)}...</span>
                 </div>
-                <div className="text-xs text-[#685f54] font-serif">
-                  Token 消耗：<span className="text-[#854d0e] font-semibold">{currentJob.used_tokens}</span> / {currentJob.budget_tokens}
+                <div className="text-xs text-ink-2 font-serif">
+                  Token 消耗：<span className="text-primary font-semibold">{currentJob.used_tokens}</span> / {currentJob.budget_tokens}
                 </div>
               </div>
 
               {/* Progress Bar */}
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-serif">
-                  <span className="text-[#2b2621] font-medium">
+                  <span className="text-ink font-medium">
                     连载进度：{currentJob.completed_chapters_count} / {currentJob.target_chapters_count} 章
                   </span>
-                  <span className="text-[#854d0e] font-bold">{progressPercent}%</span>
+                  <span className="text-primary font-bold">{progressPercent}%</span>
                 </div>
-                <div className="w-full bg-[#efe9dc] h-2.5 rounded-full overflow-hidden border border-[#ded5c4]">
+                <div className="w-full bg-surface-2 h-2.5 rounded-full overflow-hidden border border-line">
                   <div
                     className="bg-gradient-to-r from-[#854d0e] to-[#b45309] h-full transition-all duration-500 rounded-full"
                     style={{ width: `${progressPercent}%` }}
@@ -287,15 +295,15 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
               </div>
 
               {/* Guardrail & Mode Indicator */}
-              <div className="flex items-center gap-4 text-xs bg-[#fdfbf7] p-3 rounded-lg border border-[#ded5c4] text-[#52493d]">
+              <div className="flex items-center gap-4 text-xs bg-surface p-3 rounded-lg border border-line text-ink-2">
                 <div className="flex items-center gap-1.5 font-serif">
                   <ShieldCheck className="w-4 h-4 text-[#047857]" />
-                  <span>定稿模式: <strong className="text-[#2b2621]">{currentJob.auto_approve ? '全自动定稿推进' : '安全模式 (每章等待人工审定)'}</strong></span>
+                  <span>定稿模式: <strong className="text-ink">{currentJob.auto_approve ? '全自动定稿推进' : '安全模式 (每章等待人工审定)'}</strong></span>
                 </div>
                 {currentJob.current_chapter_id && (
                   <button
                     onClick={handleViewCurrentChapter}
-                    className="ml-auto text-[#854d0e] hover:text-[#713f12] underline flex items-center gap-1 font-serif font-medium"
+                    className="ml-auto text-primary hover:text-[#713f12] underline flex items-center gap-1 font-serif font-medium"
                   >
                     <BookOpen className="w-3.5 h-3.5" />
                     跳转编辑当前章节
@@ -304,7 +312,7 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
               </div>
 
               {/* Operations Control Actions */}
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#ded5c4]">
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-line">
                 <button
                   onClick={handleAdvanceStep}
                   disabled={stepLoading || currentJob.status === 'COMPLETED' || currentJob.status === 'CANCELLED'}
@@ -320,7 +328,7 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
                   className={`px-4 py-2 rounded-lg text-xs font-serif font-medium flex items-center gap-1.5 transition border ${
                     isAutoRunning
                       ? 'bg-[#c2410c] hover:bg-[#9a3412] text-white border-[#c2410c] shadow-xs'
-                      : 'bg-[#efe9dc] hover:bg-[#e5ded0] text-[#2b2621] border-[#ded5c4]'
+                      : 'bg-surface-2 hover:bg-surface-3-hover text-ink border-line'
                   }`}
                 >
                   {isAutoRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -330,7 +338,7 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
                 {currentJob.status === 'RUNNING' && (
                   <button
                     onClick={handlePauseJob}
-                    className="px-3 py-2 rounded-lg bg-[#efe9dc] hover:bg-[#e5ded0] text-[#2b2621] text-xs font-serif flex items-center gap-1 transition border border-[#ded5c4]"
+                    className="px-3 py-2 rounded-lg bg-surface-2 hover:bg-surface-3-hover text-ink text-xs font-serif flex items-center gap-1 transition border border-line"
                   >
                     <Pause className="w-3.5 h-3.5" />
                     暂停任务
@@ -349,31 +357,31 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
               </div>
             </div>
           ) : (
-            <div className="bg-[#f7f2e7] p-6 rounded-xl border border-[#ded5c4] text-center space-y-2">
-              <Layers className="w-8 h-8 text-[#854d0e] opacity-50 mx-auto" />
-              <p className="text-sm text-[#2b2621] font-serif font-medium">暂无进行中的连载任务</p>
-              <p className="text-xs text-[#685f54] font-serif">可在下方配置并启动新的全自动多 Agent 创作任务。</p>
+            <div className="bg-surface p-6 rounded-xl border border-line text-center space-y-2">
+              <Layers className="w-8 h-8 text-primary opacity-50 mx-auto" />
+              <p className="text-sm text-ink font-serif font-medium">暂无进行中的连载任务</p>
+              <p className="text-xs text-ink-2 font-serif">可在下方配置并启动新的全自动多 Agent 创作任务。</p>
             </div>
           )}
 
           {/* Status Live Notification */}
           {statusMessage && (
-            <div className="p-3 bg-[#efe9dc] border border-[#ded5c4] rounded-lg text-xs font-serif text-[#854d0e] flex items-center gap-2 animate-in fade-in">
-              <Sparkles className="w-4 h-4 text-[#854d0e] shrink-0" />
+            <div className="p-3 bg-surface-2 border border-line rounded-lg text-xs font-serif text-primary flex items-center gap-2 animate-in fade-in">
+              <Sparkles className="w-4 h-4 text-primary shrink-0" />
               <span>{statusMessage}</span>
             </div>
           )}
 
           {/* New Job Setup Section */}
-          <div className="bg-[#f7f2e7] p-5 rounded-xl border border-[#ded5c4] space-y-4 shadow-2xs">
-            <h3 className="text-xs font-serif font-bold text-[#2b2621] uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#854d0e]" />
+          <div className="bg-surface p-5 rounded-xl border border-line space-y-4 shadow-2xs">
+            <h3 className="text-xs font-serif font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
               配置并启动新的连载批次
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-serif font-medium text-[#685f54] mb-1">
+                <label className="block text-xs font-serif font-medium text-ink-2 mb-1">
                   计划生成章节数
                 </label>
                 <input
@@ -382,13 +390,13 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
                   max={50}
                   value={chaptersCount}
                   onChange={(e) => setChaptersCount(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-3 py-2 bg-[#fdfbf7] border border-[#ded5c4] rounded-lg text-sm text-[#2b2621] focus:outline-hidden focus:border-[#854d0e]"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-ink focus:outline-hidden focus:border-[#854d0e]"
                 />
-                <span className="text-[11px] text-[#786f65] font-serif mt-1 block">建议每次批次规划 3 ~ 10 章</span>
+                <span className="text-[11px] text-ink-2 font-serif mt-1 block">建议每次批次规划 3 ~ 10 章</span>
               </div>
 
               <div>
-                <label className="block text-xs font-serif font-medium text-[#685f54] mb-1">
+                <label className="block text-xs font-serif font-medium text-ink-2 mb-1">
                   单章预期目标字数
                 </label>
                 <input
@@ -398,13 +406,13 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
                   max={8000}
                   value={chapterTargetWords}
                   onChange={(e) => setChapterTargetWords(parseInt(e.target.value) || 3000)}
-                  className="w-full px-3 py-2 bg-[#fdfbf7] border border-[#ded5c4] rounded-lg text-sm text-[#2b2621] focus:outline-hidden focus:border-[#854d0e]"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-ink focus:outline-hidden focus:border-[#854d0e]"
                 />
-                <span className="text-[11px] text-[#786f65] font-serif mt-1 block">默认 3000 字（按细纲场景精准拆解分段）</span>
+                <span className="text-[11px] text-ink-2 font-serif mt-1 block">默认 3000 字（按细纲场景精准拆解分段）</span>
               </div>
 
               <div>
-                <label className="block text-xs font-serif font-medium text-[#685f54] mb-1">
+                <label className="block text-xs font-serif font-medium text-ink-2 mb-1">
                   批次 Token 预算上限
                 </label>
                 <input
@@ -412,7 +420,7 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
                   step={10000}
                   value={budgetTokens}
                   onChange={(e) => setBudgetTokens(parseInt(e.target.value) || 200000)}
-                  className="w-full px-3 py-2 bg-[#fdfbf7] border border-[#ded5c4] rounded-lg text-sm text-[#2b2621] focus:outline-hidden focus:border-[#854d0e]"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-ink focus:outline-hidden focus:border-[#854d0e]"
                 />
               </div>
 
@@ -422,11 +430,11 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
                     type="checkbox"
                     checked={autoApprove}
                     onChange={(e) => setAutoApprove(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#854d0e] bg-[#fdfbf7] border-[#ded5c4] focus:ring-0"
+                    className="w-4 h-4 rounded text-primary bg-surface border-line focus:ring-0"
                   />
-                  <span className="text-xs font-serif text-[#2b2621] font-medium">允许全自动定稿并推进</span>
+                  <span className="text-xs font-serif text-ink font-medium">允许全自动定稿并推进</span>
                 </label>
-                <span className="text-[11px] text-[#786f65] font-serif mt-1 ml-6">
+                <span className="text-[11px] text-ink-2 font-serif mt-1 ml-6">
                   未勾选时，每章生成后将安全停留在待审定状态，不擅自推进下一章
                 </span>
               </div>
@@ -447,12 +455,12 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
           {/* Job History Table */}
           {jobs.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs font-serif font-semibold text-[#685f54] uppercase tracking-wider">
+              <h3 className="text-xs font-serif font-semibold text-ink-2 uppercase tracking-wider">
                 历史任务记录 ({jobs.length})
               </h3>
-              <div className="border border-[#ded5c4] rounded-xl overflow-hidden bg-[#fdfbf7] shadow-2xs">
+              <div className="border border-line rounded-xl overflow-hidden bg-surface shadow-2xs">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-[#efe9dc] text-[#52493d] font-serif border-b border-[#ded5c4]">
+                  <thead className="bg-surface-2 text-ink-2 font-serif border-b border-line">
                     <tr>
                       <th className="px-3 py-2">任务 ID</th>
                       <th className="px-3 py-2">状态</th>
@@ -464,18 +472,18 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
                   </thead>
                   <tbody className="divide-y divide-[#ded5c4]/60">
                     {jobs.map((job) => (
-                      <tr key={job.id} className="hover:bg-[#f7f2e7] transition font-serif">
-                        <td className="px-3 py-2.5 font-mono text-[#2b2621]">
+                      <tr key={job.id} className="hover:bg-surface transition font-serif">
+                        <td className="px-3 py-2.5 font-mono text-ink">
                           {job.id.slice(0, 8)}...
                         </td>
                         <td className="px-3 py-2.5">{getStatusBadge(job.status)}</td>
-                        <td className="px-3 py-2.5 text-[#2b2621] font-medium">
+                        <td className="px-3 py-2.5 text-ink font-medium">
                           {job.completed_chapters_count} / {job.target_chapters_count} 章
                         </td>
-                        <td className="px-3 py-2.5 text-[#685f54]">
+                        <td className="px-3 py-2.5 text-ink-2">
                           {job.used_tokens}
                         </td>
-                        <td className="px-3 py-2.5 text-[#786f65]">
+                        <td className="px-3 py-2.5 text-ink-2">
                           {new Date(job.created_at * 1000).toLocaleString('zh-CN', {
                             month: 'numeric',
                             day: 'numeric',
@@ -486,7 +494,7 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
                         <td className="px-3 py-2.5 text-right">
                           <button
                             onClick={() => setCurrentJob(job)}
-                            className="text-xs text-[#854d0e] hover:text-[#713f12] font-semibold underline"
+                            className="text-xs text-primary hover:text-[#713f12] font-semibold underline"
                           >
                             载入控制台
                           </button>
@@ -501,11 +509,11 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-[#ded5c4] bg-[#efe9dc] flex items-center justify-between text-xs text-[#685f54] font-serif">
+        <div className="px-6 py-3 border-t border-line bg-surface-2 flex items-center justify-between text-xs text-ink-2 font-serif">
           <span>安全保障：已生成文本永久存入本地 SQLite，随时支持版本回溯与手动精修</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-[#fdfbf7] border border-[#ded5c4] hover:bg-[#e5ded0] text-[#2b2621] transition shadow-2xs font-serif"
+            className="px-4 py-1.5 rounded-lg bg-surface border border-line hover:bg-surface-3-hover text-ink transition shadow-2xs font-serif"
           >
             关闭
           </button>

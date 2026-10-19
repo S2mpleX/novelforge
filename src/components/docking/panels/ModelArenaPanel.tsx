@@ -389,9 +389,9 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
   const labelB = !isBlind || revealedBlind ? `${modelNameB || '模型 B'} (${provBName})` : '选手乙 (盲测中)';
 
   return (
-    <div className={`flex flex-col h-full w-full bg-[#f4efe6] text-[#2c2825] font-serif select-none overflow-hidden ${isModal ? 'p-1' : ''}`}>
+    <div className={`flex flex-col h-full w-full bg-canvas text-ink font-serif select-none overflow-hidden ${isModal ? 'p-1' : ''}`}>
       {/* Top Banner / Duel Setup */}
-      <div className="p-3 border-b border-[#ded5c4] bg-[#efe9dc] shrink-0 space-y-2.5">
+      <div className="p-3 border-b border-line bg-surface-2 shrink-0 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-amber-800 text-white shadow-2xs">
@@ -399,15 +399,15 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-[#231f1a]">多模型同台比稿竞技场</span>
-                <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-800/10 text-amber-800 border border-amber-800/20 font-sans font-bold">
+                <span className="font-bold text-sm text-ink">多模型同台比稿竞技场</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-800/10 text-primary border border-amber-800/20 font-sans font-bold">
                   Multi-Model Arena
                 </span>
                 {activeNovel && (
-                  <span className="text-xs text-[#786f65]">《{activeNovel.title}》</span>
+                  <span className="text-xs text-ink-2">《{activeNovel.title}》</span>
                 )}
               </div>
-              <p className="text-[10px] text-[#786f65] font-sans">
+              <p className="text-[10px] text-ink-2 font-sans">
                 双模型同台并发流式生成 · 盲测文笔对决 · Humanizer 去 AI 味评分对比 · 智能融稿
               </p>
             </div>
@@ -420,7 +420,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
               className={`px-2 py-1 rounded-md text-xs font-sans font-medium flex items-center gap-1.5 border transition cursor-pointer ${
                 isBlind
                   ? 'bg-amber-800 text-white border-amber-800 shadow-2xs'
-                  : 'bg-[#f7f2e7] text-[#6b5f52] border-[#ded5c4] hover:bg-[#e4dcce]'
+                  : 'bg-surface text-[#6b5f52] border-line hover:bg-surface-3-hover'
               }`}
               title="开启后将遮蔽两侧模型真实名称，根据纯文学质量进行盲测投票"
             >
@@ -431,9 +431,9 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             {/* Toggle Config */}
             <button
               onClick={() => setShowConfig(!showConfig)}
-              className="px-2 py-1 rounded-md text-xs font-sans text-[#6b5f52] bg-[#f7f2e7] hover:bg-[#e4dcce] border border-[#ded5c4] flex items-center gap-1 cursor-pointer"
+              className="px-2 py-1 rounded-md text-xs font-sans text-[#6b5f52] bg-surface hover:bg-surface-3-hover border border-line flex items-center gap-1 cursor-pointer"
             >
-              <Sliders className="w-3.5 h-3.5 text-amber-800" />
+              <Sliders className="w-3.5 h-3.5 text-primary" />
               <span>模型参数</span>
               {showConfig ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
@@ -444,7 +444,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
               className={`px-2 py-1 rounded-md text-xs font-sans font-medium flex items-center gap-1 border transition cursor-pointer ${
                 showHistory
                   ? 'bg-amber-800 text-white border-amber-800'
-                  : 'bg-[#f7f2e7] text-[#6b5f52] border-[#ded5c4] hover:bg-[#e4dcce]'
+                  : 'bg-surface text-[#6b5f52] border-line hover:bg-surface-3-hover'
               }`}
             >
               <History className="w-3.5 h-3.5" />
@@ -454,7 +454,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             {isModal && onClose && (
               <button
                 onClick={onClose}
-                className="p-1 rounded-md text-[#786f65] hover:text-[#231f1a] hover:bg-[#e4dcce] cursor-pointer"
+                className="p-1 rounded-md text-ink-2 hover:text-ink hover:bg-surface-3-hover cursor-pointer"
               >
                 ✕
               </button>
@@ -464,16 +464,16 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
 
         {/* Collapsible Model Selectors */}
         {showConfig && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-2.5 rounded-lg bg-[#f7f2e7] border border-[#dcd3c1] font-sans text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-2.5 rounded-lg bg-surface border border-line font-sans text-xs">
             {/* Slot A Settings */}
-            <div className="space-y-1.5 p-2 rounded bg-white/70 border border-amber-800/10">
-              <div className="font-bold text-amber-900 flex items-center justify-between">
+            <div className="space-y-1.5 p-2 rounded bg-surface-2 dark:bg-[#201c18] border border-amber-800/10 dark:border-amber-500/20">
+              <div className="font-bold text-primary flex items-center justify-between">
                 <span>🔴 选手 A (Slot A) 配置</span>
-                <span className="text-[11px] text-[#786f65]">发散度: {tempA}</span>
+                <span className="text-[11px] text-ink-2">发散度: {tempA}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-[#786f65] block mb-0.5">服务商</label>
+                  <label className="text-[10px] text-ink-2 block mb-0.5">服务商</label>
                   <select
                     value={providerIdA}
                     onChange={(e) => {
@@ -481,7 +481,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                       const mList = modelsMap[e.target.value] || [];
                       if (mList[0]) setModelNameA(mList[0].model_name);
                     }}
-                    className="w-full p-1 text-xs rounded border border-[#ded5c4] bg-white"
+                    className="w-full p-1 text-xs rounded border border-line bg-surface dark:bg-[#1f1b17] text-ink dark:text-stone-200"
                   >
                     {providers.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -491,11 +491,11 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#786f65] block mb-0.5">模型</label>
+                  <label className="text-[10px] text-ink-2 block mb-0.5">模型</label>
                   <select
                     value={modelNameA}
                     onChange={(e) => setModelNameA(e.target.value)}
-                    className="w-full p-1 text-xs rounded border border-[#ded5c4] bg-white font-mono"
+                    className="w-full p-1 text-xs rounded border border-line bg-surface dark:bg-[#1f1b17] text-ink dark:text-stone-200 font-mono"
                   >
                     {(modelsMap[providerIdA] || []).map((m) => (
                       <option key={m.id} value={m.model_name}>
@@ -517,14 +517,14 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             </div>
 
             {/* Slot B Settings */}
-            <div className="space-y-1.5 p-2 rounded bg-white/70 border border-emerald-800/10">
-              <div className="font-bold text-emerald-900 flex items-center justify-between">
+            <div className="space-y-1.5 p-2 rounded bg-surface-2 dark:bg-[#201c18] border border-emerald-800/10 dark:border-emerald-500/20">
+              <div className="font-bold text-emerald-900 dark:text-emerald-300 flex items-center justify-between">
                 <span>🟢 选手 B (Slot B) 配置</span>
-                <span className="text-[11px] text-[#786f65]">发散度: {tempB}</span>
+                <span className="text-[11px] text-ink-2">发散度: {tempB}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-[#786f65] block mb-0.5">服务商</label>
+                  <label className="text-[10px] text-ink-2 block mb-0.5">服务商</label>
                   <select
                     value={providerIdB}
                     onChange={(e) => {
@@ -532,7 +532,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                       const mList = modelsMap[e.target.value] || [];
                       if (mList[0]) setModelNameB(mList[0].model_name);
                     }}
-                    className="w-full p-1 text-xs rounded border border-[#ded5c4] bg-white"
+                    className="w-full p-1 text-xs rounded border border-line bg-surface dark:bg-[#1f1b17] text-ink dark:text-stone-200"
                   >
                     {providers.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -542,11 +542,11 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#786f65] block mb-0.5">模型</label>
+                  <label className="text-[10px] text-ink-2 block mb-0.5">模型</label>
                   <select
                     value={modelNameB}
                     onChange={(e) => setModelNameB(e.target.value)}
-                    className="w-full p-1 text-xs rounded border border-[#ded5c4] bg-white font-mono"
+                    className="w-full p-1 text-xs rounded border border-line bg-surface dark:bg-[#1f1b17] text-ink dark:text-stone-200 font-mono"
                   >
                     {(modelsMap[providerIdB] || []).map((m) => (
                       <option key={m.id} value={m.model_name}>
@@ -576,12 +576,12 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             onChange={(e) => setPrompt(e.target.value)}
             rows={2}
             placeholder="输入创作指令、情节大纲或关键冲突，让两个 AI 模型同台飙戏比稿（例如：描写反派撕下伪装的震撼反转时刻，注意动作微表情）..."
-            className="w-full p-2.5 text-xs rounded-lg border border-[#d5cbb8] bg-white font-serif focus:outline-none focus:ring-1 focus:ring-amber-800 resize-none pr-32"
+            className="w-full p-2.5 text-xs rounded-lg border border-line bg-surface dark:bg-[#1a1714] text-ink dark:text-stone-200 font-serif focus:outline-none focus:ring-1 focus:ring-amber-800 resize-none pr-32"
           />
           <div className="absolute right-2 bottom-2.5 flex items-center gap-1.5 font-sans">
             <button
               onClick={handleInjectContext}
-              className="px-2 py-1 rounded bg-[#efe9dc] hover:bg-[#e4dcce] text-amber-900 border border-[#ded5c4] text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+              className="px-2 py-1 rounded bg-surface-2 hover:bg-surface-3-hover text-primary border border-line text-[11px] font-medium flex items-center gap-1 cursor-pointer"
               title="自动提取当前编辑章节末尾前文作为背景上下文"
             >
               <FileText className="w-3 h-3" />
@@ -610,9 +610,9 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
       </div>
 
       {message && (
-        <div className="px-3 py-1.5 bg-amber-800/10 text-amber-950 border-b border-amber-800/20 text-xs font-sans font-medium flex items-center justify-between">
+        <div className="px-3 py-1.5 bg-amber-800/10 text-amber-950 dark:text-amber-300 border-b border-amber-800/20 text-xs font-sans font-medium flex items-center justify-between">
           <span>{message}</span>
-          <button onClick={() => setMessage(null)} className="text-amber-800 hover:text-amber-950">
+          <button onClick={() => setMessage(null)} className="text-primary hover:text-amber-950 dark:hover:text-amber-100">
             ✕
           </button>
         </div>
@@ -621,25 +621,25 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
       {/* Main Dual-Column Arena Canvas */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Column: Slot A */}
-        <div className="flex-1 flex flex-col border-r border-[#ded5c4] overflow-hidden bg-[#fdfbf7]">
+        <div className="flex-1 flex flex-col border-r border-line overflow-hidden bg-surface">
           {/* Header A */}
-          <div className="p-2.5 border-b border-[#ded5c4] bg-[#f7f2e7] flex items-center justify-between shrink-0 font-sans">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-800" />
-              <span className="font-bold text-xs text-amber-950 truncate max-w-[220px]" title={labelA}>
+          <div className="p-2.5 border-b border-line bg-surface flex items-center justify-between shrink-0 font-sans gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-800 shrink-0" />
+              <span className="font-bold text-xs text-amber-950 dark:text-amber-200 truncate" title={labelA}>
                 {labelA}
               </span>
               {winnerSlot === 'A' && (
-                <span className="px-1.5 py-0.2 rounded bg-amber-800 text-white text-[10px] font-bold flex items-center gap-0.5 shadow-2xs">
+                <span className="px-1.5 py-0.2 rounded bg-amber-800 text-white text-[10px] font-bold flex items-center gap-0.5 shadow-2xs shrink-0 whitespace-nowrap">
                   <Trophy className="w-2.5 h-2.5" /> 本场胜出
                 </span>
               )}
             </div>
 
             {/* Metrics A */}
-            <div className="flex items-center gap-2 text-[11px] text-[#786f65]">
+            <div className="flex items-center gap-2 text-[11px] text-ink-2 shrink-0 whitespace-nowrap">
               <span className="flex items-center gap-0.5">
-                <Clock className="w-3 h-3 text-amber-800" />
+                <Clock className="w-3 h-3 text-primary" />
                 {(durationA / 1000).toFixed(1)}s
               </span>
               <span>{outputA.length} 字</span>
@@ -649,7 +649,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                     analysisA.score >= 80
                       ? 'bg-emerald-800/10 text-emerald-800 border border-emerald-800/20'
                       : analysisA.score >= 60
-                      ? 'bg-amber-800/10 text-amber-800 border border-amber-800/20'
+                      ? 'bg-amber-800/10 text-primary border border-amber-800/20'
                       : 'bg-rose-800/10 text-rose-800 border border-rose-800/20'
                   }`}
                   title={`人情味得分: ${analysisA.score} 分，命中 AI 套话: ${analysisA.clicheCount} 处`}
@@ -661,7 +661,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
           </div>
 
           {/* Content Surface A */}
-          <div className="flex-1 overflow-y-auto p-4 text-xs leading-relaxed font-serif text-[#231d17] whitespace-pre-wrap selection:bg-amber-800/20">
+          <div className="flex-1 overflow-y-auto p-4 text-xs leading-relaxed font-serif text-[#231d17] dark:text-stone-200 whitespace-pre-wrap selection:bg-amber-800/20">
             {errorA ? (
               <div className="p-3 rounded bg-rose-50 text-rose-800 border border-rose-200 font-sans">
                 {errorA}
@@ -676,7 +676,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
           </div>
 
           {/* Action Footer A */}
-          <div className="p-2 border-t border-[#ded5c4] bg-[#f7f2e7] flex items-center justify-between shrink-0 font-sans text-xs">
+          <div className="p-2 border-t border-line bg-surface flex items-center justify-between shrink-0 font-sans text-xs">
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => handleVoteWinner('A')}
@@ -684,7 +684,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                 className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition shadow-2xs disabled:opacity-30 cursor-pointer ${
                   winnerSlot === 'A'
                     ? 'bg-amber-800 text-white'
-                    : 'bg-white hover:bg-amber-800/10 text-amber-900 border border-amber-800/30'
+                    : 'bg-surface dark:bg-[#28231e] hover:bg-amber-800/10 text-primary dark:text-amber-300 border border-amber-800/30'
                 }`}
                 title="判定选手 A 胜出，并揭晓双方模型"
               >
@@ -697,7 +697,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
               <button
                 onClick={() => handleCopy(outputA, 'A')}
                 disabled={!outputA}
-                className="p-1 rounded hover:bg-[#e4dcce] text-[#786f65] hover:text-[#231f1a] disabled:opacity-30 cursor-pointer"
+                className="p-1 rounded hover:bg-surface-3-hover text-ink-2 hover:text-ink disabled:opacity-30 cursor-pointer"
                 title="复制全文"
               >
                 {copiedSlot === 'A' ? <Check className="w-3.5 h-3.5 text-emerald-700" /> : <Copy className="w-3.5 h-3.5" />}
@@ -705,7 +705,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
               <button
                 onClick={() => handleApplyToEditor(outputA, 'APPEND')}
                 disabled={!outputA}
-                className="px-2 py-1 rounded bg-[#efe9dc] hover:bg-[#e4dcce] text-amber-900 border border-[#ded5c4] text-[11px] font-medium disabled:opacity-30 cursor-pointer"
+                className="px-2 py-1 rounded bg-surface-2 hover:bg-surface-3-hover text-primary border border-line text-[11px] font-medium disabled:opacity-30 cursor-pointer"
                 title="追加到当前编辑器章节末尾"
               >
                 追加文末
@@ -723,25 +723,25 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
         </div>
 
         {/* Right Column: Slot B */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-[#fdfbf7]">
+        <div className="flex-1 flex flex-col overflow-hidden bg-surface">
           {/* Header B */}
-          <div className="p-2.5 border-b border-[#ded5c4] bg-[#f7f2e7] flex items-center justify-between shrink-0 font-sans">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-800" />
-              <span className="font-bold text-xs text-emerald-950 truncate max-w-[220px]" title={labelB}>
+          <div className="p-2.5 border-b border-line bg-surface flex items-center justify-between shrink-0 font-sans gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-800 shrink-0" />
+              <span className="font-bold text-xs text-emerald-950 dark:text-emerald-300 truncate" title={labelB}>
                 {labelB}
               </span>
               {winnerSlot === 'B' && (
-                <span className="px-1.5 py-0.2 rounded bg-emerald-800 text-white text-[10px] font-bold flex items-center gap-0.5 shadow-2xs">
+                <span className="px-1.5 py-0.2 rounded bg-emerald-800 text-white text-[10px] font-bold flex items-center gap-0.5 shadow-2xs shrink-0 whitespace-nowrap">
                   <Trophy className="w-2.5 h-2.5" /> 本场胜出
                 </span>
               )}
             </div>
 
             {/* Metrics B */}
-            <div className="flex items-center gap-2 text-[11px] text-[#786f65]">
+            <div className="flex items-center gap-2 text-[11px] text-ink-2 shrink-0 whitespace-nowrap">
               <span className="flex items-center gap-0.5">
-                <Clock className="w-3 h-3 text-emerald-800" />
+                <Clock className="w-3 h-3 text-emerald-800 dark:text-emerald-400" />
                 {(durationB / 1000).toFixed(1)}s
               </span>
               <span>{outputB.length} 字</span>
@@ -749,9 +749,9 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                 <span
                   className={`px-1.5 py-0.2 rounded font-mono font-bold text-[10px] ${
                     analysisB.score >= 80
-                      ? 'bg-emerald-800/10 text-emerald-800 border border-emerald-800/20'
+                      ? 'bg-emerald-800/10 text-emerald-800 dark:text-emerald-300 border border-emerald-800/20'
                       : analysisB.score >= 60
-                      ? 'bg-amber-800/10 text-amber-800 border border-amber-800/20'
+                      ? 'bg-amber-800/10 text-primary border border-amber-800/20'
                       : 'bg-rose-800/10 text-rose-800 border border-rose-800/20'
                   }`}
                   title={`人情味得分: ${analysisB.score} 分，命中 AI 套话: ${analysisB.clicheCount} 处`}
@@ -763,7 +763,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
           </div>
 
           {/* Content Surface B */}
-          <div className="flex-1 overflow-y-auto p-4 text-xs leading-relaxed font-serif text-[#231d17] whitespace-pre-wrap selection:bg-emerald-800/20">
+          <div className="flex-1 overflow-y-auto p-4 text-xs leading-relaxed font-serif text-[#231d17] dark:text-stone-200 whitespace-pre-wrap selection:bg-emerald-800/20">
             {errorB ? (
               <div className="p-3 rounded bg-rose-50 text-rose-800 border border-rose-200 font-sans">
                 {errorB}
@@ -778,7 +778,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
           </div>
 
           {/* Action Footer B */}
-          <div className="p-2 border-t border-[#ded5c4] bg-[#f7f2e7] flex items-center justify-between shrink-0 font-sans text-xs">
+          <div className="p-2 border-t border-line bg-surface flex items-center justify-between shrink-0 font-sans text-xs">
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => handleVoteWinner('B')}
@@ -786,7 +786,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                 className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition shadow-2xs disabled:opacity-30 cursor-pointer ${
                   winnerSlot === 'B'
                     ? 'bg-emerald-800 text-white'
-                    : 'bg-white hover:bg-emerald-800/10 text-emerald-900 border border-emerald-800/30'
+                    : 'bg-surface dark:bg-[#28231e] hover:bg-emerald-800/10 text-emerald-900 dark:text-emerald-300 border border-emerald-800/30'
                 }`}
                 title="判定选手 B 胜出，并揭晓双方模型"
               >
@@ -799,7 +799,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
               <button
                 onClick={() => handleCopy(outputB, 'B')}
                 disabled={!outputB}
-                className="p-1 rounded hover:bg-[#e4dcce] text-[#786f65] hover:text-[#231f1a] disabled:opacity-30 cursor-pointer"
+                className="p-1 rounded hover:bg-surface-3-hover text-ink-2 hover:text-ink disabled:opacity-30 cursor-pointer"
                 title="复制全文"
               >
                 {copiedSlot === 'B' ? <Check className="w-3.5 h-3.5 text-emerald-700" /> : <Copy className="w-3.5 h-3.5" />}
@@ -807,7 +807,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
               <button
                 onClick={() => handleApplyToEditor(outputB, 'APPEND')}
                 disabled={!outputB}
-                className="px-2 py-1 rounded bg-[#efe9dc] hover:bg-[#e4dcce] text-emerald-900 border border-[#ded5c4] text-[11px] font-medium disabled:opacity-30 cursor-pointer"
+                className="px-2 py-1 rounded bg-surface-2 hover:bg-surface-3-hover text-emerald-900 dark:text-emerald-300 border border-line text-[11px] font-medium disabled:opacity-30 cursor-pointer"
                 title="追加到当前编辑器章节末尾"
               >
                 追加文末
@@ -826,7 +826,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
       </div>
 
       {/* Middle Deck: Diff & Synthesis Bar */}
-      <div className="p-2.5 border-t border-[#ded5c4] bg-[#ede5d6] flex flex-wrap items-center justify-between gap-2 shrink-0 font-sans text-xs">
+      <div className="p-2.5 border-t border-line bg-surface-2 flex flex-wrap items-center justify-between gap-2 shrink-0 font-sans text-xs">
         <div className="flex items-center gap-2">
           {/* Diff Toggle */}
           <button
@@ -835,7 +835,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             className={`px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5 border transition disabled:opacity-30 cursor-pointer ${
               showDiff
                 ? 'bg-amber-800 text-white border-amber-800'
-                : 'bg-white hover:bg-[#e4dcce] text-[#5c5245] border-[#ded5c4]'
+                : 'bg-surface dark:bg-[#24201b] hover:bg-surface-3-hover text-ink-2 dark:text-[#ede6dc] border-line'
             }`}
           >
             <GitCompare className="w-3.5 h-3.5" />
@@ -849,7 +849,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             className={`px-2 py-1 rounded font-medium border transition disabled:opacity-30 cursor-pointer ${
               winnerSlot === 'TIE'
                 ? 'bg-purple-800 text-white border-purple-800'
-                : 'bg-white hover:bg-[#e4dcce] text-[#5c5245] border-[#ded5c4]'
+                : 'bg-surface dark:bg-[#24201b] hover:bg-surface-3-hover text-ink-2 dark:text-[#ede6dc] border-line'
             }`}
           >
             不分伯仲 (平局)
@@ -863,7 +863,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             value={mergeFocus}
             onChange={(e) => setMergeFocus(e.target.value)}
             placeholder="融稿偏好要求..."
-            className="w-56 p-1 text-[11px] rounded border border-[#ded5c4] bg-white font-sans hidden xl:inline-block"
+            className="w-56 p-1 text-[11px] rounded border border-line bg-surface dark:bg-[#1a1714] text-ink dark:text-stone-200 font-sans hidden xl:inline-block"
           />
           <button
             onClick={handleMergeOutputs}
@@ -887,10 +887,10 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
 
       {/* Visual Diff Section (Expandable) */}
       {showDiff && outputA && outputB && (
-        <div className="h-64 border-t border-[#ded5c4] bg-[#fdfbf7] p-3 overflow-y-auto shrink-0 flex flex-col">
-          <div className="text-xs font-bold text-amber-950 mb-1.5 flex items-center justify-between font-sans">
+        <div className="h-64 border-t border-line bg-surface p-3 overflow-y-auto shrink-0 flex flex-col">
+          <div className="text-xs font-bold text-amber-950 dark:text-amber-200 mb-1.5 flex items-center justify-between font-sans">
             <span>A 方案 vs B 方案 词句红绿 Visual Diff</span>
-            <span className="text-[10px] text-[#786f65]">红色划线为 A 专有词，绿色高亮为 B 专有词</span>
+            <span className="text-[10px] text-ink-2">红色划线为 A 专有词，绿色高亮为 B 专有词</span>
           </div>
           <div className="flex-1 overflow-y-auto">
             <InlineDiffViewer original={outputA} revised={outputB} />
@@ -900,36 +900,36 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
 
       {/* Merged Synthesis Section (Expandable) */}
       {mergedOutput && (
-        <div className="h-64 border-t border-[#ded5c4] bg-[#fbf8f2] p-3 overflow-y-auto shrink-0 flex flex-col space-y-2">
+        <div className="h-64 border-t border-line bg-surface-2 p-3 overflow-y-auto shrink-0 flex flex-col space-y-2">
           <div className="flex items-center justify-between font-sans">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-purple-950">
-              <Sparkles className="w-3.5 h-3.5 text-purple-800" />
+            <div className="flex items-center gap-1.5 text-xs font-bold text-purple-950 dark:text-purple-300">
+              <Sparkles className="w-3.5 h-3.5 text-purple-800 dark:text-purple-400" />
               <span>智能双模融合精华稿</span>
-              <span className="text-[10px] text-[#786f65] font-normal">({mergedOutput.length} 字)</span>
+              <span className="text-[10px] text-ink-2 font-normal">({mergedOutput.length} 字)</span>
             </div>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => handleCopy(mergedOutput, 'MERGED')}
-                className="p-1 rounded hover:bg-[#e4dcce] text-[#786f65]"
+                className="p-1 rounded hover:bg-surface-3-hover text-ink-2"
                 title="复制融合结果"
               >
                 {copiedSlot === 'MERGED' ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3" />}
               </button>
               <button
                 onClick={() => handleApplyToEditor(mergedOutput, 'APPEND')}
-                className="px-2 py-0.5 rounded bg-white hover:bg-[#e4dcce] text-purple-900 border border-purple-800/30 text-[11px]"
+                className="px-2 py-0.5 rounded bg-surface dark:bg-[#201a24] hover:bg-surface-3-hover text-purple-900 dark:text-purple-200 border border-purple-800/30 text-[11px] cursor-pointer"
               >
                 追加文末
               </button>
               <button
                 onClick={() => handleApplyToEditor(mergedOutput, 'REPLACE')}
-                className="px-2.5 py-0.5 rounded bg-purple-900 text-white hover:bg-purple-800 text-[11px] shadow-2xs"
+                className="px-2.5 py-0.5 rounded bg-purple-900 text-white hover:bg-purple-800 text-[11px] shadow-2xs cursor-pointer"
               >
                 采纳为正文
               </button>
             </div>
           </div>
-          <div className="flex-1 p-2 rounded bg-white border border-purple-800/20 text-xs font-serif leading-relaxed whitespace-pre-wrap overflow-y-auto">
+          <div className="flex-1 p-2 rounded bg-surface dark:bg-[#19151e] border border-purple-800/20 dark:border-purple-800/40 text-xs font-serif leading-relaxed text-ink dark:text-stone-200 whitespace-pre-wrap overflow-y-auto">
             {mergedOutput}
           </div>
         </div>
@@ -937,29 +937,29 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
 
       {/* History Drawer */}
       {showHistory && (
-        <div className="h-56 border-t border-[#ded5c4] bg-[#f7f2e7] p-3 overflow-y-auto shrink-0 space-y-2 font-sans">
-          <div className="flex items-center justify-between text-xs font-bold text-[#231f1a]">
+        <div className="h-56 border-t border-line bg-surface p-3 overflow-y-auto shrink-0 space-y-2 font-sans">
+          <div className="flex items-center justify-between text-xs font-bold text-ink">
             <span>过往比稿战报记录 ({historyRuns.length})</span>
             <button
               onClick={() => setShowHistory(false)}
-              className="text-[11px] text-[#786f65] hover:text-[#231f1a]"
+              className="text-[11px] text-ink-2 hover:text-ink"
             >
               收起战报
             </button>
           </div>
           {historyRuns.length === 0 ? (
-            <div className="text-center py-6 text-xs text-[#786f65]">暂无历史比稿记录</div>
+            <div className="text-center py-6 text-xs text-ink-2">暂无历史比稿记录</div>
           ) : (
             <div className="space-y-1.5">
               {historyRuns.map((run) => (
                 <div
                   key={run.id}
-                  className="p-2 rounded bg-white border border-[#ded5c4] flex items-center justify-between text-xs hover:border-amber-800/40 transition"
+                  className="p-2 rounded bg-surface dark:bg-[#1a1714] border border-line flex items-center justify-between text-xs hover:border-amber-800/40 transition"
                 >
                   <div className="space-y-0.5 max-w-md">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-amber-950 truncate max-w-xs">{run.prompt}</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-800/10 text-amber-800 font-bold">
+                      <span className="font-medium text-amber-950 dark:text-amber-100 truncate max-w-xs">{run.prompt}</span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-800/10 text-primary font-bold">
                         {run.winner_slot === 'A'
                           ? `A [${run.model_a_name}] 胜出`
                           : run.winner_slot === 'B'
@@ -969,7 +969,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                           : '平局'}
                       </span>
                     </div>
-                    <div className="text-[10px] text-[#786f65] flex items-center gap-3">
+                    <div className="text-[10px] text-ink-2 flex items-center gap-3">
                       <span>A: {run.model_a_name} ({(run.model_a_duration_ms / 1000).toFixed(1)}s)</span>
                       <span>B: {run.model_b_name} ({(run.model_b_duration_ms / 1000).toFixed(1)}s)</span>
                       <span>{new Date(run.created_at).toLocaleString()}</span>
@@ -990,7 +990,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                         setRevealedBlind(true);
                         setShowHistory(false);
                       }}
-                      className="px-2 py-1 rounded bg-[#efe9dc] hover:bg-[#e4dcce] text-amber-900 text-[11px]"
+                      className="px-2 py-1 rounded bg-surface-2 hover:bg-surface-3-hover text-primary text-[11px]"
                     >
                       加载查看
                     </button>
@@ -999,7 +999,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
                         await api.deleteModelArenaRun(run.id);
                         loadHistory();
                       }}
-                      className="p-1 rounded text-[#786f65] hover:text-rose-800 hover:bg-rose-50"
+                      className="p-1 rounded text-ink-2 hover:text-rose-800 hover:bg-rose-50"
                       title="删除记录"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

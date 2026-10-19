@@ -35,6 +35,8 @@ import type {
   ExecuteArenaDuelInput,
   ArenaDuelResult,
   MergeArenaOutputsInput,
+  OptimizeWritingPromptInput,
+  OptimizeWritingPromptResult,
 } from '@/types';
 import { emitWebStreamChunk, emitArenaStreamChunk } from './tauriBridge';
 
@@ -86,6 +88,7 @@ export function ensureWebSeedData(): void {
         language: 'zh-CN',
         writing_style: '硬派沉稳、考据扎实、冷峻克制',
         status: 'ONGOING',
+        cover_url: 'preset:deep_cosmos',
         created_at: Date.now() - 86400000 * 3,
         updated_at: Date.now(),
         chapter_count: 1,
@@ -331,6 +334,7 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         language: args.input.language || 'zh-CN',
         writing_style: args.input.writing_style || '通俗流畅',
         status: 'ONGOING',
+        cover_url: args.input.cover_url || '',
         created_at: Date.now(),
         updated_at: Date.now(),
         chapter_count: 0,
@@ -348,9 +352,71 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
       return;
     }
 
-    // --- CHAPTERS ---
-    case 'list_volumes':
-      return getStorage<Volume[]>('volumes', []);
+    case 'update_novel': {
+      const novels = getStorage<Novel[]>('novels', []);
+      const n = novels.find((item) => item.id === args.input.id);
+      if (n) {
+        n.title = args.input.title;
+        if (args.input.description !== undefined) n.description = args.input.description;
+        if (args.input.genre_profile !== undefined) n.genre_profile = args.input.genre_profile;
+        if (args.input.writing_style !== undefined) n.writing_style = args.input.writing_style;
+        if (args.input.cover_url !== undefined) n.cover_url = args.input.cover_url;
+        n.updated_at = Date.now();
+        setStorage('novels', novels);
+        return n;
+      }
+      return null;
+    }
+
+    // --- CHAPTERS & VOLUMES ---
+    case 'list_volumes': {
+      const volumes = getStorage<Volume[]>('volumes', []);
+      if (!args?.novelId) return volumes;
+      return volumes.filter((v) => v.novel_id === args.novelId);
+    }
+
+    case 'create_volume': {
+      const volumes = getStorage<Volume[]>('volumes', []);
+      const newVol: Volume = {
+        id: 'vol_' + Date.now(),
+        novel_id: args.input.novel_id,
+        part_id: args.input.part_id,
+        title: args.input.title,
+        order_index: args.input.order_index || (volumes.filter((v) => v.novel_id === args.input.novel_id).length + 1),
+        summary: args.input.summary || '',
+        status: 'PLANNING',
+        created_at: Date.now(),
+      };
+      volumes.push(newVol);
+      setStorage('volumes', volumes);
+      return newVol;
+    }
+
+    case 'delete_volume': {
+      let volumes = getStorage<Volume[]>('volumes', []);
+      volumes = volumes.filter((v) => v.id !== args.id);
+      setStorage('volumes', volumes);
+      const chapters = getStorage<Chapter[]>('chapters', []);
+      for (const ch of chapters) {
+        if (ch.volume_id === args.id) {
+          ch.volume_id = undefined;
+        }
+      }
+      setStorage('chapters', chapters);
+      return;
+    }
+
+    case 'update_volume': {
+      const volumes = getStorage<Volume[]>('volumes', []);
+      const v = volumes.find((item) => item.id === args.input.id);
+      if (v) {
+        v.title = args.input.title;
+        if (args.input.summary !== undefined) v.summary = args.input.summary;
+        setStorage('volumes', volumes);
+        return v;
+      }
+      return null;
+    }
 
     case 'list_chapters': {
       const chapters = getStorage<Chapter[]>('chapters', []);
@@ -424,6 +490,18 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
       return;
     }
 
+    case 'update_chapter_title': {
+      const chapters = getStorage<Chapter[]>('chapters', []);
+      const ch = chapters.find((c) => c.id === args.chapterId);
+      if (ch) {
+        ch.title = args.title;
+        ch.updated_at = Date.now();
+        setStorage('chapters', chapters);
+        return ch;
+      }
+      return null;
+    }
+
     // --- STORY BIBLE ---
     case 'list_characters': {
       const chars = getStorage<Character[]>('characters', []);
@@ -451,6 +529,53 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
       return newC;
     }
 
+    case 'update_character_status': {
+      const chars = getStorage<Character[]>('characters', []);
+      const char = chars.find((c) => c.id === args?.id);
+      if (char) {
+        char.status = args.status;
+        char.updated_at = Date.now();
+        setStorage('characters', chars);
+      }
+      return;
+    }
+
+    case 'update_character': {
+      const chars = getStorage<Character[]>('characters', []);
+      const idx = chars.findIndex((c) => c.id === args?.input?.id);
+      if (idx !== -1) {
+        chars[idx] = {
+          ...chars[idx],
+          name: args.input.name,
+          aliases: args.input.aliases ?? chars[idx].aliases,
+          profile: args.input.profile ?? chars[idx].profile,
+          personality: args.input.personality ?? chars[idx].personality,
+          background: args.input.background ?? chars[idx].background,
+          motivation: args.input.motivation ?? chars[idx].motivation,
+          status: args.input.status ?? chars[idx].status,
+          updated_at: Date.now(),
+        };
+        setStorage('characters', chars);
+        return chars[idx];
+      }
+      throw new Error('未找到对应角色');
+    }
+
+    case 'delete_character': {
+      let chars = getStorage<Character[]>('characters', []);
+      chars = chars.filter((c) => c.id !== args?.id);
+      setStorage('characters', chars);
+      // 清理关系
+      let rels = getStorage<CharacterRelationship[]>('character_relationships', []);
+      rels = rels.filter((r) => r.source_character_id !== args?.id && r.target_character_id !== args?.id);
+      setStorage('character_relationships', rels);
+      // 清理状态
+      let states = getStorage<any[]>('character_state_events', []);
+      states = states.filter((s) => s.character_id !== args?.id);
+      setStorage('character_state_events', states);
+      return;
+    }
+
     case 'list_world_rules': {
       const rules = getStorage<WorldRule[]>('world_rules', []);
       if (!args?.novelId) return rules;
@@ -471,6 +596,30 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
       rules.push(newR);
       setStorage('world_rules', rules);
       return newR;
+    }
+
+    case 'update_world_rule': {
+      const rules = getStorage<WorldRule[]>('world_rules', []);
+      const idx = rules.findIndex((r) => r.id === args?.input?.id);
+      if (idx !== -1) {
+        rules[idx] = {
+          ...rules[idx],
+          title: args.input.title,
+          rule_content: args.input.rule_content,
+          authority_level: args.input.authority_level ?? rules[idx].authority_level,
+          status: args.input.status ?? rules[idx].status,
+        };
+        setStorage('world_rules', rules);
+        return rules[idx];
+      }
+      throw new Error('未找到对应世界观法则');
+    }
+
+    case 'delete_world_rule': {
+      let rules = getStorage<WorldRule[]>('world_rules', []);
+      rules = rules.filter((r) => r.id !== args?.id);
+      setStorage('world_rules', rules);
+      return;
     }
 
     case 'list_plot_threads': {
@@ -495,6 +644,44 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
       threads.push(newT);
       setStorage('plot_threads', threads);
       return newT;
+    }
+
+    case 'update_plot_thread_status': {
+      const threads = getStorage<PlotThread[]>('plot_threads', []);
+      const th = threads.find((t) => t.id === args?.id);
+      if (th) {
+        th.status = args.status;
+        th.updated_at = Date.now();
+        setStorage('plot_threads', threads);
+      }
+      return;
+    }
+
+    case 'update_plot_thread': {
+      const threads = getStorage<PlotThread[]>('plot_threads', []);
+      const idx = threads.findIndex((t) => t.id === args?.input?.id);
+      if (idx !== -1) {
+        threads[idx] = {
+          ...threads[idx],
+          title: args.input.title,
+          description: args.input.description ?? threads[idx].description,
+          introduced_chapter_id: args.input.introduced_chapter_id ?? threads[idx].introduced_chapter_id,
+          expected_resolution: args.input.expected_resolution ?? threads[idx].expected_resolution,
+          resolved_chapter_id: args.input.resolved_chapter_id ?? threads[idx].resolved_chapter_id,
+          status: args.input.status ?? threads[idx].status,
+          updated_at: Date.now(),
+        };
+        setStorage('plot_threads', threads);
+        return threads[idx];
+      }
+      throw new Error('未找到对应伏笔线索');
+    }
+
+    case 'delete_plot_thread': {
+      let threads = getStorage<PlotThread[]>('plot_threads', []);
+      threads = threads.filter((t) => t.id !== args?.id);
+      setStorage('plot_threads', threads);
+      return;
     }
 
     // --- CHARACTER RELATIONSHIPS ---
@@ -1193,6 +1380,7 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
     // --- V2.0: Tree & Lifecycle Operations ---
     case 'get_novel_content_tree': {
       const chapters = getStorage<Chapter[]>('chapters', []).filter((c) => c.novel_id === args.novelId);
+      const volumes = getStorage<Volume[]>('volumes', []).filter((v) => v.novel_id === args.novelId);
       const parts = getStorage<any[]>('parts', []).filter((p) => p.novel_id === args.novelId);
       const config = getStorage<Record<string, any>>('hierarchy_configs', {})[args.novelId] || {
         enable_parts: parts.length > 0,
@@ -1203,18 +1391,43 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         default_publishing_level: 'CHAPTER',
       };
 
-      const rootNodes: any[] = chapters.map((c) => ({
+      const chapterNodes = chapters.map((c) => ({
         id: c.id,
         node_type: 'CHAPTER',
         title: c.title,
         number: c.chapter_number,
         order_index: c.chapter_number,
+        parent_id: c.volume_id,
         word_count: c.word_count || 0,
         status: c.status,
         goal_or_summary: '',
         associated_plot_count: 0,
         children: [],
       }));
+
+      let rootNodes: any[] = [];
+      if (volumes.length > 0) {
+        rootNodes = volumes.map((v) => {
+          const vChaps = chapterNodes.filter((c) => c.parent_id === v.id);
+          return {
+            id: v.id,
+            node_type: 'VOLUME',
+            title: v.title,
+            number: v.order_index,
+            order_index: v.order_index,
+            parent_id: null,
+            word_count: vChaps.reduce((sum, ch) => sum + (ch.word_count || 0), 0),
+            status: v.status,
+            goal_or_summary: v.summary,
+            associated_plot_count: 0,
+            children: vChaps,
+          };
+        });
+        const unassigned = chapterNodes.filter((c) => !c.parent_id);
+        rootNodes.push(...unassigned);
+      } else {
+        rootNodes = chapterNodes;
+      }
 
       return {
         novel_id: args.novelId,
@@ -1723,6 +1936,203 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         word_count: totalWords,
         title,
       };
+    }
+
+    // --- V2.5.1: AI Prompt Optimizer ---
+    case 'optimize_writing_prompt': {
+      const input: OptimizeWritingPromptInput = args?.input || {};
+      const raw = input.raw_prompt || '';
+      const angle = input.optimization_angle || 'DRAMA_CONFLICT';
+
+      let angleDesc = '戏剧博弈与人物交锋';
+      let hookDesc = '在对峙达到顶点时，暗处突然传来一声微弱的机括轻响，彻底打乱了所有人的算计。';
+      if (angle === 'SENSORY_DETAIL') {
+        angleDesc = '多重感官白描与物象细节';
+        hookDesc = '案几上的烛芯忽然无风自炸，一点火星落入未干的墨迹中，腾起一缕带着苦艾气味的青烟。';
+      } else if (angle === 'PLOT_HOOK') {
+        angleDesc = '伏笔勾连与章末断章悬念';
+        hookDesc = '石盒裂开一道缝隙，露出的却非失传古卷，而是一面刻着家族血誓的残破青铜命牌。';
+      } else if (angle === 'CONCISE_PUNCHY') {
+        angleDesc = '快节奏爽利推进与强冲突对抗';
+        hookDesc = '一刀斩落，刀锋在咽喉前三寸骤然停滞，对方眼底闪过的却不是惊恐，而是计谋得逞的狞笑。';
+      }
+
+      const result: OptimizeWritingPromptResult = {
+        original_prompt: raw,
+        optimized_prompt: `【重构创作指令·${angleDesc}】\n\n【核心情境与动作动机】\n${raw}\n\n【戏剧冲突展开与博弈】\n- 强化主角迫切想要达成的目标，与阻碍力量形成即时摩擦；\n- 运用具象动作、神态与言辞机锋替代直白陈述；\n- 对话包含潜台词，句句带有机锋试探，信息层层递进。\n\n【感官与环境具象（Show, Don't Tell）】\n- 刻画周围环境的压抑感（光影明暗、风声雨声、空气中的异味），借物喻情；\n- 捕捉生理微反应：指节发白、呼吸沉重、喉头微动，传递紧绷情绪。\n\n【叙事节奏与收尾】\n- 拒绝注水与大段说明性设定，把世界观融于当下的交锋之中；\n- 章末收于突发悬念，将事件推向不可逆转的选择节点。`,
+        enhancement_points: [
+          '重构核心动机：将简要意图具象化为高压对抗与迫切障碍',
+          '注入潜台词交锋：对话暗藏动机试探，告别说明书式问答',
+          '强化临场白描：运用多维感官与物象细节替代抽象情绪宣泄',
+          '精准断章扣子：在对抗失衡瞬间收尾，留足下一步期待感',
+        ],
+        suggested_hooks: hookDesc,
+        suggested_tags: ['戏剧张力', '感官白描', '潜台词交锋', '高潮断章'],
+      };
+      return result;
+    }
+
+    // --- Story Bible / Review / Serialization / Hierarchy Mock Completions ---
+    case 'delete_story_phase': {
+      const phases = getStorage<any[]>('story_phases', []);
+      setStorage('story_phases', phases.filter((p) => p.id !== args?.id));
+      return;
+    }
+
+    case 'update_story_arc_status': {
+      const arcs = getStorage<any[]>('story_arcs', []);
+      const target = arcs.find((a) => a.id === args?.id);
+      if (target) {
+        target.status = args?.status;
+        setStorage('story_arcs', arcs);
+      }
+      return;
+    }
+
+    case 'delete_story_arc': {
+      const arcs = getStorage<any[]>('story_arcs', []);
+      setStorage('story_arcs', arcs.filter((a) => a.id !== args?.id));
+      return;
+    }
+
+    case 'update_scene_status': {
+      const scenes = getStorage<any[]>('scenes', []);
+      const target = scenes.find((s) => s.id === args?.id);
+      if (target) {
+        target.status = args?.status;
+        setStorage('scenes', scenes);
+      }
+      return;
+    }
+
+    case 'list_review_reports': {
+      return getStorage<any[]>('review_reports', []);
+    }
+
+    case 'get_latest_review_report': {
+      const reports = getStorage<any[]>('review_reports', []);
+      return reports[reports.length - 1] || null;
+    }
+
+    case 'update_finding_status': {
+      return;
+    }
+
+    case 'run_scene_planning': {
+      return {
+        scenes: [
+          {
+            scene_number: 1,
+            title: '剑试青云峰',
+            setting: '太玄主峰绝壁',
+            conflict_target: '通过宗门试炼',
+            emotional_beat: '由忐忑变为决然',
+            key_dialogue_subtext: '隐藏的杀机',
+          },
+        ],
+      };
+    }
+
+    case 'run_collaborative_workflow': {
+      return {
+        step: 3,
+        status: 'COMPLETED',
+        message: '工作流已成功完成协同创作',
+      };
+    }
+
+    case 'export_chapter_text': {
+      const chapters = getStorage<Chapter[]>('chapters', []);
+      const ch = chapters.find((c) => c.id === args?.chapterId);
+      return ch?.content || '';
+    }
+
+    case 'get_serialization_job': {
+      const jobs = getStorage<any[]>('serialization_jobs', []);
+      return jobs.find((j) => j.id === args?.jobId) || null;
+    }
+
+    case 'pause_serialization_job':
+    case 'cancel_serialization_job': {
+      const jobs = getStorage<any[]>('serialization_jobs', []);
+      const job = jobs.find((j) => j.id === args?.jobId);
+      if (job) {
+        job.status = cmd === 'pause_serialization_job' ? 'PAUSED' : 'CANCELLED';
+        setStorage('serialization_jobs', jobs);
+      }
+      return;
+    }
+
+    case 'import_novel_archive': {
+      try {
+        const archive = JSON.parse(args?.archiveJson || '{}');
+        const novels = getStorage<Novel[]>('novels', []);
+        const newNovel: Novel = {
+          id: 'novel_' + Date.now(),
+          title: `${archive.novel?.title || '导入小说'} (导入副本)`,
+          description: archive.novel?.description || '',
+          genre_profile: archive.novel?.genre_profile || '未分类',
+          language: archive.novel?.language || 'zh-CN',
+          writing_style: archive.novel?.writing_style || '沉稳细腻',
+          status: archive.novel?.status || 'PLANNING',
+          created_at: Date.now(),
+          updated_at: Date.now(),
+        };
+        novels.push(newNovel);
+        setStorage('novels', novels);
+
+        // Import chapters
+        if (Array.isArray(archive.chapters)) {
+          const chapters = getStorage<Chapter[]>('chapters', []);
+          for (const ch of archive.chapters) {
+            chapters.push({
+              ...ch,
+              id: 'ch_' + Math.random().toString(36).slice(2, 9),
+              novel_id: newNovel.id,
+            });
+          }
+          setStorage('chapters', chapters);
+        }
+
+        // Import characters
+        if (Array.isArray(archive.characters)) {
+          const chars = getStorage<Character[]>('characters', []);
+          for (const c of archive.characters) {
+            chars.push({
+              ...c,
+              id: 'char_' + Math.random().toString(36).slice(2, 9),
+              novel_id: newNovel.id,
+            });
+          }
+          setStorage('characters', chars);
+        }
+
+        return newNovel;
+      } catch (e) {
+        throw new Error('导入归档失败: ' + e);
+      }
+    }
+
+    case 'get_series': {
+      const series = getStorage<any[]>('series', []);
+      return series.find((s) => s.id === args?.id) || null;
+    }
+
+    case 'get_part': {
+      const parts = getStorage<any[]>('parts', []);
+      return parts.find((p) => p.id === args?.id) || null;
+    }
+
+    case 'list_plot_associations_for_entity': {
+      const assocs = getStorage<any[]>('plot_associations', []);
+      return assocs.filter(
+        (a) => a.entity_id === args?.entityId || a.entity_type === args?.entityType
+      );
+    }
+
+    case 'split_scene':
+    case 'merge_scenes': {
+      return;
     }
 
     default:

@@ -15,6 +15,7 @@ import '@xyflow/react/dist/style.css';
 
 import { api } from '@/utils/tauriBridge';
 import type { Character, CharacterRelationship } from '@/types';
+import { alertDialog } from '@/utils/dialog';
 import {
   Users,
   Plus,
@@ -88,24 +89,24 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
           position: { x, y },
           data: {
             label: (
-              <div className="px-4 py-3 bg-[#fdfbf7] border border-[#d5cbb8] hover:border-amber-800 rounded-xl shadow-xs transition-all text-left min-w-[150px]">
+              <div className="px-4 py-3 bg-surface border border-line hover:border-amber-800 rounded-xl shadow-xs transition-all text-left min-w-[150px]">
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-7 h-7 rounded-full bg-amber-800/10 border border-amber-800/30 flex items-center justify-center text-xs font-bold text-amber-900 font-serif">
+                  <div className="w-7 h-7 rounded-full bg-amber-800/10 border border-amber-800/30 flex items-center justify-center text-xs font-bold text-primary font-serif">
                     {char.name.slice(0, 1)}
                   </div>
                   <div>
-                    <div className="font-semibold text-[#1f1d1a] text-sm leading-tight font-serif">
+                    <div className="font-semibold text-ink text-sm leading-tight font-serif">
                       {char.name}
                     </div>
                     {char.aliases && (
-                      <div className="text-[11px] text-[#786f65] leading-tight">
+                      <div className="text-[11px] text-ink-2 leading-tight">
                         {char.aliases}
                       </div>
                     )}
                   </div>
                 </div>
                 {char.personality && (
-                  <div className="text-[11px] text-[#786f65] line-clamp-1 border-t border-[#ded5c4] pt-1 mt-1">
+                  <div className="text-[11px] text-ink-2 line-clamp-1 border-t border-line pt-1 mt-1">
                     {char.personality}
                   </div>
                 )}
@@ -167,7 +168,7 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
     e.preventDefault();
     if (!novelId || !sourceId || !targetId) return;
     if (sourceId === targetId) {
-      alert('关系源角色与目标角色不能相同');
+      await alertDialog('关系源角色与目标角色不能相同');
       return;
     }
 
@@ -184,7 +185,7 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
       setRelDesc('');
       loadData();
     } catch (err) {
-      alert('添加角色关系失败: ' + err);
+      await alertDialog('添加角色关系失败: ' + err);
     }
   };
 
@@ -195,7 +196,7 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
       setSelectedEdgeId(null);
       loadData();
     } catch (err) {
-      alert('删除关系失败: ' + err);
+      await alertDialog('删除关系失败: ' + err);
     }
   };
 
@@ -220,42 +221,67 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
     [novelId, loadData]
   );
 
+  const handleNodesChange = useCallback(
+    (changes: Parameters<typeof onNodesChange>[0]) => {
+      // 过滤掉 'remove' 变更，防止在拓扑图中通过键盘按键误删角色节点
+      const safeChanges = changes.filter((c) => c.type !== 'remove');
+      onNodesChange(safeChanges);
+    },
+    [onNodesChange]
+  );
+
+  const onEdgesDelete = useCallback(
+    async (deletedEdges: Edge[]) => {
+      for (const edge of deletedEdges) {
+        try {
+          await api.deleteCharacterRelationship(edge.id);
+        } catch (err) {
+          console.error('删除关系失败:', err);
+        }
+      }
+      setSelectedEdgeId(null);
+      loadData();
+    },
+    [loadData]
+  );
+
   return (
-    <div className="flex flex-col h-full bg-[#fdfbf7] text-[#2b2621] rounded-xl overflow-hidden border border-[#ded5c4] shadow-xs">
+    <div className="flex flex-col h-full bg-surface text-ink rounded-xl overflow-hidden border border-line shadow-xs">
       {/* Top Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#efe9dc]/90 border-b border-[#ded5c4]">
-        <div className="flex items-center gap-2">
-          <Users className="w-5 h-5 text-amber-800" />
-          <h2 className="font-semibold text-[#1f1d1a] font-serif">人物动态关系拓扑图 (React Flow)</h2>
-          <span className="text-xs bg-amber-800/10 text-amber-900 border border-amber-800/20 px-2 py-0.5 rounded-full font-mono">
-            {characters.length} 人物 / {relationships.length} 条关系
+      <div className="flex items-center justify-between px-4 py-3 bg-surface-2/90 border-b border-line gap-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <Users className="w-5 h-5 text-primary shrink-0" />
+          <h2 className="font-semibold text-ink font-serif truncate">人物关系拓扑图 (React Flow)</h2>
+          <span className="text-xs bg-amber-800/10 text-primary border border-amber-800/20 px-2 py-0.5 rounded-full font-mono shrink-0 whitespace-nowrap">
+            {characters.length} 人物 / {relationships.length} 关系
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
           {selectedEdgeId && (
             <button
               onClick={handleDeleteSelectedEdge}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-800/10 hover:bg-rose-800/20 text-rose-800 border border-rose-800/20 rounded-lg text-xs font-medium transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-800/10 hover:bg-rose-800/20 text-rose-800 border border-rose-800/20 rounded-lg text-xs font-medium transition-all shrink-0 whitespace-nowrap"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              删除选中连线
+              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+              删除连线
             </button>
           )}
 
           <button
             onClick={() => setShowAddModal(true)}
             disabled={characters.length < 2}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-800 hover:bg-amber-700 text-white rounded-lg text-xs font-medium transition-all disabled:opacity-40 shadow-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-800 hover:bg-amber-700 text-white rounded-lg text-xs font-medium transition-all disabled:opacity-40 shadow-xs shrink-0 whitespace-nowrap"
           >
-            <Plus className="w-3.5 h-3.5" />
-            建立关系连线
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">建立关系连线</span>
+            <span className="sm:hidden">建立关系</span>
           </button>
 
           <button
             onClick={loadData}
             title="刷新图谱"
-            className="p-1.5 bg-[#e4dcce] hover:bg-[#ded4c3] text-[#5c4f3d] rounded-lg transition-all"
+            className="p-1.5 bg-surface-3 hover:bg-surface-3-hover text-[#5c4f3d] rounded-lg transition-all shrink-0"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
@@ -263,36 +289,38 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
       </div>
 
       {/* Main Flow Canvas */}
-      <div className="flex-1 w-full h-[550px] relative bg-[#f7f2e7]">
+      <div className="flex-1 w-full h-[550px] relative bg-surface">
         {characters.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-[#786f65] gap-3">
-            <Users className="w-12 h-12 stroke-[1.2] text-[#9e9383]" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-ink-2 gap-3">
+            <Users className="w-12 h-12 stroke-[1.2] text-ink-2" />
             <p className="text-sm">暂无角色数据，请先在“角色档案”选项卡中创建角色</p>
           </div>
         ) : (
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
+            onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onEdgesDelete={onEdgesDelete}
             onEdgeClick={(_, edge) => setSelectedEdgeId(edge.id)}
+            onPaneClick={() => setSelectedEdgeId(null)}
             fitView
-            className="bg-[#f7f2e7]"
+            className="bg-surface"
           >
             <Background color="#ded5c4" gap={20} size={1} />
-            <Controls className="!bg-[#fdfbf7] !border-[#ded5c4] !text-[#2b2621] !fill-[#2b2621]" />
+            <Controls className="!bg-surface !border-line !text-ink !fill-[#2b2621]" />
             <MiniMap
               nodeColor="#b45309"
               maskColor="rgba(244, 239, 230, 0.75)"
-              className="!bg-[#fdfbf7] !border-[#ded5c4] rounded-lg"
+              className="!bg-surface !border-line rounded-lg"
             />
           </ReactFlow>
         )}
       </div>
 
       {/* Legend footer */}
-      <div className="px-4 py-2.5 bg-[#efe9dc]/90 border-t border-[#ded5c4] flex flex-wrap items-center justify-between text-xs text-[#786f65] gap-2">
+      <div className="px-4 py-2.5 bg-surface-2/90 border-t border-line flex flex-wrap items-center justify-between text-xs text-ink-2 gap-2">
         <div className="flex items-center gap-4 flex-wrap">
           <span className="font-medium text-slate-300">关系类型图例：</span>
           {RELATION_PRESETS.map((p) => (
@@ -310,22 +338,22 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
       {/* Modal: Add Relationship */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-[#fdfbf7] border border-[#ded5c4] rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-base font-serif font-bold text-[#2b2621] mb-4 flex items-center gap-2">
-              <GitCommit className="w-5 h-5 text-[#854d0e]" />
+          <div className="bg-surface border border-line rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <h3 className="text-base font-serif font-bold text-ink mb-4 flex items-center gap-2">
+              <GitCommit className="w-5 h-5 text-primary" />
               建立新的人物关联
             </h3>
 
             <form onSubmit={handleCreateRelationship} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-serif font-medium text-[#685f54] mb-1">
+                  <label className="block text-xs font-serif font-medium text-ink-2 mb-1">
                     起始角色 (Source)
                   </label>
                   <select
                     value={sourceId}
                     onChange={(e) => setSourceId(e.target.value)}
-                    className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg px-3 py-2 text-sm text-[#2b2621] focus:outline-hidden focus:border-[#854d0e]"
+                    className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-hidden focus:border-[#854d0e]"
                   >
                     {characters.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -336,13 +364,13 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
                 </div>
 
                 <div>
-                  <label className="block text-xs font-serif font-medium text-[#685f54] mb-1">
+                  <label className="block text-xs font-serif font-medium text-ink-2 mb-1">
                     目标角色 (Target)
                   </label>
                   <select
                     value={targetId}
                     onChange={(e) => setTargetId(e.target.value)}
-                    className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg px-3 py-2 text-sm text-[#2b2621] focus:outline-hidden focus:border-[#854d0e]"
+                    className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-hidden focus:border-[#854d0e]"
                   >
                     {characters.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -354,7 +382,7 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
               </div>
 
               <div>
-                <label className="block text-xs font-serif font-medium text-[#685f54] mb-1">关系类型</label>
+                <label className="block text-xs font-serif font-medium text-ink-2 mb-1">关系类型</label>
                 <div className="grid grid-cols-3 gap-2">
                   {RELATION_PRESETS.map((p) => (
                     <button
@@ -363,8 +391,8 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
                       onClick={() => setRelType(p.label)}
                       className={`px-2.5 py-1.5 rounded-lg text-xs font-serif font-medium border text-center transition-all ${
                         relType === p.label
-                          ? 'bg-[#efe9dc] border-[#854d0e] text-[#854d0e] shadow-2xs font-bold'
-                          : 'bg-[#f7f2e7] border-[#ded5c4] text-[#685f54] hover:bg-[#efe9dc]'
+                          ? 'bg-surface-2 border-[#854d0e] text-primary shadow-2xs font-bold'
+                          : 'bg-surface border-line text-ink-2 hover:bg-surface-2'
                       }`}
                     >
                       {p.label}
@@ -374,7 +402,7 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
               </div>
 
               <div>
-                <label className="block text-xs font-serif font-medium text-[#685f54] mb-1">
+                <label className="block text-xs font-serif font-medium text-ink-2 mb-1">
                   关系背景描述 (可选)
                 </label>
                 <textarea
@@ -382,15 +410,15 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
                   onChange={(e) => setRelDesc(e.target.value)}
                   placeholder="例如：自小一同在宗门修炼，数次生死相托……"
                   rows={2}
-                  className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg px-3 py-2 text-sm text-[#2b2621] placeholder-[#a89f91] focus:outline-hidden focus:border-[#854d0e] resize-none"
+                  className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder-[#a89f91] focus:outline-hidden focus:border-[#854d0e] resize-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#ded5c4]">
+              <div className="flex justify-end gap-2 pt-2 border-t border-line">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-xs font-serif font-medium text-[#685f54] hover:text-[#2b2621] transition-colors"
+                  className="px-4 py-2 text-xs font-serif font-medium text-ink-2 hover:text-ink transition-colors"
                 >
                   取消
                 </button>

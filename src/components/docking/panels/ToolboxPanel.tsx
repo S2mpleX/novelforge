@@ -14,8 +14,15 @@ import {
   BookOpen,
   Maximize2,
   Loader2,
+  Clapperboard,
+  FileSearch,
+  HeartPulse,
 } from 'lucide-react';
 import { NovelistToolboxModal } from '@/components/modals/NovelistToolboxModal';
+import { QuickNameModal } from '@/components/modals/QuickNameModal';
+import { DeconstructModal } from '@/components/modals/DeconstructModal';
+import { FullCheckModal } from '@/components/modals/FullCheckModal';
+import { AssetProposalModal } from '@/components/modals/AssetProposalModal';
 
 const QUICK_TOOLS: { type: ToolboxActionType; label: string; icon: any }[] = [
   { type: 'name', label: '起名灵感', icon: Wand2 },
@@ -25,6 +32,10 @@ const QUICK_TOOLS: { type: ToolboxActionType; label: string; icon: any }[] = [
   { type: 'world_law', label: '力量境界', icon: Compass },
   { type: 'gold_opening', label: '黄金开篇', icon: BookOpen },
   { type: 'chapter_outline', label: '单章细纲', icon: FileText },
+  { type: 'story_architect', label: '因果架构', icon: Compass },
+  { type: 'scene_dramaturge', label: '双导演方案', icon: Clapperboard },
+  { type: 'ending_forge', label: '结局锻造', icon: Sparkles },
+  { type: 'cold_reader', label: '读者盲审', icon: BookOpen },
   { type: 'dialogue_polish', label: '对白精修', icon: Users },
   { type: 'humanizer_polish', label: '去AI味重塑', icon: Sparkles },
 ];
@@ -38,6 +49,10 @@ export const ToolboxPanel: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showFullModal, setShowFullModal] = useState(false);
+  const [showQuickNameModal, setShowQuickNameModal] = useState(false);
+  const [showDeconstructModal, setShowDeconstructModal] = useState(false);
+  const [showFullCheckModal, setShowFullCheckModal] = useState(false);
+  const [showAssetProposalModal, setShowAssetProposalModal] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   if (!activeNovel) {
@@ -100,14 +115,52 @@ export const ToolboxPanel: React.FC = () => {
           <Wand2 className="w-3.5 h-3.5 text-amber-500" />
           <span>小说专项工具箱</span>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowFullModal(true)}
-          className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 hover:text-amber-500 font-medium px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
-        >
-          <Maximize2 className="w-3 h-3" />
-          展开高级工作室
-        </button>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowQuickNameModal(true)}
+            className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 hover:text-amber-500 font-medium px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 transition-colors border border-amber-500/20 cursor-pointer"
+            title="快捷起名生成器 (含本地高质词根与AI双驱动)"
+          >
+            <Sparkles className="w-3 h-3 text-amber-500" />
+            起名
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDeconstructModal(true)}
+            className="flex items-center gap-1 text-[11px] text-primary dark:text-amber-300 hover:text-amber-600 font-medium px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 transition-colors border border-amber-200 dark:border-amber-800 cursor-pointer"
+            title="拆书工坊：逆向拆解竞品与爆款范文骨架、黄金三章开局与可复用打法"
+          >
+            <FileSearch className="w-3 h-3 text-primary dark:text-amber-400" />
+            拆书工坊
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFullCheckModal(true)}
+            className="flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 hover:text-emerald-600 font-medium px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 transition-colors border border-emerald-200 dark:border-emerald-800 cursor-pointer"
+            title="全书体检：死人诈尸、伤病闭关登场、核心角色掉线、伏笔烂尾滞后排查"
+          >
+            <HeartPulse className="w-3 h-3 text-emerald-600" />
+            全景体检
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAssetProposalModal(true)}
+            className="flex items-center gap-1 text-[11px] text-purple-700 dark:text-purple-400 hover:text-purple-600 font-medium px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 transition-colors border border-purple-200 dark:border-purple-800 cursor-pointer"
+            title="资产反哺：扫描正文野生新角色、新宗门、新功法与法宝，一键采纳落库"
+          >
+            <Sparkles className="w-3 h-3 text-purple-600" />
+            资产反哺
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFullModal(true)}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground font-medium px-2 py-0.5 rounded bg-muted hover:bg-muted/80 transition-colors cursor-pointer"
+          >
+            <Maximize2 className="w-3 h-3" />
+            展开
+          </button>
+        </div>
       </div>
 
       {/* 专项快捷标签 */}
@@ -206,6 +259,39 @@ export const ToolboxPanel: React.FC = () => {
           initialAction={selectedType}
         />
       )}
+
+      {/* 起名灵感生成器 */}
+      {showQuickNameModal && (
+        <QuickNameModal
+          isOpen={showQuickNameModal}
+          onClose={() => setShowQuickNameModal(false)}
+        />
+      )}
+
+      {/* 拆书工坊 */}
+      {showDeconstructModal && (
+        <DeconstructModal
+          isOpen={showDeconstructModal}
+          onClose={() => setShowDeconstructModal(false)}
+        />
+      )}
+
+      {/* 全身因果体检 */}
+      {showFullCheckModal && (
+        <FullCheckModal
+          isOpen={showFullCheckModal}
+          onClose={() => setShowFullCheckModal(false)}
+        />
+      )}
+
+      {/* 资产反哺提案 */}
+      {showAssetProposalModal && (
+        <AssetProposalModal
+          isOpen={showAssetProposalModal}
+          onClose={() => setShowAssetProposalModal(false)}
+        />
+      )}
     </div>
+
   );
 };

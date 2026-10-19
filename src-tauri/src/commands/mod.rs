@@ -21,6 +21,9 @@ use crate::models::{
     WorkflowRunDetails, ExecuteToolboxActionInput, ExecuteToolboxActionResult,
     VoiceProfile, SaveVoiceProfileInput, GenerateFindingRepairInput, FindingRepairResult,
     ModelArenaRun, SaveModelArenaRunInput, ArenaStreamChunkPayload, ExecuteArenaDuelInput, ArenaDuelResult, MergeArenaOutputsInput,
+    OptimizeWritingPromptInput, OptimizeWritingPromptResult,
+    UpdateNovelInput, UpdateVolumeInput,
+    UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput,
 };
 use crate::providers::{
     ChatMessage, ChatCompletionRequest, ConnectionTestResult, OpenAIClient,
@@ -46,6 +49,11 @@ pub fn get_novel(db: State<DbManager>, id: String) -> Result<Novel, String> {
 #[tauri::command]
 pub fn delete_novel(db: State<DbManager>, id: String) -> Result<(), String> {
     db.delete_novel(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_novel(db: State<DbManager>, input: UpdateNovelInput) -> Result<Novel, String> {
+    db.update_novel(input).map_err(|e| e.to_string())
 }
 
 // --- VOLUMES & CHAPTERS ---
@@ -96,6 +104,15 @@ pub fn delete_chapter(db: State<DbManager>, id: String) -> Result<(), String> {
     db.delete_chapter(&id).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn update_chapter_title(
+    db: State<DbManager>,
+    chapter_id: String,
+    title: String,
+) -> Result<Chapter, String> {
+    db.update_chapter_title(&chapter_id, &title).map_err(|e| e.to_string())
+}
+
 // --- STORY BIBLE (CHARACTERS, WORLD RULES, PLOT THREADS) ---
 
 #[tauri::command]
@@ -112,6 +129,28 @@ pub fn create_character(
 }
 
 #[tauri::command]
+pub fn update_character_status(
+    db: State<DbManager>,
+    id: String,
+    status: String,
+) -> Result<(), String> {
+    db.update_character_status(&id, &status).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_character(
+    db: State<DbManager>,
+    input: UpdateCharacterInput,
+) -> Result<Character, String> {
+    db.update_character(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_character(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_character(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn list_world_rules(db: State<DbManager>, novel_id: String) -> Result<Vec<WorldRule>, String> {
     db.list_world_rules(&novel_id).map_err(|e| e.to_string())
 }
@@ -125,6 +164,19 @@ pub fn create_world_rule(
 }
 
 #[tauri::command]
+pub fn update_world_rule(
+    db: State<DbManager>,
+    input: UpdateWorldRuleInput,
+) -> Result<WorldRule, String> {
+    db.update_world_rule(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_world_rule(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_world_rule(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn list_plot_threads(db: State<DbManager>, novel_id: String) -> Result<Vec<PlotThread>, String> {
     db.list_plot_threads(&novel_id).map_err(|e| e.to_string())
 }
@@ -135,6 +187,28 @@ pub fn create_plot_thread(
     input: CreatePlotThreadInput,
 ) -> Result<PlotThread, String> {
     db.create_plot_thread(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_plot_thread_status(
+    db: State<DbManager>,
+    id: String,
+    status: String,
+) -> Result<(), String> {
+    db.update_plot_thread_status(&id, &status).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_plot_thread(
+    db: State<DbManager>,
+    input: UpdatePlotThreadInput,
+) -> Result<PlotThread, String> {
+    db.update_plot_thread(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_plot_thread(db: State<DbManager>, id: String) -> Result<(), String> {
+    db.delete_plot_thread(&id).map_err(|e| e.to_string())
 }
 
 // --- AI PROVIDERS & MODELS ---
@@ -352,11 +426,12 @@ pub fn export_novel_text(
     }
 
     for ch in chapters {
-        let content = ch.content.unwrap_or_default();
+        let raw_content = ch.content.unwrap_or_default();
+        let plain_content = crate::export::html_to_plain_text(&raw_content);
         if is_md {
-            out.push_str(&format!("## 第 {} 章 {}\n\n{}\n\n", ch.chapter_number, ch.title, content));
+            out.push_str(&format!("## 第 {} 章 {}\n\n{}\n\n", ch.chapter_number, ch.title, plain_content));
         } else {
-            out.push_str(&format!("第 {} 章 {}\n\n{}\n\n", ch.chapter_number, ch.title, content));
+            out.push_str(&format!("第 {} 章 {}\n\n{}\n\n", ch.chapter_number, ch.title, plain_content));
         }
     }
 
@@ -449,6 +524,14 @@ pub fn update_story_arc_status(
     status: String,
 ) -> Result<(), String> {
     db.update_story_arc_status(&id, &status).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_story_arc(
+    db: State<DbManager>,
+    id: String,
+) -> Result<(), String> {
+    db.delete_story_arc(&id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -878,16 +961,29 @@ pub async fn run_collaborative_workflow(
         system_prompt.push('\n');
     }
 
-    let mut user_prompt = format!(
-        "请依据编剧拆解的以下场景细纲，撰写第 {} 章《{}》的完整正文草稿（目标字数约 {} 字）：\n\n",
-        chapter.chapter_number, chapter.title, input.target_word_count.unwrap_or(3000)
-    );
+    let target_wc = input.target_word_count.unwrap_or(3000);
+    let mut user_prompt = if target_wc == 0 {
+        format!(
+            "请依据编剧拆解的以下场景细纲，自主权衡各场次的情节张力与自然节拍，撰写第 {} 章《{}》的完整正文草稿（篇幅由你根据情节需要自适应裁量，以各幕充分展开、因果闭环、不注水拖沓为准）：\n\n",
+            chapter.chapter_number, chapter.title
+        )
+    } else {
+        format!(
+            "请依据编剧拆解的以下场景细纲，撰写第 {} 章《{}》的完整正文草稿（目标字数约 {} 字）：\n\n",
+            chapter.chapter_number, chapter.title, target_wc
+        )
+    };
 
     for s in &scenes {
         user_prompt.push_str(&format!("【场次 {}】：目标 - {}\n细纲节奏 - {}\n\n", s.sequence, s.objective, s.outline));
     }
 
     let client = OpenAIClient::new();
+    let computed_tokens: i64 = if target_wc == 0 {
+        8000
+    } else {
+        std::cmp::max(4000, (target_wc as f64 * 2.2) as i64)
+    };
     let req = ChatCompletionRequest {
         model: model.model_name,
         messages: vec![
@@ -895,7 +991,7 @@ pub async fn run_collaborative_workflow(
             ChatMessage { role: "user".to_string(), content: user_prompt },
         ],
         temperature: Some(0.75),
-        max_tokens: Some(4000),
+        max_tokens: Some(computed_tokens),
         stream: false,
     };
 
@@ -1440,6 +1536,11 @@ pub fn create_volume(db: State<DbManager>, input: CreateVolumeInput) -> Result<V
 #[tauri::command]
 pub fn delete_volume(db: State<DbManager>, id: String) -> Result<(), String> {
     db.delete_volume(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_volume(db: State<DbManager>, input: UpdateVolumeInput) -> Result<Volume, String> {
+    db.update_volume(input).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2096,3 +2197,176 @@ pub fn save_model_arena_run(
 pub fn delete_model_arena_run(db: State<DbManager>, id: String) -> Result<(), String> {
     db.delete_model_arena_run(&id).map_err(|e| e.to_string())
 }
+
+// ==========================================
+// V2.5.1 AI PROMPT OPTIMIZER COMMAND
+// ==========================================
+
+#[tauri::command]
+pub async fn optimize_writing_prompt(
+    db: State<'_, DbManager>,
+    input: OptimizeWritingPromptInput,
+) -> Result<OptimizeWritingPromptResult, String> {
+    let raw_prompt = input.raw_prompt.trim().to_string();
+    if raw_prompt.is_empty() {
+        return Err("请输入待优化的原始提示词或剧情构思".to_string());
+    }
+
+    let (provider, model) = db
+        .get_active_provider_and_model()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "未找到已激活的 AI 模型服务商，请先在模型设置中激活 API".to_string())?;
+
+    // 组装小说工程上下文
+    let mut novel_context = String::new();
+    if let Some(novel_id) = &input.novel_id {
+        if let Ok(novel) = db.get_novel(novel_id) {
+            novel_context.push_str(&format!(
+                "【作品名称】：《{}》\n【题材流派】：{}\n【基调风骨】：{}\n",
+                novel.title, novel.genre_profile, novel.writing_style
+            ));
+
+            // 补充激活的文风档案
+            if let Ok(Some(vp)) = db.get_active_voice_profile(Some(novel_id)) {
+                novel_context.push_str(&format!(
+                    "【文风档案约束】：句式节奏={}，遣词风格={}，叙事视角={}\n",
+                    vp.sentence_rhythm, vp.vocabulary_tone, vp.pov_preference
+                ));
+            }
+
+            // 补充核心世界法则公理 (Canon facts, 取前 5 条)
+            if let Ok(facts) = db.list_canon_facts(novel_id, None) {
+                if !facts.is_empty() {
+                    let fact_summaries: Vec<String> = facts
+                        .into_iter()
+                        .take(5)
+                        .map(|f| format!("- {} {}: {}", f.subject_id, f.predicate, f.object_value))
+                        .collect();
+                    novel_context.push_str(&format!("【核心世界法则公理】:\n{}\n", fact_summaries.join("\n")));
+                }
+            }
+        }
+    }
+
+    let mut chapter_context = String::new();
+    if let Some(chapter_id) = &input.chapter_id {
+        if let Ok(chapter) = db.get_chapter(chapter_id) {
+            chapter_context.push_str(&format!(
+                "【当前章节】：第{}章《{}》\n",
+                chapter.chapter_number, chapter.title
+            ));
+        }
+    }
+
+    let angle_desc = match input.optimization_angle.as_deref().unwrap_or("DRAMA_CONFLICT") {
+        "DRAMA_CONFLICT" => "【优化侧重点：戏剧冲突与心理博弈】强调角色的欲望对抗、言语潜台词试探、危机步步升级与险象环生。",
+        "SENSORY_DETAIL" => "【优化侧重点：白描临场与物象细节】强调微观动作、室内冷暖声色、气味触感，杜绝假大空，落实Show, Don't Tell。",
+        "PLOT_HOOK" => "【优化侧重点：伏笔勾连与悬念断章】强调前情暗线因果交织、惊人秘密揭示的一角、不可逆代价以及章末引人入胜的悬念钩子。",
+        "CONCISE_PUNCHY" => "【优化侧重点：快节奏爽利推进】削枝保干，短句有力，直接切入核心矛盾，极速拉高期待感。",
+        _ => "【优化侧重点：全方位戏剧化小说专业重构】。",
+    };
+
+    let target_len_desc = input
+        .target_length
+        .map(|l| format!("【期望正文篇幅】：约{}字\n", l))
+        .unwrap_or_default();
+    let style_mode_desc = input
+        .style_mode
+        .map(|s| format!("【作者指定文风】：{}\n", s))
+        .unwrap_or_default();
+
+    // 加载系统提示词 (优先读取 prompts/prompt_optimizer.md，失败则降级内置兜底)
+    let prompt_file_path = std::path::Path::new("prompts/prompt_optimizer.md");
+    let base_system_prompt = std::fs::read_to_string(prompt_file_path).unwrap_or_else(|_| {
+        "你是一名顶级小说策划与提示词架构师，专精将粗糙的网文灵感扩展优化为具备强画面感、人物对抗张力与因果闭环的高效创作Prompt。必须输出合法的 JSON：{\"optimized_prompt\":\"...\",\"enhancement_points\":[\"...\"],\"suggested_hooks\":\"...\",\"suggested_tags\":[\"...\"]}".to_string()
+    });
+
+    let system_prompt = format!(
+        "{}\n\n\
+         当前创作工程背景：\n\
+         {}\
+         {}\
+         {}\
+         {}\
+         {}\n\
+         请严格输出标准合法的 JSON 格式对象，不要包含 markdown 额外包裹或闲聊废话。",
+        base_system_prompt,
+        novel_context,
+        chapter_context,
+        target_len_desc,
+        style_mode_desc,
+        angle_desc
+    );
+
+    let user_prompt = format!(
+        "作者输入的原始剧情想法与提示词：\n\
+         \"{}\"\n\n\
+         请根据上述背景与优化倾向，将其重构点金为专业小说创作提示词，并严格输出 JSON 格式（包含 optimized_prompt, enhancement_points, suggested_hooks, suggested_tags）。",
+        raw_prompt
+    );
+
+    let client = OpenAIClient::new();
+    let req = ChatCompletionRequest {
+        model: model.model_name,
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: system_prompt,
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: user_prompt,
+            },
+        ],
+        temperature: Some(0.7),
+        max_tokens: Some(2500),
+        stream: false,
+    };
+
+    let raw_reply = client
+        .chat_completion(&provider.base_url, &provider.api_key, req)
+        .await?;
+    let json_str = extract_json_block(&raw_reply);
+
+    // 解析 JSON 响应
+    #[derive(serde::Deserialize)]
+    struct PartialOptResult {
+        optimized_prompt: Option<String>,
+        enhancement_points: Option<Vec<String>>,
+        suggested_hooks: Option<String>,
+        suggested_tags: Option<Vec<String>>,
+    }
+
+    let parsed: Result<PartialOptResult, _> = serde_json::from_str(json_str);
+    match parsed {
+        Ok(res) => Ok(OptimizeWritingPromptResult {
+            original_prompt: raw_prompt.clone(),
+            optimized_prompt: res.optimized_prompt.unwrap_or_else(|| raw_reply.clone()),
+            enhancement_points: res.enhancement_points.unwrap_or_else(|| {
+                vec![
+                    "增强了微观动作与环境压迫感".to_string(),
+                    "明确了角色的核心欲望与即时阻碍".to_string(),
+                    "注入了言语交锋的潜台词试探".to_string(),
+                ]
+            }),
+            suggested_hooks: res.suggested_hooks,
+            suggested_tags: res
+                .suggested_tags
+                .unwrap_or_else(|| vec!["剧情推进".to_string(), "张力强化".to_string()]),
+        }),
+        Err(_) => {
+            // 如果模型未返回标准 JSON，以文本形式优雅降级
+            Ok(OptimizeWritingPromptResult {
+                original_prompt: raw_prompt,
+                optimized_prompt: raw_reply,
+                enhancement_points: vec![
+                    "完成小说剧本化张力提炼".to_string(),
+                    "丰富了场景物象与行动指引".to_string(),
+                ],
+                suggested_hooks: None,
+                suggested_tags: vec!["智能优化".to_string()],
+            })
+        }
+    }
+}
+

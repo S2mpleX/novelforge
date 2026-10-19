@@ -3,7 +3,7 @@ import { AiAssistantPanel as CoreAiAssistantPanel } from '@/components/editor/Ai
 
 export const AiAssistantPanelWrapper: React.FC = () => {
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden">
+    <div className="w-full h-full min-w-[240px] flex flex-col overflow-hidden">
       <CoreAiAssistantPanel />
     </div>
   );

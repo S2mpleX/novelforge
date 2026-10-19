@@ -25,6 +25,11 @@ import {
   Feather,
   Swords,
   FileText,
+  Sliders,
+  FileSearch,
+  HeartPulse,
+  Lightbulb,
+  Layers,
 } from 'lucide-react';
 
 interface Props {
@@ -32,6 +37,7 @@ interface Props {
   onClose: () => void;
   onOpenSettings: () => void;
   onOpenUpdater?: () => void;
+  onOpenSkills?: () => void;
   onOpenSerialization: () => void;
   onOpenPublishing: () => void;
   onOpenCreateChapter: () => void;
@@ -42,6 +48,11 @@ interface Props {
   onOpenArena?: () => void;
   onOpenTypesetter?: () => void;
   onOpenWordImport?: () => void;
+  onOpenDeconstruct?: () => void;
+  onOpenFullCheck?: () => void;
+  onOpenAssetProposal?: () => void;
+  onOpenBatchRevise?: () => void;
+  onOpenMap?: () => void;
 }
 
 export const CommandPaletteModal: React.FC<Props> = ({
@@ -49,6 +60,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
   onClose,
   onOpenSettings,
   onOpenUpdater,
+  onOpenSkills,
   onOpenSerialization,
   onOpenPublishing,
   onOpenCreateChapter,
@@ -59,6 +71,11 @@ export const CommandPaletteModal: React.FC<Props> = ({
   onOpenArena,
   onOpenTypesetter,
   onOpenWordImport,
+  onOpenDeconstruct,
+  onOpenFullCheck,
+  onOpenAssetProposal,
+  onOpenBatchRevise,
+  onOpenMap,
 }) => {
   const {
     chapters,
@@ -91,7 +108,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
   const baseCommands = [
     {
       id: 'cmd-create-ch',
-      icon: <FilePlus className="w-4 h-4 text-[#854d0e]" />,
+      icon: <FilePlus className="w-4 h-4 text-primary" />,
       title: '新建下一章节',
       category: '创作操作',
       action: () => {
@@ -101,7 +118,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-save',
-      icon: <Save className="w-4 h-4 text-[#854d0e]" />,
+      icon: <Save className="w-4 h-4 text-primary" />,
       title: '立即保存当前正文快照 (Ctrl+S)',
       category: '创作操作',
       action: () => {
@@ -141,7 +158,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-voice-profile',
-      icon: <Feather className="w-4 h-4 text-amber-800" />,
+      icon: <Feather className="w-4 h-4 text-primary" />,
       title: '打开作者文风档案工作室 (文风建模/节奏语调/现场试读)',
       category: '智能写作',
       action: () => {
@@ -151,7 +168,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-arena',
-      icon: <Swords className="w-4 h-4 text-amber-800" />,
+      icon: <Swords className="w-4 h-4 text-primary" />,
       title: '打开多模型同台比稿竞技场 (双模推演/盲测PK/智能融稿)',
       category: '智能写作',
       action: () => {
@@ -160,8 +177,68 @@ export const CommandPaletteModal: React.FC<Props> = ({
       },
     },
     {
+      id: 'cmd-skills-manager',
+      icon: <Sliders className="w-4 h-4 text-primary" />,
+      title: '打开 Agent Skills 技能管理中心 (Humanizer / Lieflat 语言学去AI味)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenSkills?.();
+      },
+    },
+    {
+      id: 'cmd-deconstruct',
+      icon: <FileSearch className="w-4 h-4 text-emerald-600" />,
+      title: '打开样章与名作拆书工坊 (黄金三章/节奏爽点/套路提炼)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenDeconstruct?.();
+      },
+    },
+    {
+      id: 'cmd-full-check',
+      icon: <HeartPulse className="w-4 h-4 text-rose-600" />,
+      title: '打开全书因果体检与违规巡检 (死人诈尸/角色掉线/烂尾伏笔/公理违背)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenFullCheck?.();
+      },
+    },
+    {
+      id: 'cmd-asset-proposal',
+      icon: <Lightbulb className="w-4 h-4 text-amber-600" />,
+      title: '打开正文资产反哺提案引擎 (自动提炼野生人物/宗门功法/一键入库)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenAssetProposal?.();
+      },
+    },
+    {
+      id: 'cmd-batch-revise',
+      icon: <Layers className="w-4 h-4 text-primary" />,
+      title: '打开跨章节批量重塑工作流 (批量去AI味/提速/强化悬念/Diff采纳)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenBatchRevise?.();
+      },
+    },
+    {
+      id: 'cmd-map-sandbox',
+      icon: <Compass className="w-4 h-4 text-blue-700" />,
+      title: '打开神州山河地理沙盘路线图 (宗门城池坐标/历练行军路线规划)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenMap?.();
+      },
+    },
+    {
       id: 'cmd-format',
-      icon: <AlignLeft className="w-4 h-4 text-[#854d0e]" />,
+      icon: <AlignLeft className="w-4 h-4 text-primary" />,
       title: '一键文学规范排版 (首行双全角缩进、清理空行标点)',
       category: '排版精修',
       action: () => {
@@ -181,7 +258,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-tab-editor',
-      icon: <BookOpen className="w-4 h-4 text-[#854d0e]" />,
+      icon: <BookOpen className="w-4 h-4 text-primary" />,
       title: '切换视图 ➔ 正文沉浸写作',
       category: '视图导航',
       action: () => {
@@ -191,7 +268,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-tab-dashboard',
-      icon: <LayoutDashboard className="w-4 h-4 text-[#854d0e]" />,
+      icon: <LayoutDashboard className="w-4 h-4 text-primary" />,
       title: '切换视图 ➔ 全景大纲看板',
       category: '视图导航',
       action: () => {
@@ -201,7 +278,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-tab-characters',
-      icon: <Users className="w-4 h-4 text-[#854d0e]" />,
+      icon: <Users className="w-4 h-4 text-primary" />,
       title: '切换视图 ➔ 人物档案与动态拓扑图',
       category: '视图导航',
       action: () => {
@@ -211,7 +288,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-tab-world',
-      icon: <Compass className="w-4 h-4 text-[#854d0e]" />,
+      icon: <Compass className="w-4 h-4 text-primary" />,
       title: '切换视图 ➔ 世界观法则与设定集',
       category: '视图导航',
       action: () => {
@@ -221,7 +298,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-tab-memory',
-      icon: <Brain className="w-4 h-4 text-[#854d0e]" />,
+      icon: <Brain className="w-4 h-4 text-primary" />,
       title: '切换视图 ➔ L0~L4 因果长期记忆引擎',
       category: '视图导航',
       action: () => {
@@ -231,7 +308,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-serialization',
-      icon: <TrendingUp className="w-4 h-4 text-[#854d0e]" />,
+      icon: <TrendingUp className="w-4 h-4 text-primary" />,
       title: '打开自动连载流水线控制台',
       category: '系统工具',
       action: () => {
@@ -241,7 +318,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-publishing',
-      icon: <Archive className="w-4 h-4 text-[#854d0e]" />,
+      icon: <Archive className="w-4 h-4 text-primary" />,
       title: '全本交付导出中心 (HTML5/TXT/MD/工程备份)',
       category: '系统工具',
       action: () => {
@@ -251,7 +328,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-settings',
-      icon: <Settings className="w-4 h-4 text-[#854d0e]" />,
+      icon: <Settings className="w-4 h-4 text-primary" />,
       title: '打开模型网关与 API 端点配置',
       category: '系统工具',
       action: () => {
@@ -261,7 +338,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-updater',
-      icon: <Sparkles className="w-4 h-4 text-[#854d0e]" />,
+      icon: <Sparkles className="w-4 h-4 text-primary" />,
       title: '检查软件更新 · 软件更新中心 (Update Center)',
       category: '系统工具',
       action: () => {
@@ -285,7 +362,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-zoom-in',
-      icon: <ZoomIn className="w-4 h-4 text-[#854d0e]" />,
+      icon: <ZoomIn className="w-4 h-4 text-primary" />,
       title: `放大全局界面与文字尺寸 (+5%，当前 ${uiScale}%)`,
       category: '外观与界面',
       action: () => {
@@ -294,7 +371,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-zoom-out',
-      icon: <ZoomOut className="w-4 h-4 text-[#854d0e]" />,
+      icon: <ZoomOut className="w-4 h-4 text-primary" />,
       title: `缩小全局界面与文字尺寸 (-5%，当前 ${uiScale}%)`,
       category: '外观与界面',
       action: () => {
@@ -303,7 +380,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     },
     {
       id: 'cmd-zoom-reset',
-      icon: <RotateCcw className="w-4 h-4 text-[#854d0e]" />,
+      icon: <RotateCcw className="w-4 h-4 text-primary" />,
       title: '重置全局界面与文字尺寸为 100% 默认大小',
       category: '外观与界面',
       action: () => {
@@ -315,7 +392,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
   // Add chapter jumps
   const chapterCommands = chapters.map((ch) => ({
     id: `cmd-ch-${ch.id}`,
-    icon: <Sparkles className="w-4 h-4 text-[#854d0e]" />,
+    icon: <Sparkles className="w-4 h-4 text-primary" />,
     title: `跳转阅读/编辑：第 ${ch.chapter_number} 章《${ch.title}》(${ch.word_count} 字)`,
     category: '章节直达',
     action: () => {
@@ -351,10 +428,10 @@ export const CommandPaletteModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/40 backdrop-blur-xs p-4 animate-in fade-in">
-      <div className="w-full max-w-xl bg-[#fdfbf7] border border-[#ded5c4] rounded-2xl shadow-2xl overflow-hidden flex flex-col font-serif">
+      <div className="w-full max-w-xl bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden flex flex-col font-serif">
         {/* Search Input Bar */}
-        <div className="p-3.5 border-b border-[#ded5c4] flex items-center gap-3 bg-[#efe9dc]">
-          <Search className="w-5 h-5 text-[#854d0e] shrink-0" />
+        <div className="p-3.5 border-b border-line flex items-center gap-3 bg-surface-2">
+          <Search className="w-5 h-5 text-primary shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -365,14 +442,14 @@ export const CommandPaletteModal: React.FC<Props> = ({
             }}
             onKeyDown={handleKeyDown}
             placeholder="键入指令、章节名、或视图名称快速直达 (支持 ↑↓ 键移动，Enter 执行)..."
-            className="flex-1 bg-transparent border-none text-sm text-[#2b2621] placeholder-[#a89f91] focus:outline-hidden"
+            className="flex-1 bg-transparent border-none text-sm text-ink placeholder-[#a89f91] focus:outline-hidden"
           />
-          <kbd className="px-2 py-0.5 rounded bg-[#f4efe6] border border-[#ded5c4] text-[11px] font-mono text-[#786f65]">
+          <kbd className="px-2 py-0.5 rounded bg-canvas border border-line text-[11px] font-mono text-ink-2">
             ESC
           </kbd>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-[#685f54] hover:text-[#2b2621] hover:bg-[#e5ded0] transition"
+            className="p-1 rounded-lg text-ink-2 hover:text-ink hover:bg-surface-3-hover transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -381,7 +458,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
         {/* Results List */}
         <div className="max-h-96 overflow-y-auto p-2 divide-y divide-[#ded5c4]/40">
           {filtered.length === 0 ? (
-            <div className="py-12 text-center text-xs text-[#786f65]">
+            <div className="py-12 text-center text-xs text-ink-2">
               未检索到匹配指令。请尝试搜索 “大纲”、“新建”、“排版” 或章节名称。
             </div>
           ) : (
@@ -394,17 +471,17 @@ export const CommandPaletteModal: React.FC<Props> = ({
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={`px-3 py-2.5 rounded-xl cursor-pointer transition flex items-center justify-between text-xs ${
                     isSelected
-                      ? 'bg-[#efe9dc] text-[#854d0e] shadow-2xs font-semibold'
-                      : 'text-[#4a4237] hover:bg-[#f7f2e7]'
+                      ? 'bg-surface-2 text-primary shadow-2xs font-semibold'
+                      : 'text-ink-2 hover:bg-surface'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-1.5 rounded-lg bg-[#fdfbf7] border border-[#ded5c4] shadow-2xs">
+                    <div className="p-1.5 rounded-lg bg-surface border border-line shadow-2xs">
                       {item.icon}
                     </div>
                     <span>{item.title}</span>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#f4efe6] text-[#786f65] border border-[#ded5c4]">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-canvas text-ink-2 border border-line">
                     {item.category}
                   </span>
                 </div>
@@ -414,8 +491,8 @@ export const CommandPaletteModal: React.FC<Props> = ({
         </div>
 
         {/* Footer tips */}
-        <div className="p-2.5 border-t border-[#ded5c4] bg-[#efe9dc] flex items-center justify-between text-[11px] text-[#786f65]">
-          <span>提示：任意时刻按下 <kbd className="font-mono bg-[#fdfbf7] px-1 py-0.5 rounded border border-[#ded5c4]">Ctrl+K</kbd> 均可唤出本命令面板</span>
+        <div className="p-2.5 border-t border-line bg-surface-2 flex items-center justify-between text-[11px] text-ink-2">
+          <span>提示：任意时刻按下 <kbd className="font-mono bg-surface px-1 py-0.5 rounded border border-line">Ctrl+K</kbd> 均可唤出本命令面板</span>
           <span>当前共 {filtered.length} 项指令</span>
         </div>
       </div>

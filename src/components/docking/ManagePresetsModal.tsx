@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useWorkspaceStore } from '@/stores/useWorkspaceStore';
+import { confirmDialog, alertDialog } from '@/utils/dialog';
 import {
   X,
   Layout,
@@ -48,7 +49,7 @@ export const ManagePresetsModal: React.FC<Props> = ({ onClose }) => {
     setShowJsonExport(true);
   };
 
-  const handleImportJson = () => {
+  const handleImportJson = async () => {
     try {
       const parsed = JSON.parse(jsonText);
       useWorkspaceStore.setState({ layout: parsed });
@@ -57,20 +58,20 @@ export const ManagePresetsModal: React.FC<Props> = ({ onClose }) => {
       setShowJsonExport(false);
       setTimeout(() => setMsg(null), 2500);
     } catch (e) {
-      alert(`导入 JSON 失败: ${e}`);
+      await alertDialog(`导入 JSON 失败: ${e}`);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-[#fdfbf7] border border-[#d5cbb8] rounded-xl max-w-xl w-full p-4 shadow-2xl text-xs text-[#2b2621]">
+      <div className="bg-surface border border-line rounded-xl max-w-xl w-full p-4 shadow-2xl text-xs text-ink">
         {/* Header */}
-        <div className="flex items-center justify-between pb-2.5 border-b border-[#ded5c4] mb-3">
+        <div className="flex items-center justify-between pb-2.5 border-b border-line mb-3">
           <div className="flex items-center gap-2">
-            <Layout className="w-4 h-4 text-amber-800" />
-            <span className="font-bold text-sm text-[#854d0e]">工作区布局管理中心</span>
+            <Layout className="w-4 h-4 text-primary" />
+            <span className="font-bold text-sm text-primary">工作区布局管理中心</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded text-[#786f65] hover:text-[#2c2825]">
+          <button onClick={onClose} className="p-1 rounded text-ink-2 hover:text-ink">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -91,14 +92,14 @@ export const ManagePresetsModal: React.FC<Props> = ({ onClose }) => {
                 className={`p-2.5 rounded-lg border transition flex items-center justify-between ${
                   isActive
                     ? 'bg-[#f5efe3] border-amber-800/40 shadow-xs'
-                    : 'bg-[#fcfaf5] border-[#e2d9c8] hover:bg-[#ede5d6]'
+                    : 'bg-[#fcfaf5] border-[#e2d9c8] hover:bg-surface-3'
                 }`}
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs text-[#2c2825]">{preset.name}</span>
+                    <span className="font-bold text-xs text-ink">{preset.name}</span>
                     {preset.isBuiltIn ? (
-                      <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-800/10 text-amber-800 border border-amber-800/20 font-medium">
+                      <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-800/10 text-primary border border-amber-800/20 font-medium">
                         内置预设
                       </span>
                     ) : (
@@ -112,7 +113,7 @@ export const ManagePresetsModal: React.FC<Props> = ({ onClose }) => {
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-[#786f65] mt-0.5 font-serif line-clamp-1">
+                  <p className="text-[10px] text-ink-2 mt-0.5 font-serif line-clamp-1">
                     {preset.description}
                   </p>
                 </div>
@@ -132,13 +133,13 @@ export const ManagePresetsModal: React.FC<Props> = ({ onClose }) => {
 
                   {!preset.isBuiltIn && (
                     <button
-                      onClick={() => {
-                        if (confirm(`确定删除自定义预设【${preset.name}】吗？`)) {
+                      onClick={async () => {
+                        if (await confirmDialog(`确定删除自定义预设【${preset.name}】吗？`)) {
                           deleteCustomPreset(preset.id);
                         }
                       }}
                       title="删除此预设"
-                      className="p-1 rounded text-[#786f65] hover:text-red-700 hover:bg-red-800/10 transition"
+                      className="p-1 rounded text-ink-2 hover:text-red-700 hover:bg-red-800/10 transition"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -150,18 +151,18 @@ export const ManagePresetsModal: React.FC<Props> = ({ onClose }) => {
         </div>
 
         {/* Action Buttons */}
-        <div className="pt-2 border-t border-[#ded5c4] flex items-center justify-between">
+        <div className="pt-2 border-t border-line flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSaveNew(!showSaveNew)}
-              className="px-2.5 py-1.5 rounded bg-amber-800/10 hover:bg-amber-800/20 text-amber-900 border border-amber-800/30 font-medium flex items-center gap-1 transition"
+              className="px-2.5 py-1.5 rounded bg-amber-800/10 hover:bg-amber-800/20 text-primary border border-amber-800/30 font-medium flex items-center gap-1 transition"
             >
               <Plus className="w-3.5 h-3.5" />
               另存当前布局为预设
             </button>
             <button
               onClick={handleExportJson}
-              className="px-2.5 py-1.5 rounded border border-[#d5cbb8] hover:bg-[#ede5d6] text-[#554b3e] font-medium flex items-center gap-1 transition"
+              className="px-2.5 py-1.5 rounded border border-line hover:bg-surface-3 text-ink-2 font-medium flex items-center gap-1 transition"
             >
               <Download className="w-3.5 h-3.5" />
               导出/导入 JSON
@@ -169,8 +170,8 @@ export const ManagePresetsModal: React.FC<Props> = ({ onClose }) => {
           </div>
 
           <button
-            onClick={() => {
-              if (confirm('确定要恢复默认专注写作布局吗？小说正文数据不会受到任何影响。')) {
+            onClick={async () => {
+              if (await confirmDialog('确定要恢复默认专注写作布局吗？小说正文数据不会受到任何影响。')) {
                 resetToDefaultLayout();
                 setMsg('已恢复出厂默认布局！');
               }
@@ -184,28 +185,28 @@ export const ManagePresetsModal: React.FC<Props> = ({ onClose }) => {
 
         {/* Form: Save New Preset */}
         {showSaveNew && (
-          <form onSubmit={handleSaveNew} className="mt-3 p-3 rounded-lg bg-[#ede5d6] border border-[#ded5c4] space-y-2">
-            <h4 className="font-bold text-xs text-[#854d0e]">另存为新预设</h4>
+          <form onSubmit={handleSaveNew} className="mt-3 p-3 rounded-lg bg-surface-2 border border-line space-y-2">
+            <h4 className="font-bold text-xs text-primary">另存为新预设</h4>
             <input
               type="text"
               required
               placeholder="预设名称（例如：夜间精细审稿工作区）"
               value={newPresetName}
               onChange={(e) => setNewPresetName(e.target.value)}
-              className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded px-2.5 py-1 text-xs"
+              className="w-full bg-surface border border-line rounded px-2.5 py-1 text-xs"
             />
             <input
               type="text"
               placeholder="预设简短描述（可选）"
               value={newPresetDesc}
               onChange={(e) => setNewPresetDesc(e.target.value)}
-              className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded px-2.5 py-1 text-xs"
+              className="w-full bg-surface border border-line rounded px-2.5 py-1 text-xs"
             />
             <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setShowSaveNew(false)}
-                className="px-2.5 py-1 rounded border border-[#d5cbb8]"
+                className="px-2.5 py-1 rounded border border-line"
               >
                 取消
               </button>
@@ -221,18 +222,18 @@ export const ManagePresetsModal: React.FC<Props> = ({ onClose }) => {
 
         {/* JSON Export / Import Sub-panel */}
         {showJsonExport && (
-          <div className="mt-3 p-3 rounded-lg bg-[#ede5d6] border border-[#ded5c4] space-y-2">
-            <h4 className="font-bold text-xs text-[#854d0e]">工作区布局 JSON 配置</h4>
+          <div className="mt-3 p-3 rounded-lg bg-surface-2 border border-line space-y-2">
+            <h4 className="font-bold text-xs text-primary">工作区布局 JSON 配置</h4>
             <textarea
               rows={5}
               value={jsonText}
               onChange={(e) => setJsonText(e.target.value)}
-              className="w-full font-mono text-[10px] bg-[#fdfbf7] border border-[#d5cbb8] rounded p-2"
+              className="w-full font-mono text-[10px] bg-surface border border-line rounded p-2"
             />
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowJsonExport(false)}
-                className="px-2.5 py-1 rounded border border-[#d5cbb8]"
+                className="px-2.5 py-1 rounded border border-line"
               >
                 关闭
               </button>

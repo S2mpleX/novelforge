@@ -23,7 +23,13 @@ export type PanelType =
   | 'workflow_engine'      // 22. 剧情工作流引擎 (V2.3)
   | 'voice_profiles'       // 23. 作者文风档案工作室 (V2.3.1)
   | 'model_arena'          // 24. 多模型比稿竞技场 (V2.4)
-  | 'typesetter_cleaner';  // 25. 网文排版清洗机与敏感词预检 (V2.5)
+  | 'typesetter_cleaner'   // 25. 网文排版清洗机与敏感词预检 (V2.5)
+  | 'skills_manager'       // 26. Agent Skills 技能管理中心 (V2.5)
+  | 'deconstruct_workshop' // 27. 拆书工坊 (V2.5.5)
+  | 'full_check'           // 28. 全书一致性体检与因果巡检 (V2.5.5)
+  | 'asset_proposal'       // 29. 正文资产反哺提案 (V2.5.5)
+  | 'batch_revise'         // 30. 跨章节批量重塑工作流 (V2.6.2)
+  | 'map_sandbox';         // 31. 神州山河地理沙盘路线图 (V2.6.2)
 
 export interface PanelInstance {
   instanceId: string;

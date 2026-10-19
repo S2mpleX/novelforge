@@ -76,12 +76,12 @@ export const AgentStatusPanel: React.FC = () => {
   const [selectedAgent, setSelectedAgent] = useState<AgentInfo>(AGENTS[0]);
 
   return (
-    <div className="flex h-full w-full bg-[#fdfbf7] text-[#2c2825] text-xs divide-x divide-[#ded5c4] select-none">
+    <div className="flex h-full w-full bg-surface text-ink text-xs divide-x divide-[#ded5c4] select-none">
       {/* Left: Agent List */}
-      <div className="w-64 flex flex-col shrink-0 bg-[#f8f4ec]">
-        <div className="p-2.5 border-b border-[#ded5c4] bg-[#ede5d6] flex items-center justify-between">
-          <div className="flex items-center gap-1.5 font-semibold text-[#2c2825]">
-            <Users className="w-3.5 h-3.5 text-amber-800" />
+      <div className="w-64 flex flex-col shrink-0 bg-surface-2">
+        <div className="p-2.5 border-b border-line bg-surface-2 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 font-semibold text-ink">
+            <Users className="w-3.5 h-3.5 text-primary" />
             <span>创作 Agent 团队 ({AGENTS.length})</span>
           </div>
           <span className="text-[10px] text-emerald-800 flex items-center gap-1 font-medium">
@@ -99,17 +99,17 @@ export const AgentStatusPanel: React.FC = () => {
                 onClick={() => setSelectedAgent(agent)}
                 className={`p-2 rounded cursor-pointer transition border ${
                   isSelected
-                    ? 'bg-[#fdfbf7] border-amber-800/40 shadow-xs'
-                    : 'border-transparent hover:bg-[#ede5d6]'
+                    ? 'bg-surface border-amber-800/40 shadow-xs'
+                    : 'border-transparent hover:bg-surface-3'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-[#854d0e]">{agent.name}</span>
+                  <span className="font-semibold text-primary">{agent.name}</span>
                   <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-800/10 text-emerald-800 border border-emerald-800/20 font-medium">
                     就绪
                   </span>
                 </div>
-                <div className="text-[10px] text-[#786f65] truncate font-serif">
+                <div className="text-[10px] text-ink-2 truncate font-serif">
                   {agent.role}
                 </div>
               </div>
@@ -119,35 +119,35 @@ export const AgentStatusPanel: React.FC = () => {
       </div>
 
       {/* Right: Agent Details & Prompt Specs */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#fdfbf7] overflow-y-auto p-4 space-y-3">
-        <div className="border-b border-[#ded5c4] pb-3">
+      <div className="flex-1 flex flex-col min-w-0 bg-surface overflow-y-auto p-4 space-y-3">
+        <div className="border-b border-line pb-3">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-bold text-base text-[#854d0e]">{selectedAgent.name}</h3>
-            <span className="px-2 py-0.5 rounded bg-amber-800/10 text-amber-900 border border-amber-800/20 text-[10px] font-semibold">
+            <h3 className="font-bold text-base text-primary">{selectedAgent.name}</h3>
+            <span className="px-2 py-0.5 rounded bg-amber-800/10 text-primary border border-amber-800/20 text-[10px] font-semibold">
               温度系数: {selectedAgent.temperature}
             </span>
           </div>
-          <p className="text-[#6b583f] font-serif text-xs leading-relaxed">
+          <p className="text-ink-2 font-serif text-xs leading-relaxed">
             {selectedAgent.responsibility}
           </p>
         </div>
 
-        <div className="bg-[#f8f4ec] border border-[#ded5c4] rounded-lg p-3 space-y-2">
-          <div className="flex items-center gap-1.5 font-bold text-xs text-[#2c2825]">
-            <FileCode className="w-3.5 h-3.5 text-amber-800" />
+        <div className="bg-surface-2 border border-line rounded-lg p-3 space-y-2">
+          <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+            <FileCode className="w-3.5 h-3.5 text-primary" />
             系统提示词注册路径 (Prompt Registry)
           </div>
-          <code className="block bg-[#fdfbf7] border border-[#d5cbb8] px-2.5 py-1.5 rounded font-mono text-[11px] text-[#854d0e]">
+          <code className="block bg-surface border border-line px-2.5 py-1.5 rounded font-mono text-[11px] text-primary">
             {selectedAgent.promptFile}
           </code>
         </div>
 
-        <div className="bg-[#f8f4ec] border border-[#ded5c4] rounded-lg p-3 space-y-2">
-          <div className="flex items-center gap-1.5 font-bold text-xs text-[#2c2825]">
-            <Shield className="w-3.5 h-3.5 text-amber-800" />
+        <div className="bg-surface-2 border border-line rounded-lg p-3 space-y-2">
+          <div className="flex items-center gap-1.5 font-bold text-xs text-ink">
+            <Shield className="w-3.5 h-3.5 text-primary" />
             职责隔离与防篡改策略
           </div>
-          <ul className="list-disc list-inside space-y-1 text-[11px] text-[#554b3e] font-serif leading-relaxed">
+          <ul className="list-disc list-inside space-y-1 text-[11px] text-ink-2 font-serif leading-relaxed">
             <li>独立系统提示词与输入/输出 JSON Schema 强校验</li>
             <li>挂载 Humanizer 叙事守则，禁止空洞概括与策划术语外露</li>
             <li>生成结果默认作为候选修订，严禁无故覆盖用户手动创作正文</li>

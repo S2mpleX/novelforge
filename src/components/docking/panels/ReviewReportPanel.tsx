@@ -127,7 +127,7 @@ export const ReviewReportPanel: React.FC = () => {
         );
       case 'MAJOR':
         return (
-          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-800/10 text-amber-800 border border-amber-800/30 font-bold">
+          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-800/10 text-primary border border-amber-800/30 font-bold">
             主要瑕疵 (MAJOR)
           </span>
         );
@@ -148,45 +148,46 @@ export const ReviewReportPanel: React.FC = () => {
 
   if (!activeChapter) {
     return (
-      <div className="flex-1 flex items-center justify-center text-xs text-[#786f65] p-6 text-center">
+      <div className="flex-1 flex items-center justify-center text-xs text-ink-2 p-6 text-center">
         请选择小说章节以查看逻辑审稿报告
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#f4efe6] text-[#2c2825] text-xs overflow-hidden select-none">
+    <div className="flex flex-col h-full w-full bg-canvas text-ink text-xs overflow-hidden select-none">
       {/* Header */}
-      <div className="p-2 border-b border-[#ded5c4] bg-[#efe9dc] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-3.5 h-3.5 text-amber-800" />
-          <span className="font-semibold text-xs">
-            逻辑审稿质检报告（第 {activeChapter.chapter_number} 章）
+      <div className="p-2 border-b border-line bg-surface-2 flex items-center justify-between shrink-0 gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <ShieldCheck className="w-3.5 h-3.5 text-primary shrink-0" />
+          <span className="font-semibold text-xs truncate">
+            逻辑审稿质检（第 {activeChapter.chapter_number} 章）
           </span>
         </div>
         <button
           onClick={handleRunAudit}
           disabled={isAuditing}
-          className="px-2.5 py-1 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium transition flex items-center gap-1 shadow-xs text-[11px] disabled:opacity-40"
+          className="px-2.5 py-1 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium transition flex items-center gap-1 shadow-xs text-[11px] disabled:opacity-40 shrink-0 whitespace-nowrap"
         >
           {isAuditing ? (
             <>
-              <RotateCcw className="w-3 h-3 animate-spin" />
-              全面质检中...
+              <RotateCcw className="w-3 h-3 animate-spin shrink-0" />
+              质检中...
             </>
           ) : (
             <>
-              <Play className="w-3 h-3" />
-              执行逻辑一致性质检
+              <Play className="w-3 h-3 shrink-0" />
+              <span className="hidden sm:inline">执行一致性质检</span>
+              <span className="sm:hidden">质检</span>
             </>
           )}
         </button>
       </div>
 
       {message && (
-        <div className="px-3 py-1.5 bg-amber-800/10 text-amber-900 border-b border-amber-800/20 text-[11px] font-medium flex items-center justify-between">
-          <span>{message}</span>
-          <button onClick={() => setMessage(null)} className="text-amber-800 hover:text-amber-950">
+        <div className="px-3 py-1.5 bg-amber-800/10 text-primary border-b border-amber-800/20 text-[11px] font-medium flex items-center justify-between gap-2 min-w-0">
+          <span className="truncate">{message}</span>
+          <button onClick={() => setMessage(null)} className="text-primary hover:text-amber-950 shrink-0">
             <X className="w-3 h-3" />
           </button>
         </div>
@@ -195,30 +196,30 @@ export const ReviewReportPanel: React.FC = () => {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {!report ? (
-          <div className="py-12 text-center text-[#786f65]">
-            <FileText className="w-8 h-8 mx-auto mb-2 opacity-30 text-amber-800" />
+          <div className="py-12 text-center text-ink-2">
+            <FileText className="w-8 h-8 mx-auto mb-2 opacity-30 text-primary" />
             <p>本章暂无审稿报告，点击右上角【执行逻辑一致性质检】启动审核</p>
           </div>
         ) : (
           <>
             {/* Score card */}
-            <div className="bg-[#fdfbf7] border border-[#dcd3c1] rounded-lg p-3 shadow-xs flex items-center justify-between">
+            <div className="bg-surface border border-line rounded-lg p-3 shadow-xs flex items-center justify-between">
               <div>
-                <div className="text-[11px] text-[#786f65] font-medium">
+                <div className="text-[11px] text-ink-2 font-medium">
                   版本快照 V{report.version_number} 一致性评分
                 </div>
-                <div className="text-xl font-bold text-[#854d0e] mt-0.5">
+                <div className="text-xl font-bold text-primary mt-0.5">
                   {report.score} / 100
                 </div>
               </div>
-              <p className="text-[11px] text-[#554b3e] max-w-sm font-serif leading-relaxed">
+              <p className="text-[11px] text-ink-2 max-w-sm font-serif leading-relaxed">
                 {report.summary}
               </p>
             </div>
 
             {/* Findings list */}
             <div className="space-y-2">
-              <h4 className="font-bold text-xs text-[#554b3e]">
+              <h4 className="font-bold text-xs text-ink-2">
                 体检发现与修订建议 ({report.findings.length})
               </h4>
               {report.findings.length === 0 ? (
@@ -237,7 +238,7 @@ export const ReviewReportPanel: React.FC = () => {
                     return (
                       <div
                         key={f.id}
-                        className="p-2 rounded bg-[#ebe4d6] border border-[#ded5c4] text-[#8e8579] flex items-center justify-between opacity-60"
+                        className="p-2 rounded bg-[#ebe4d6] border border-line text-ink-2 flex items-center justify-between opacity-60"
                       >
                         <span className="line-through">{f.title} (已忽略)</span>
                         <button
@@ -246,7 +247,7 @@ export const ReviewReportPanel: React.FC = () => {
                             next.delete(f.id);
                             return next;
                           })}
-                          className="text-[10px] text-amber-800 hover:underline"
+                          className="text-[10px] text-primary hover:underline"
                         >
                           恢复展示
                         </button>
@@ -257,13 +258,13 @@ export const ReviewReportPanel: React.FC = () => {
                   return (
                     <div
                       key={f.id}
-                      className={`bg-[#fdfbf7] border rounded-lg p-3 space-y-2.5 shadow-xs transition-colors ${
-                        isAccepted ? 'border-emerald-700/40 bg-emerald-50/30' : 'border-[#dcd3c1]'
+                      className={`bg-surface border rounded-lg p-3 space-y-2.5 shadow-xs transition-colors ${
+                        isAccepted ? 'border-emerald-700/40 bg-emerald-50/30' : 'border-line'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-[#854d0e]">{f.title}</span>
+                          <span className="font-bold text-sm text-primary">{f.title}</span>
                           {isAccepted && (
                             <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-800/10 text-emerald-800 border border-emerald-800/30 font-bold flex items-center gap-0.5">
                               <Check className="w-2.5 h-2.5" /> 已采纳替换
@@ -278,13 +279,13 @@ export const ReviewReportPanel: React.FC = () => {
                       </p>
 
                       {f.evidence_quote && (
-                        <div className="p-2 rounded bg-[#f7f2e7] border-l-2 border-amber-800 font-serif text-[11px] text-[#6b583f] italic">
+                        <div className="p-2 rounded bg-surface border-l-2 border-amber-800 font-serif text-[11px] text-ink-2 italic">
                           “{f.evidence_quote}”
                         </div>
                       )}
 
                       {f.suggestion && (
-                        <div className="text-[11px] text-[#854d0e] font-serif font-medium">
+                        <div className="text-[11px] text-primary font-serif font-medium">
                           <strong>修改建议：</strong>{f.suggestion}
                         </div>
                       )}
@@ -293,23 +294,23 @@ export const ReviewReportPanel: React.FC = () => {
                       {repair && !isAccepted && (
                         <div className="mt-2.5 p-2.5 rounded-md bg-[#f5ede0] border border-amber-800/20 space-y-2">
                           <div className="flex items-center justify-between text-[11px]">
-                            <div className="flex items-center gap-1.5 font-medium text-amber-900">
-                              <Feather className="w-3 h-3 text-amber-800" />
+                            <div className="flex items-center gap-1.5 font-medium text-primary">
+                              <Feather className="w-3 h-3 text-primary" />
                               <span>文风档案对齐：</span>
-                              <span className="px-1.5 py-0.2 bg-amber-800/10 rounded text-amber-800 font-bold">
+                              <span className="px-1.5 py-0.2 bg-amber-800/10 rounded text-primary font-bold">
                                 {repair.voice_profile_used}
                               </span>
                             </div>
-                            <span className="text-[10px] text-[#8e8579]">{repair.diff_summary}</span>
+                            <span className="text-[10px] text-ink-2">{repair.diff_summary}</span>
                           </div>
 
                           {/* 修订文本预览与对比 */}
                           <div className="space-y-1">
-                            <div className="flex items-center justify-between text-[10px] text-[#786f65]">
+                            <div className="flex items-center justify-between text-[10px] text-ink-2">
                               <span>修订草案比对（可直接编辑微调）：</span>
                               <button
                                 onClick={() => setIsEditingDraft((prev) => ({ ...prev, [f.id]: !prev[f.id] }))}
-                                className="flex items-center gap-0.5 text-amber-800 hover:underline"
+                                className="flex items-center gap-0.5 text-primary hover:underline"
                               >
                                 <Edit3 className="w-2.5 h-2.5" />
                                 {isEditing ? '完成微调' : '直接编辑草案'}
@@ -337,7 +338,7 @@ export const ReviewReportPanel: React.FC = () => {
                           <div className="flex items-center justify-end gap-2 pt-1 border-t border-amber-800/10">
                             <button
                               onClick={() => handleDiscardRepair(f.id)}
-                              className="px-2 py-1 rounded border border-[#ded5c4] bg-[#efe9dc] text-[#554b3e] hover:bg-[#e4dcce] text-[11px] font-medium"
+                              className="px-2 py-1 rounded border border-line bg-surface-2 text-ink-2 hover:bg-surface-3-hover text-[11px] font-medium"
                             >
                               放弃草案
                             </button>
@@ -357,7 +358,7 @@ export const ReviewReportPanel: React.FC = () => {
                         <div className="flex items-center justify-between pt-1 border-t border-[#eee6d7]">
                           <button
                             onClick={() => handleIgnoreFinding(f.id)}
-                            className="text-[10px] text-[#8e8579] hover:text-[#554b3e] flex items-center gap-1"
+                            className="text-[10px] text-ink-2 hover:text-ink-2 flex items-center gap-1"
                           >
                             <EyeOff className="w-2.5 h-2.5" /> 忽略/误报
                           </button>

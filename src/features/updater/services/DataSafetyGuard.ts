@@ -84,8 +84,8 @@ export class DataSafetyGuard {
       } catch (err: any) {
         console.error('更新前数据库备份失败:', err);
         result.backupCreated = false;
+        result.canProceed = false;
         result.errorMessage = `更新前自动热备份失败: ${err.message || err}。为保护创作数据，建议在备份成功后再进行更新。`;
-        // 如果备份命令失败，标记警告
       }
 
       // 综合判断：若有未保存正文，提醒用户需要确认保存

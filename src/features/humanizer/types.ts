@@ -26,6 +26,37 @@ export interface ClicheMatch {
   suggestion: string;
 }
 
+export interface HumanSignalDimension {
+  key: string;
+  label: string;
+  score: number; // 0 ~ 1 归一化得分
+  rawScore?: number;
+  weight: number;
+  threshold: number;
+  hint: string;
+}
+
+export interface RedCardMatch {
+  key: string;
+  label: string;
+  sample: string;
+  hint: string;
+  startIndex?: number;
+  endIndex?: number;
+}
+
+export type HumanizerGenre = 'fiction' | 'article';
+
+export interface HumanSignalReport {
+  score: number; // 0 ~ 100 综合得分
+  genre: HumanizerGenre;
+  burstinessCv: number; // 句长离散系数 (CV)
+  dialogueRatio: number; // 对话字符占比 (0 ~ 1)
+  dimensions: HumanSignalDimension[];
+  redCards: RedCardMatch[];
+  warnings: string[];
+}
+
 export interface HumanizerAuditReport {
   score: number; // 0 ~ 100
   rating: 'EXCELLENT' | 'GOOD' | 'NEEDS_POLISH' | 'SEVERE_AI_TONE';
@@ -33,4 +64,6 @@ export interface HumanizerAuditReport {
   clicheCount: number;
   matches: ClicheMatch[];
   summary: string;
+  signals?: HumanSignalReport;
 }
+

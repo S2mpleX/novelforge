@@ -14,14 +14,16 @@ import {
   Lock,
   Layers,
   Sparkles,
+  Sliders,
 } from 'lucide-react';
 
 import { UpdateCenter } from '@/features/updater/components/UpdateCenter';
 import { useUpdateStore } from '@/features/updater/stores/useUpdateStore';
+import { SkillsManagerView } from '@/features/skills/components/SkillsManagerView';
 
 interface Props {
   onClose: () => void;
-  initialTab?: 'MODEL' | 'UPDATER';
+  initialTab?: 'MODEL' | 'UPDATER' | 'SKILLS';
 }
 
 interface PresetItem {
@@ -80,7 +82,7 @@ const PRESETS: PresetItem[] = [
 export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }) => {
   const { activeProvider, providers, loadProviders } = useNovelStore();
   const { status } = useUpdateStore();
-  const [activeTab, setActiveTab] = useState<'MODEL' | 'UPDATER'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'MODEL' | 'UPDATER' | 'SKILLS'>(initialTab);
 
   const [providerId, setProviderId] = useState<string | undefined>(activeProvider?.id);
   const [providerName, setProviderName] = useState('本地网关 (CPA / OpenAI 兼容)');
@@ -125,14 +127,23 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
     };
 
     initProviderData();
-    api.getDbStats().then((stats) => {
-      if (isMounted) setDbStats(stats);
-    }).catch(console.error);
+    if (activeTab === 'MODEL') {
+      api.getDbStats().then((stats) => {
+        if (isMounted) setDbStats(stats);
+      }).catch(console.error);
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [activeProvider]);
+  }, [activeProvider, activeTab]);
+
+  // 当切换到 MODEL tab 且 dbStats 为空时按需懒加载
+  useEffect(() => {
+    if (activeTab === 'MODEL' && !dbStats) {
+      api.getDbStats().then(setDbStats).catch(console.error);
+    }
+  }, [activeTab, dbStats]);
 
   // 点击快速预设处理
   const handleSelectPreset = async (preset: PresetItem) => {
@@ -268,34 +279,46 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
   const suggestedModels = matchedPreset?.suggestedModels || [];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-      <div className={`w-full ${activeTab === 'UPDATER' ? 'max-w-3xl' : 'max-w-xl'} bg-[#fdfbf7] border border-[#ded5c4] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all duration-200`}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className={`w-full ${activeTab === 'SKILLS' ? 'max-w-5xl' : activeTab === 'UPDATER' ? 'max-w-3xl' : 'max-w-xl'} bg-surface dark:bg-[#1c1917] border border-line dark:border-[#2e2a27] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]`}>
         {/* Header */}
-        <div className="p-4 border-b border-[#ded5c4] flex items-center justify-between bg-[#efe9dc]">
+        <div className="p-4 border-b border-line dark:border-[#2e2a27] flex items-center justify-between bg-surface-2 dark:bg-[#201c1a]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#854d0e] flex items-center justify-center text-[#fdfbf7] shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-[#854d0e] flex items-center justify-center text-[#fdfbf7] shadow-xs shrink-0">
               <Settings className="w-4 h-4" />
             </div>
             {/* Tabs */}
-            <div className="flex items-center bg-[#e4dcce] p-1 rounded-xl border border-[#d5cbb8]">
+            <div className="flex items-center bg-surface-3 dark:bg-[#1a1715] p-1 rounded-xl border border-line dark:border-[#2f2b28]">
               <button
                 type="button"
                 onClick={() => setActiveTab('MODEL')}
                 className={`px-3 py-1 rounded-lg text-xs font-serif font-bold transition cursor-pointer ${
                   activeTab === 'MODEL'
-                    ? 'bg-[#fdfbf7] text-[#854d0e] shadow-2xs'
-                    : 'text-[#685f54] hover:text-[#2b2621]'
+                    ? 'bg-surface dark:bg-[#2d2825] text-primary dark:text-amber-400 shadow-2xs'
+                    : 'text-ink-2 dark:text-[#a8a29e] hover:text-ink dark:hover:text-white'
                 }`}
               >
                 模型网关配置
               </button>
               <button
                 type="button"
+                onClick={() => setActiveTab('SKILLS')}
+                className={`px-3 py-1 rounded-lg text-xs font-serif font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'SKILLS'
+                    ? 'bg-surface dark:bg-[#2d2825] text-primary dark:text-amber-400 shadow-2xs'
+                    : 'text-ink-2 dark:text-[#a8a29e] hover:text-ink dark:hover:text-white'
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5 text-primary dark:text-amber-400" />
+                <span>Skills 技能中心</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab('UPDATER')}
                 className={`px-3 py-1 rounded-lg text-xs font-serif font-bold transition flex items-center gap-1.5 cursor-pointer relative ${
                   activeTab === 'UPDATER'
-                    ? 'bg-[#fdfbf7] text-[#854d0e] shadow-2xs'
-                    : 'text-[#685f54] hover:text-[#2b2621]'
+                    ? 'bg-surface dark:bg-[#2d2825] text-primary dark:text-amber-400 shadow-2xs'
+                    : 'text-ink-2 dark:text-[#a8a29e] hover:text-ink dark:hover:text-white'
                 }`}
               >
                 <span>软件更新</span>
@@ -310,24 +333,28 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#685f54] hover:text-[#2b2621] hover:bg-[#e5ded0] transition cursor-pointer"
+            className="p-1.5 rounded-lg text-ink-2 dark:text-[#a8a29e] hover:text-ink dark:hover:text-white hover:bg-surface-3-hover dark:hover:bg-[#2d2825] transition cursor-pointer"
           >
             <X className="w-4.5 h-4.5" />
           </button>
         </div>
 
         {/* Content Body */}
-        {activeTab === 'UPDATER' ? (
-          <div className="p-6 overflow-y-auto bg-[#fdfbf7]">
+        {activeTab === 'SKILLS' ? (
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <SkillsManagerView />
+          </div>
+        ) : activeTab === 'UPDATER' ? (
+          <div className="p-6 overflow-y-auto bg-surface dark:bg-[#1c1917]">
             <UpdateCenter />
           </div>
         ) : (
-          <div className="p-6 overflow-y-auto space-y-5 bg-[#fdfbf7]">
+          <div className="p-6 overflow-y-auto space-y-5 bg-surface dark:bg-[#1c1917]">
             {/* Privacy Note */}
-            <div className="p-3.5 rounded-xl bg-[#efe9dc]/80 border border-[#ded5c4] text-xs text-[#4a4237] flex items-start gap-3">
-              <Lock className="w-4 h-4 text-[#854d0e] shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-xl bg-surface-2/80 dark:bg-[#24201c] border border-line dark:border-[#38332f] text-xs text-ink-2 dark:text-[#d6d3d1] flex items-start gap-3">
+              <Lock className="w-4 h-4 text-primary dark:text-amber-500 shrink-0 mt-0.5" />
               <div className="leading-relaxed font-serif">
-                <strong className="text-[#854d0e]">本地优先与密钥安全保障：</strong>
+                <strong className="text-primary dark:text-amber-500">本地优先与密钥安全保障：</strong>
                 所有小说正文、人物档案与长期设定默认保存在本地 SQLite 数据库中。API Key 仅在调用受控 Tauri 命令时于 Rust 本地进程向配置网关发起 HTTP 请求，绝不打印到普通日志中。
               </div>
             </div>
@@ -335,12 +362,12 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
             {/* Configured Providers Quick Switcher (存在多个服务商时展示) */}
             {providers.length > 1 && (
               <div className="space-y-1.5">
-                <label className="text-xs font-serif font-bold text-[#854d0e] flex items-center justify-between">
+                <label className="text-xs font-serif font-bold text-primary flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5" />
                     已配置的服务商 (点击切换)
                   </span>
-                  <span className="text-[11px] text-[#786f65] font-normal">
+                  <span className="text-[11px] text-ink-2 font-normal">
                     共 {providers.length} 个本地配置
                   </span>
                 </label>
@@ -355,7 +382,7 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
                         className={`px-3 py-1 rounded-lg text-xs font-serif flex items-center gap-1.5 border transition cursor-pointer ${
                           isSelected
                             ? 'bg-[#854d0e] text-[#fdfbf7] border-[#854d0e] shadow-2xs font-semibold'
-                            : 'bg-[#f7f2e7] hover:bg-[#efe9dc] text-[#52493d] border-[#ded5c4]'
+                            : 'bg-surface hover:bg-surface-2 text-ink-2 border-line'
                         }`}
                       >
                         <span>{p.name}</span>
@@ -371,9 +398,9 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
 
             {/* Provider Quick Presets */}
             <div className="space-y-2">
-              <label className="text-xs font-serif font-bold text-[#854d0e] flex items-center justify-between">
+              <label className="text-xs font-serif font-bold text-primary flex items-center justify-between">
                 <span>⚡ 一键快速预设 (点击自动填入端点与模型)</span>
-                <span className="text-[11px] text-[#786f65] font-normal">支持本地网关、官方及第三方端点</span>
+                <span className="text-[11px] text-ink-2 font-normal">支持本地网关、官方及第三方端点</span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {PRESETS.map((preset) => {
@@ -385,17 +412,17 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
                       onClick={() => handleSelectPreset(preset)}
                       className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
                         isMatch
-                          ? 'bg-[#efe9dc] border-[#854d0e] text-[#854d0e] shadow-2xs ring-1 ring-[#854d0e]/30'
-                          : 'bg-[#f7f2e7] border-[#ded5c4] text-[#4a4237] hover:bg-[#efe9dc] hover:border-[#854d0e]/40'
+                          ? 'bg-surface-2 border-[#854d0e] text-primary shadow-2xs ring-1 ring-[#854d0e]/30'
+                          : 'bg-surface border-line text-ink-2 hover:bg-surface-2 hover:border-[#854d0e]/40'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-serif font-bold truncate">{preset.name}</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#fdfbf7] text-[#854d0e] border border-[#ded5c4]">
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface text-primary border border-line">
                           {preset.badge}
                         </span>
                       </div>
-                      <span className="text-[10px] text-[#786f65] font-mono truncate">{preset.model}</span>
+                      <span className="text-[10px] text-ink-2 font-mono truncate">{preset.model}</span>
                     </button>
                   );
                 })}
@@ -404,7 +431,7 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="text-xs font-serif font-semibold text-[#2b2621] block mb-1.5">
+                <label className="text-xs font-serif font-semibold text-ink block mb-1.5">
                   服务商名称
                 </label>
                 <input
@@ -413,50 +440,50 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
                   value={providerName}
                   onChange={(e) => setProviderName(e.target.value)}
                   placeholder="例如：本地网关 (CPA / CLIProxyAPI)"
-                  className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg px-3 py-2 text-xs text-[#2b2621] focus:outline-hidden focus:border-[#854d0e] focus:ring-1 focus:ring-[#854d0e]"
+                  className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-hidden focus:border-[#854d0e] focus:ring-1 focus:ring-[#854d0e]"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-serif font-semibold text-[#2b2621] block mb-1.5 flex items-center justify-between">
+                <label className="text-xs font-serif font-semibold text-ink block mb-1.5 flex items-center justify-between">
                   <span>Base URL (API 端点)</span>
-                  <span className="text-[11px] text-[#786f65]">示例：http://127.0.0.1:8317/v1</span>
+                  <span className="text-[11px] text-ink-2">示例：http://127.0.0.1:8317/v1</span>
                 </label>
                 <div className="relative">
-                  <Server className="w-3.5 h-3.5 text-[#854d0e] absolute left-3 top-2.5" />
+                  <Server className="w-3.5 h-3.5 text-primary absolute left-3 top-2.5" />
                   <input
                     type="text"
                     required
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
                     placeholder="http://127.0.0.1:8317/v1 或 https://api.openai.com/v1"
-                    className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg pl-8 pr-3 py-2 text-xs text-[#2b2621] focus:outline-hidden focus:border-[#854d0e] focus:ring-1 focus:ring-[#854d0e] font-mono"
+                    className="w-full bg-surface border border-line rounded-lg pl-8 pr-3 py-2 text-xs text-ink focus:outline-hidden focus:border-[#854d0e] focus:ring-1 focus:ring-[#854d0e] font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-serif font-semibold text-[#2b2621] block mb-1.5 flex items-center justify-between">
+                <label className="text-xs font-serif font-semibold text-ink block mb-1.5 flex items-center justify-between">
                   <span>API Key (密钥)</span>
-                  <span className="text-[11px] text-[#786f65]">本地网关如无需密钥可留空</span>
+                  <span className="text-[11px] text-ink-2">本地网关如无需密钥可留空</span>
                 </label>
                 <div className="relative">
-                  <KeyRound className="w-3.5 h-3.5 text-[#854d0e] absolute left-3 top-2.5" />
+                  <KeyRound className="w-3.5 h-3.5 text-primary absolute left-3 top-2.5" />
                   <input
                     type="password"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="sk-..."
-                    className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg pl-8 pr-3 py-2 text-xs text-[#2b2621] focus:outline-hidden focus:border-[#854d0e] focus:ring-1 focus:ring-[#854d0e] font-mono"
+                    className="w-full bg-surface border border-line rounded-lg pl-8 pr-3 py-2 text-xs text-ink focus:outline-hidden focus:border-[#854d0e] focus:ring-1 focus:ring-[#854d0e] font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-serif font-semibold text-[#2b2621] block mb-1.5 flex items-center justify-between">
+                <label className="text-xs font-serif font-semibold text-ink block mb-1.5 flex items-center justify-between">
                   <span>模型 ID (Model ID)</span>
                   {savedModels.length > 0 && (
-                    <span className="text-[11px] text-[#786f65]">
+                    <span className="text-[11px] text-ink-2">
                       当前库中绑定: {savedModels[0].model_name}
                     </span>
                   )}
@@ -467,14 +494,14 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
                   value={modelName}
                   onChange={(e) => setModelName(e.target.value)}
                   placeholder="例如：gemini-3.8-flash-high、deepseek-chat、gpt-4o-mini"
-                  className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg px-3 py-2 text-xs text-[#2b2621] focus:outline-hidden focus:border-[#854d0e] focus:ring-1 focus:ring-[#854d0e] font-mono"
+                  className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-hidden focus:border-[#854d0e] focus:ring-1 focus:ring-[#854d0e] font-mono"
                 />
 
                 {/* 常用模型快捷填充芯片 */}
                 {suggestedModels.length > 0 && (
                   <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                    <span className="text-[11px] text-[#786f65] flex items-center gap-1 font-serif">
-                      <Sparkles className="w-3 h-3 text-[#854d0e]" />
+                    <span className="text-[11px] text-ink-2 flex items-center gap-1 font-serif">
+                      <Sparkles className="w-3 h-3 text-primary" />
                       快捷选用：
                     </span>
                     {suggestedModels.map((m) => (
@@ -485,7 +512,7 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
                         className={`text-[10px] px-2 py-0.5 rounded font-mono border transition cursor-pointer ${
                           modelName === m
                             ? 'bg-[#854d0e] text-[#fdfbf7] border-[#854d0e] font-bold shadow-2xs'
-                            : 'bg-[#efe9dc] hover:bg-[#e4dcce] text-[#52493d] border-[#ded5c4]'
+                            : 'bg-surface-2 hover:bg-surface-3-hover text-ink-2 border-line'
                         }`}
                       >
                         {m}
@@ -501,9 +528,9 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
                   type="button"
                   onClick={handleTestConnection}
                   disabled={isTesting}
-                  className="w-full py-2 rounded-lg bg-[#efe9dc] hover:bg-[#e5ded0] text-[#2b2621] text-xs font-serif font-medium flex items-center justify-center gap-1.5 transition border border-[#ded5c4] disabled:opacity-40 cursor-pointer"
+                  className="w-full py-2 rounded-lg bg-surface-2 hover:bg-surface-3-hover text-ink text-xs font-serif font-medium flex items-center justify-center gap-1.5 transition border border-line disabled:opacity-40 cursor-pointer"
                 >
-                  <Zap className="w-3.5 h-3.5 text-[#854d0e]" />
+                  <Zap className="w-3.5 h-3.5 text-primary" />
                   {isTesting ? '正在连接测试...' : '测试 API 连通性与可用模型'}
                 </button>
 
@@ -524,14 +551,14 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
                       <div className="font-semibold flex items-center gap-2">
                         <span>{testResult.message}</span>
                         {testResult.latency_ms > 0 && (
-                          <span className="px-1.5 py-0.2 rounded bg-[#f7f2e7] border border-[#ded5c4] text-[10px] text-[#2b2621]">
+                          <span className="px-1.5 py-0.2 rounded bg-surface border border-line text-[10px] text-ink">
                             {testResult.latency_ms} ms
                           </span>
                         )}
                       </div>
                       {testResult.models_found && testResult.models_found.length > 0 && (
-                        <div className="mt-2 text-[11px] text-[#52493d]">
-                          <span className="font-semibold text-[#854d0e] block mb-1">
+                        <div className="mt-2 text-[11px] text-ink-2">
+                          <span className="font-semibold text-primary block mb-1">
                             网关返回可用模型（点击直接设为当前模型）：
                           </span>
                           <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pt-1">
@@ -543,7 +570,7 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
                                 className={`px-2 py-0.5 rounded text-[10px] font-mono border transition cursor-pointer ${
                                   modelName === m
                                     ? 'bg-[#854d0e] text-white border-[#854d0e] font-bold shadow-2xs'
-                                    : 'bg-[#fdfbf7] hover:bg-[#efe9dc] text-[#52493d] border-[#ded5c4]'
+                                    : 'bg-surface hover:bg-surface-2 text-ink-2 border-line'
                                 }`}
                               >
                                 {m}
@@ -559,19 +586,19 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
 
               {/* Database Diagnostics Info */}
               {dbStats && (
-                <div className="pt-2 border-t border-[#ded5c4]">
-                  <div className="flex items-center gap-1.5 text-xs text-[#685f54] font-serif mb-1">
-                    <Database className="w-3.5 h-3.5 text-[#854d0e]" />
+                <div className="pt-2 border-t border-line">
+                  <div className="flex items-center gap-1.5 text-xs text-ink-2 font-serif mb-1">
+                    <Database className="w-3.5 h-3.5 text-primary" />
                     <span>本地数据库路径：</span>
                   </div>
-                  <div className="text-[11px] font-mono text-[#52493d] bg-[#f7f2e7] p-2 rounded-lg border border-[#ded5c4] break-all select-all">
+                  <div className="text-[11px] font-mono text-ink-2 bg-surface p-2 rounded-lg border border-line break-all select-all">
                     {dbStats.db_path}
                   </div>
                 </div>
               )}
 
               {/* Submit */}
-              <div className="pt-3 flex items-center justify-between border-t border-[#ded5c4]">
+              <div className="pt-3 flex items-center justify-between border-t border-line">
                 {saveSuccess && (
                   <span className="text-xs text-[#047857] flex items-center gap-1 font-serif font-medium">
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -590,7 +617,7 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-3.5 py-1.5 rounded-lg border border-[#ded5c4] text-xs font-serif text-[#685f54] hover:text-[#2b2621] hover:bg-[#efe9dc] transition cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-lg border border-line text-xs font-serif text-ink-2 hover:text-ink hover:bg-surface-2 transition cursor-pointer"
                   >
                     关闭
                   </button>

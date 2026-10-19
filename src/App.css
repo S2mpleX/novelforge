@@ -1,45 +1,65 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================
+   语义设计令牌 (Semantic Design Tokens)
+   --wf-* 为基础变量（亮/暗两套取值），@theme inline 将其暴露为
+   Tailwind 工具类：bg-canvas / bg-surface / bg-surface-2 /
+   bg-surface-3 / hover:bg-surface-3-hover / text-ink / text-ink-2 /
+   text-primary / border-line 等。新增颜色只需在下方补一行。
+   ============================================================ */
+@theme inline {
+  --breakpoint-3xl: 1920px;
+  --color-canvas: var(--wf-canvas);
+  --color-surface: var(--wf-surface);
+  --color-surface-2: var(--wf-surface-2);
+  --color-surface-3: var(--wf-surface-3);
+  --color-surface-3-hover: var(--wf-surface-3-hover);
+  --color-line: var(--wf-line);
+  --color-ink: var(--wf-ink);
+  --color-ink-2: var(--wf-ink-2);
+  --color-primary: var(--wf-primary);
+  --color-destructive: var(--wf-destructive);
+  /* shadcn 兼容别名（修复 bg-card / text-foreground / bg-muted 等失效类） */
+  --color-background: var(--wf-canvas);
+  --color-foreground: var(--wf-ink);
+  --color-card: var(--wf-surface);
+  --color-popover: var(--wf-surface);
+  --color-muted: var(--wf-surface-3);
+  --color-muted-foreground: var(--wf-ink-2);
+  --color-border: var(--wf-line);
+  --color-input: var(--wf-line);
+  --color-ring: var(--wf-primary);
+}
+
 @layer base {
   :root {
-    /* Warm Parchment / Literary Paper Design System */
-    --background: 42 35% 94%;       /* #f5f0e6 宣纸底色 */
-    --foreground: 30 15% 15%;       /* #2b2621 松烟浓墨 */
-    --card: 40 40% 97%;             /* #fcfaf5 象牙纸页 */
-    --card-foreground: 30 15% 15%;
-    --popover: 40 40% 97%;
-    --popover-foreground: 30 15% 15%;
-    --primary: 28 80% 42%;          /* #c2410c 典雅朱砂印泥 */
-    --primary-foreground: 45 40% 98%;
-    --muted: 40 25% 88%;            /* #e7dfcf 次级宣纸 */
-    --muted-foreground: 30 10% 45%; /* #786f65 浅淡水墨 */
-    --accent: 35 45% 88%;           /* #eadecc 暖米金 */
-    --accent-foreground: 30 15% 15%;
-    --destructive: 0 70% 45%;
-    --destructive-foreground: 45 40% 98%;
-    --border: 38 25% 82%;           /* #dcd1be 纸卷折痕线 */
-    --input: 38 25% 82%;
-    --ring: 28 80% 42%;
+    /* Warm Parchment / Literary Paper Design System — 亮色 */
+    --wf-canvas: #f4efe6;          /* 宣纸桌面 */
+    --wf-surface: #fdfbf7;         /* 象牙纸页 */
+    --wf-surface-2: #efe9dc;       /* 工具栏 / 底栏 */
+    --wf-surface-3: #e4dcce;       /* 内嵌 chip */
+    --wf-surface-3-hover: #ded4c3; /* chip 悬停提亮 */
+    --wf-line: #ded5c4;            /* 纸卷折痕线 */
+    --wf-ink: #2b2621;             /* 松烟浓墨 */
+    --wf-ink-2: #786f65;           /* 浅淡水墨 */
+    --wf-primary: #b45309;         /* 琥珀印泥 */
+    --wf-destructive: #be123c;     /* 朱砂警示 */
   }
 
   :root.dark {
-    --background: 240 10% 7%;        /* #121216 深宵黑夜 */
-    --foreground: 40 15% 85%;        /* #dfdbd2 柔和月华白 */
-    --card: 240 10% 12%;             /* #1d1d24 冷砚卡片 */
-    --card-foreground: 40 15% 85%;
-    --popover: 240 10% 12%;
-    --popover-foreground: 40 15% 85%;
-    --primary: 38 92% 50%;           /* #f59e0b 沉水香金 */
-    --primary-foreground: 240 10% 8%;
-    --muted: 240 8% 18%;             /* #282833 */
-    --muted-foreground: 40 10% 60%;  /* #9c968a */
-    --accent: 240 8% 22%;            /* #323240 */
-    --accent-foreground: 40 15% 90%;
-    --destructive: 0 70% 45%;
-    --destructive-foreground: 45 40% 98%;
-    --border: 240 8% 20%;            /* #2e2e3a */
-    --input: 240 8% 20%;
-    --ring: 38 92% 50%;
+    /* Midnight Ink Wash — 暗色 */
+    --wf-canvas: #121216;
+    --wf-surface: #1d1d28;
+    --wf-surface-2: #171720;
+    --wf-surface-3: #282835;
+    --wf-surface-3-hover: #323244;
+    --wf-line: #2e2e3c;
+    --wf-ink: #dfdbd2;
+    --wf-ink-2: #a49e93;
+    --wf-primary: #f59e0b;
+    --wf-destructive: #fb7185;
   }
 }
 
@@ -366,6 +386,32 @@ body {
   animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Global In-App Dialog Animations (应用内全局对话框动效) */
+@keyframes dialog-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dialog-panel-in {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.dialog-overlay {
+  animation: dialog-overlay-in 0.15s ease-out;
+}
+
+.dialog-panel {
+  animation: dialog-panel-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-overlay,
+  .dialog-panel {
+    animation: none;
+  }
+}
+
 /* ============================================================
    Global Dark Mode System (全站水墨夜读 / 曜夜暗色系统)
    ============================================================ */
@@ -419,114 +465,15 @@ html.dark body {
   box-shadow: 0 6px 20px -3px rgba(217, 119, 6, 0.18) !important;
 }
 
-/* Background Color Mappings in Dark Mode */
-.dark [class*="bg-[#f4efe6]"] {
-  background-color: #121216 !important;
-}
+/* 背景 / 悬停 / 边框 / 文本 / 琥珀强调色已全部迁移至语义令牌
+   （bg-surface / hover:bg-surface-3-hover / border-line / text-ink /
+   text-ink-2 / text-primary 等），暗色取值由 :root.dark 的 --wf-*
+   变量统一驱动，无需逐色打补丁。新增颜色只需在令牌区补一行。 */
 
-.dark [class*="bg-[#efe9dc]"],
-.dark [class*="bg-[#f3ede1]"],
-.dark [class*="bg-[#eadecb]"],
-.dark [class*="bg-[#eae2d3]"],
-.dark [class*="bg-[#f6f1e8]"],
-.dark [class*="bg-[#ede5d6]"],
-.dark [class*="bg-[#fbf8f2]"],
-.dark [class*="bg-[#f0e9dc]"],
-.dark [class*="bg-[#f8f4ec]"],
-.dark [class*="bg-[#ede8dc]"] {
-  background-color: #171720 !important;
-}
-
-.dark [class*="bg-[#fdfbf7]"],
-.dark [class*="bg-[#f7f2e7]"],
-.dark [class*="bg-[#fafdf9]"],
-.dark [class*="bg-[#fbf7ee]"],
-.dark [class*="bg-[#edf5eb]"] {
-  background-color: #1d1d28 !important;
-}
-
-.dark [class*="bg-[#e4dcce]"],
-.dark [class*="bg-[#e8e0d0]"],
-.dark [class*="bg-[#e8e0d1]"],
-.dark [class*="bg-[#e6dece]"],
-.dark [class*="bg-[#e8dfcf]"],
-.dark [class*="bg-[#f0e8d9]"],
-.dark [class*="bg-[#f6efe1]"],
-.dark [class*="bg-[#ded4c3]"] {
-  background-color: #282835 !important;
-}
-
-/* Hover States in Dark Mode */
-.dark [class*="hover:bg-[#e4dcce]"]:hover,
-.dark [class*="hover:bg-[#dfd5c4]"]:hover,
-.dark [class*="hover:bg-[#dfd4c0]"]:hover,
-.dark [class*="hover:bg-[#dad0c0]"]:hover,
-.dark [class*="hover:bg-[#e5ded0]"]:hover,
-.dark [class*="hover:bg-[#eae2d3]"]:hover,
-.dark [class*="hover:bg-[#f2ece0]"]:hover,
-.dark [class*="hover:bg-[#ede5d6]"]:hover,
-.dark [class*="hover:bg-[#ded4c3]"]:hover,
-.dark [class*="hover:bg-[#f6efe1]"]:hover,
-.dark [class*="hover:bg-[#f0e8d9]"]:hover {
-  background-color: #323244 !important;
-}
-
-/* Border Color Mappings in Dark Mode */
-.dark [class*="border-[#ded5c4]"],
-.dark [class*="border-[#ded4c1]"],
-.dark [class*="border-[#d5cbb8]"],
-.dark [class*="border-[#d5c9b4]"],
-.dark [class*="border-[#dcd1be]"],
-.dark [class*="border-[#eee6d8]"],
-.dark [class*="border-[#d8cca8]"],
-.dark [class*="border-[#cdd9ca]"],
-.dark [class*="border-[#ba9e74]"],
-.dark [class*="border-[#dad0c0]"],
-.dark [class*="border-[#b89b70]"],
-.dark [class*="border-[#a9c2a5]"],
-.dark [class*="border-[#c8b496]"] {
-  border-color: #2e2e3c !important;
-}
-
-/* Text Colors in Dark Mode */
-.dark [class*="text-[#2b2621]"],
-.dark [class*="text-[#231f1a]"],
-.dark [class*="text-[#1f1d1a]"],
-.dark [class*="text-[#1a1612]"],
-.dark [class*="text-[#2c2825]"],
-.dark [class*="text-[#3d362e]"],
-.dark [class*="text-[#2a1b10]"],
-.dark [class*="text-[#17241a]"] {
-  color: #dfdbd2 !important;
-}
-
-.dark [class*="text-[#685f54]"],
-.dark [class*="text-[#786f65]"],
-.dark [class*="text-[#6b6255]"],
-.dark [class*="text-[#5e5549]"],
-.dark [class*="text-[#5f564a]"],
-.dark [class*="text-[#6b583f]"],
-.dark [class*="text-[#8c8273]"],
-.dark [class*="text-[#8e8476]"],
-.dark [class*="text-[#9e917f]"],
+/* 低频残留色暗色映射（尚未纳入令牌体系） */
 .dark [class*="text-[#435447]"],
 .dark [class*="text-[#5c432d]"] {
   color: #a49e93 !important;
-}
-
-/* Amber / Gold Text & Accents in Dark Mode (High Contrast Water-Ink Gold) */
-.dark [class*="text-[#854d0e]"],
-.dark [class*="text-[#92400e]"],
-.dark [class*="text-[#b45309]"],
-.dark [class*="text-[#c2410c]"],
-.dark [class*="text-[#a16207]"],
-.dark .text-amber-800,
-.dark .text-amber-900 {
-  color: #f59e0b !important;
-}
-
-.dark .text-amber-700 {
-  color: #fbbf24 !important;
 }
 
 /* Amber / Brown Badges & Active Borders in Dark Mode */
@@ -593,4 +540,14 @@ html.dark body {
 
 .dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(180, 180, 200, 0.35);
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FloatingPanel } from '@/types/docking';
 import { useWorkspaceStore } from '@/stores/useWorkspaceStore';
 import { PANEL_METADATA_MAP, getPanelIcon } from './PanelRegistry';
@@ -8,6 +8,8 @@ import {
   Maximize2,
   X,
   ArrowDownToLine,
+  ArrowLeftToLine,
+  ArrowRightToLine,
 } from 'lucide-react';
 
 export const FloatingPanelContainer: React.FC = () => {
@@ -16,9 +18,14 @@ export const FloatingPanelContainer: React.FC = () => {
     updateFloatingPanel,
     bringFloatingToFront,
     dockFloatingPanel,
+    dockFloatingToSidebar,
     closePanel,
     toggleMaximizePanel,
+    setDraggingState,
+    handleDrop,
   } = useWorkspaceStore();
+
+  const [draggingFloatingId, setDraggingFloatingId] = useState<string | null>(null);
 
   const handlePointerDownHeader = (e: React.PointerEvent, f: FloatingPanel) => {
     if (e.button !== 0) return;
@@ -30,21 +37,89 @@ export const FloatingPanelContainer: React.FC = () => {
     const startY = e.clientY;
     const initialPos = { ...f.position };
 
-    const handlePointerMove = (moveEvt: PointerEvent) => {
-      const dx = moveEvt.clientX - startX;
-      const dy = moveEvt.clientY - startY;
+    let isDragging = false;
+    let animationFrameId: number | null = null;
+    let latestEvt: PointerEvent | null = null;
 
-      updateFloatingPanel(f.id, {
-        position: {
-          x: Math.max(10, initialPos.x + dx),
-          y: Math.max(40, initialPos.y + dy),
-        },
-      });
+    const handlePointerMove = (moveEvt: PointerEvent) => {
+      latestEvt = moveEvt;
+      const dist = Math.hypot(moveEvt.clientX - startX, moveEvt.clientY - startY);
+
+      if (dist > 8 && !isDragging) {
+        isDragging = true;
+        setDraggingFloatingId(f.id);
+        setDraggingState({
+          panel: f.panel,
+          sourceFloatingId: f.id,
+          dragSource: 'floating',
+          startMousePos: { x: startX, y: startY },
+          currentMousePos: { x: moveEvt.clientX, y: moveEvt.clientY },
+          offset: { x: moveEvt.clientX - initialPos.x, y: moveEvt.clientY - initialPos.y },
+        });
+      }
+
+      if (isDragging) {
+        if (animationFrameId !== null) return;
+        animationFrameId = requestAnimationFrame(() => {
+          animationFrameId = null;
+          if (!latestEvt) return;
+
+          const rawX = initialPos.x + (latestEvt.clientX - startX);
+          const rawY = initialPos.y + (latestEvt.clientY - startY);
+
+          // 边缘磁吸对齐与安全视口约束 (Magnetic Edge Snapping & Safe Viewport Bounds)
+          let snappedX = rawX;
+          let snappedY = rawY;
+          // 水平吸附与屏幕边界保护
+          if (snappedX < 24) snappedX = 8;
+          if (snappedX + f.size.width > window.innerWidth - 24) {
+            snappedX = window.innerWidth - f.size.width - 8;
+          }
+          snappedX = Math.max(8, Math.min(window.innerWidth - Math.min(f.size.width, 100), snappedX));
+
+          // 垂直吸附与 Header 避让保护（顶栏高度 56px，吸附至 60px；禁止冲破顶部导致标题栏消失）
+          if (snappedY < 72 && snappedY >= 48) snappedY = 60;
+          if (snappedY + f.size.height > window.innerHeight - 24) {
+            snappedY = window.innerHeight - f.size.height - 8;
+          }
+          snappedY = Math.max(60, Math.min(window.innerHeight - 40, snappedY));
+
+          updateFloatingPanel(f.id, {
+            position: { x: snappedX, y: snappedY },
+          });
+
+          // 驱动全局 DockDropIndicator 停靠计算
+          useWorkspaceStore.setState((state) => {
+            if (!state.draggingState) return state;
+            return {
+              draggingState: {
+                ...state.draggingState,
+                currentMousePos: { x: latestEvt!.clientX, y: latestEvt!.clientY },
+              },
+            };
+          });
+        });
+      }
     };
 
     const handlePointerUp = () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+
+      setDraggingFloatingId(null);
+
+      if (isDragging) {
+        const dropTarget = useWorkspaceStore.getState().dropTarget;
+        if (dropTarget) {
+          handleDrop();
+        } else {
+          setDraggingState(null);
+        }
+      }
     };
 
     window.addEventListener('pointermove', handlePointerMove);
@@ -72,41 +147,58 @@ export const FloatingPanelContainer: React.FC = () => {
     overlay.style.inset = '0';
     overlay.style.zIndex = '99999';
     overlay.style.cursor = `${direction}-resize`;
+    overlay.style.userSelect = 'none';
     document.body.appendChild(overlay);
 
+    let animationFrameId: number | null = null;
+    let latestEvt: PointerEvent | null = null;
+
     const handlePointerMove = (moveEvt: PointerEvent) => {
-      const dx = moveEvt.clientX - startX;
-      const dy = moveEvt.clientY - startY;
+      latestEvt = moveEvt;
+      if (animationFrameId !== null) return;
 
-      let newWidth = initialSize.width;
-      let newHeight = initialSize.height;
-      let newX = initialPos.x;
-      let newY = initialPos.y;
+      animationFrameId = requestAnimationFrame(() => {
+        animationFrameId = null;
+        if (!latestEvt) return;
+        const dx = latestEvt.clientX - startX;
+        const dy = latestEvt.clientY - startY;
 
-      if (direction.includes('e')) newWidth = Math.max(240, initialSize.width + dx);
-      if (direction.includes('s')) newHeight = Math.max(180, initialSize.height + dy);
-      if (direction.includes('w')) {
-        const potentialW = initialSize.width - dx;
-        if (potentialW >= 240) {
-          newWidth = potentialW;
-          newX = initialPos.x + dx;
+        let newWidth = initialSize.width;
+        let newHeight = initialSize.height;
+        let newX = initialPos.x;
+        let newY = initialPos.y;
+
+        if (direction.includes('e')) newWidth = Math.max(240, initialSize.width + dx);
+        if (direction.includes('s')) newHeight = Math.max(180, initialSize.height + dy);
+        if (direction.includes('w')) {
+          const potentialW = initialSize.width - dx;
+          const potentialX = initialPos.x + dx;
+          if (potentialW >= 240 && potentialX >= 8) {
+            newWidth = potentialW;
+            newX = potentialX;
+          }
         }
-      }
-      if (direction.includes('n')) {
-        const potentialH = initialSize.height - dy;
-        if (potentialH >= 180) {
-          newHeight = potentialH;
-          newY = initialPos.y + dy;
+        if (direction.includes('n')) {
+          const potentialH = initialSize.height - dy;
+          const potentialY = initialPos.y + dy;
+          if (potentialH >= 180 && potentialY >= 60) {
+            newHeight = potentialH;
+            newY = potentialY;
+          }
         }
-      }
 
-      updateFloatingPanel(f.id, {
-        position: { x: newX, y: newY },
-        size: { width: newWidth, height: newHeight },
+        updateFloatingPanel(f.id, {
+          position: { x: newX, y: newY },
+          size: { width: newWidth, height: newHeight },
+        });
       });
     };
 
     const handlePointerUp = () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
@@ -127,6 +219,8 @@ export const FloatingPanelContainer: React.FC = () => {
         const Icon = getPanelIcon(f.panel.panelType);
         const title = f.panel.title || meta.title;
 
+        const isBeingDragged = draggingFloatingId === f.id;
+
         return (
           <div
             key={f.id}
@@ -138,26 +232,48 @@ export const FloatingPanelContainer: React.FC = () => {
               height: f.isMinimized ? '34px' : `${f.size.height}px`,
               zIndex: f.zIndex,
             }}
-            className="fixed bg-[#fdfbf7] rounded-xl shadow-2xl border border-[#c8b496] flex flex-col overflow-hidden animate-in fade-in duration-150"
+            className={`fixed bg-surface rounded-xl border border-line flex flex-col overflow-hidden transition-all duration-150 ${
+              isBeingDragged
+                ? 'pointer-events-none opacity-70 ring-2 ring-amber-600 shadow-2xl scale-[1.01]'
+                : 'opacity-100 shadow-2xl'
+            }`}
           >
             {/* Floating Titlebar */}
             <div
               onPointerDown={(e) => handlePointerDownHeader(e, f)}
-              className="h-8 border-b border-[#ded5c4] bg-[#eadecb] px-2.5 flex items-center justify-between text-xs cursor-move select-none shrink-0"
+              className="h-8 border-b border-line bg-surface-2 px-2.5 flex items-center justify-between text-xs cursor-move select-none shrink-0"
             >
               <div className="flex items-center gap-1.5 min-w-0">
-                <Icon className="w-3.5 h-3.5 text-amber-800 shrink-0" />
-                <span className="font-bold text-xs text-[#2c2825] truncate">
+                <Icon className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="font-bold text-xs text-ink truncate">
                   {title} (悬浮窗)
                 </span>
               </div>
 
               <div className="flex items-center gap-0.5 shrink-0">
+                {/* Dock to left sidebar */}
+                <button
+                  onClick={() => dockFloatingToSidebar(f.id, 'left')}
+                  title="自动吸附到左侧侧边栏 (章节目录侧)"
+                  className="p-1 rounded text-ink-2 hover:text-primary hover:bg-surface-3-hover transition cursor-pointer"
+                >
+                  <ArrowLeftToLine className="w-3 h-3" />
+                </button>
+
+                {/* Dock to right sidebar */}
+                <button
+                  onClick={() => dockFloatingToSidebar(f.id, 'right')}
+                  title="自动吸附到右侧栏 (AI写作助手侧)"
+                  className="p-1 rounded text-ink-2 hover:text-primary hover:bg-surface-3-hover transition cursor-pointer"
+                >
+                  <ArrowRightToLine className="w-3 h-3" />
+                </button>
+
                 {/* Dock back into main layout */}
                 <button
                   onClick={() => dockFloatingPanel(f.id)}
-                  title="重新停靠回主工作台"
-                  className="p-1 rounded text-[#786f65] hover:text-amber-800 hover:bg-[#dfd4c0] transition"
+                  title="重新停靠回主工作台 (合并为标签页)"
+                  className="p-1 rounded text-ink-2 hover:text-primary hover:bg-surface-3-hover transition cursor-pointer"
                 >
                   <ArrowDownToLine className="w-3 h-3" />
                 </button>
@@ -166,7 +282,7 @@ export const FloatingPanelContainer: React.FC = () => {
                 <button
                   onClick={() => updateFloatingPanel(f.id, { isMinimized: !f.isMinimized })}
                   title={f.isMinimized ? '展开窗口' : '最小化折叠'}
-                  className="p-1 rounded text-[#786f65] hover:text-amber-800 hover:bg-[#dfd4c0] transition"
+                  className="p-1 rounded text-ink-2 hover:text-primary hover:bg-surface-3-hover transition"
                 >
                   <Minimize2 className="w-3 h-3" />
                 </button>
@@ -175,7 +291,7 @@ export const FloatingPanelContainer: React.FC = () => {
                 <button
                   onClick={() => toggleMaximizePanel(f.panel.instanceId)}
                   title="最大化显示"
-                  className="p-1 rounded text-[#786f65] hover:text-amber-800 hover:bg-[#dfd4c0] transition"
+                  className="p-1 rounded text-ink-2 hover:text-primary hover:bg-surface-3-hover transition"
                 >
                   <Maximize2 className="w-3 h-3" />
                 </button>
@@ -184,7 +300,7 @@ export const FloatingPanelContainer: React.FC = () => {
                 <button
                   onClick={() => closePanel(f.panel.instanceId)}
                   title="关闭悬浮面板"
-                  className="p-1 rounded text-[#786f65] hover:text-red-700 hover:bg-red-800/10 transition"
+                  className="p-1 rounded text-ink-2 hover:text-red-700 hover:bg-red-800/10 transition"
                 >
                   <X className="w-3 h-3" />
                 </button>

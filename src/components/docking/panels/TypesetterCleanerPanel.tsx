@@ -14,6 +14,7 @@ import {
   FileText,
   ShieldAlert,
   ArrowRight,
+  Ban,
 } from 'lucide-react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
@@ -24,6 +25,7 @@ import {
   TypesetResult,
   CensorMatch,
 } from '@/features/typesetter/typesetterEngine';
+import { HumanizerEngine } from '@/features/humanizer/HumanizerEngine';
 
 export const TypesetterCleanerPanel: React.FC = () => {
   const {
@@ -44,10 +46,10 @@ export const TypesetterCleanerPanel: React.FC = () => {
   const [isExportingEpub, setIsExportingEpub] = useState<boolean>(false);
   const [epubNotice, setEpubNotice] = useState<string | null>(null);
 
-  // 当切换章节时，默认载入当前正文
+  // 当切换章节时，默认载入当前正文（自动转换为无标签纯文本供清洗）
   useEffect(() => {
     const text = editorContent || activeChapter?.content || '';
-    setRawText(text);
+    setRawText(TypesetterEngine.htmlToPlainText(text));
   }, [activeChapter?.id]);
 
   // 当切换预设时，更新配置选项
@@ -61,10 +63,15 @@ export const TypesetterCleanerPanel: React.FC = () => {
     return TypesetterEngine.formatText(rawText, preset, options);
   }, [rawText, preset, options]);
 
+  // 实时执行六维人类信号与朱雀对抗红牌扫描 (0-Token 本地评估)
+  const humanReport = useMemo(() => {
+    return HumanizerEngine.auditText(rawText);
+  }, [rawText]);
+
   // 载入当前正文
   const handleReloadCurrentChapter = () => {
     const text = editorContent || activeChapter?.content || '';
-    setRawText(text);
+    setRawText(TypesetterEngine.htmlToPlainText(text));
   };
 
   // 一键复制到剪贴板
@@ -84,8 +91,16 @@ export const TypesetterCleanerPanel: React.FC = () => {
     if (!activeChapter || !result.cleanedText) return;
     setIsSaving(true);
     try {
-      updateEditorContent(result.cleanedText);
+      // 转换换行纯文本为 Tiptap 富文本 HTML 段落，确保编辑器解析与样式完整
+      const htmlContent = result.cleanedText
+        .split('\n')
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0)
+        .map((p) => `<p>${p}</p>`)
+        .join('');
+      updateEditorContent(htmlContent);
       await saveCurrentChapter(true, 'TYPESETTER_CLEAN');
+      window.dispatchEvent(new CustomEvent('novelforge:force-editor-reload'));
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (e) {
@@ -133,7 +148,7 @@ export const TypesetterCleanerPanel: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-[#fcfbfa] dark:bg-[#12141a] text-stone-800 dark:text-stone-200 select-none">
       {/* 顶部控制栏 */}
-      <div className="p-3 border-b border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-900/60 backdrop-blur-sm flex flex-wrap items-center justify-between gap-2">
+      <div className="p-3 border-b border-stone-200 dark:border-stone-800 bg-[#faf6ee] dark:bg-stone-900 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-500" />
           <span className="font-semibold text-xs tracking-wider text-stone-700 dark:text-stone-300">
@@ -202,7 +217,7 @@ export const TypesetterCleanerPanel: React.FC = () => {
             onClick={() => setShowAdvanced(!showAdvanced)}
             className={`p-1.5 rounded-md transition flex items-center gap-1 text-xs ${
               showAdvanced
-                ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
+                ? 'bg-amber-100 dark:bg-amber-950/40 text-primary dark:text-amber-400'
                 : 'hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500'
             }`}
           >
@@ -296,12 +311,31 @@ export const TypesetterCleanerPanel: React.FC = () => {
         <div className="flex items-center gap-3 text-stone-600 dark:text-stone-400">
           <span>原文字数: <strong className="text-stone-800 dark:text-stone-200">{result.originalCharCount}</strong></span>
           <ArrowRight className="w-3 h-3 text-stone-400" />
-          <span>清洗后字数: <strong className="text-amber-700 dark:text-amber-400">{result.cleanedCharCount}</strong></span>
+          <span>清洗后字数: <strong className="text-primary dark:text-amber-400">{result.cleanedCharCount}</strong></span>
           <span>段落数: <strong className="text-stone-800 dark:text-stone-200">{result.paragraphCount}</strong></span>
         </div>
 
-        {/* 敏感词统计 */}
-        <div className="flex items-center gap-1.5">
+        {/* 敏感词统计与人类信号密度 */}
+        <div className="flex items-center gap-2">
+          {/* 人类信号密度指标 */}
+          {humanReport.signals && (
+            <div
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                humanReport.signals.score >= 60
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300'
+                  : humanReport.signals.score >= 35
+                  ? 'bg-amber-50 text-primary border-amber-200 dark:bg-amber-950/40 dark:text-amber-300'
+                  : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300'
+              }`}
+              title={`六维人类信号量化打分：${humanReport.signals.score}/100\n句长离散爆发度 (CV): ${humanReport.signals.burstinessCv}\n对话字符占比: ${(humanReport.signals.dialogueRatio * 100).toFixed(0)}%`}
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>人类信号: <strong>{humanReport.signals.score}</strong>/100</span>
+              <span className="opacity-70 text-[10px]">(CV:{humanReport.signals.burstinessCv})</span>
+            </div>
+          )}
+
+          {/* 敏感词统计 */}
           {result.censorMatches.length > 0 ? (
             <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-medium px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60">
               <AlertTriangle className="w-3 h-3" />
@@ -338,12 +372,47 @@ export const TypesetterCleanerPanel: React.FC = () => {
                 {m.suggest && (
                   <button
                     onClick={() => handleReplaceCensorWord(m)}
-                    className="text-[10px] px-1 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition cursor-pointer"
+                    className="text-[10px] px-1 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-primary border border-amber-200 transition cursor-pointer"
                     title={`点击一键替换为: ${m.suggest}`}
                   >
                     换为: {m.suggest}
                   </button>
                 )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 朱雀对抗与 AI 痕迹红牌告警抽屉 (若命中红牌毒句式) */}
+      {humanReport.signals?.redCards && humanReport.signals.redCards.length > 0 && (
+        <div className="p-2.5 bg-rose-50/70 dark:bg-rose-950/25 border-b border-rose-200/70 dark:border-rose-900/50 max-h-36 overflow-y-auto text-xs">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-1">
+              <Ban className="w-3.5 h-3.5 text-rose-600" />
+              朱雀对抗拦截：检出 {humanReport.signals.redCards.length} 处 100% 判 AI 毒句式（工整排比/假反折/AI陈词）
+            </span>
+            <span className="text-[10px] text-rose-500">
+              提示：AI 检测器重点审查此类工整排比与概括句，请予以拆碎或改用口语
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {humanReport.signals.redCards.map((rc, idx) => (
+              <div
+                key={idx}
+                className="flex flex-wrap items-center justify-between gap-2 p-1.5 rounded bg-white dark:bg-stone-900 border border-rose-200 dark:border-rose-800/60 shadow-2xs"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                    {rc.label}
+                  </span>
+                  <span className="font-mono text-stone-700 dark:text-stone-300 line-clamp-1 max-w-md">
+                    “{rc.sample}”
+                  </span>
+                </div>
+                <div className="text-[10px] text-primary dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900/50">
+                  指引：{rc.hint}
+                </div>
               </div>
             ))}
           </div>
@@ -374,7 +443,7 @@ export const TypesetterCleanerPanel: React.FC = () => {
         {/* 右栏：排版后预览 */}
         <div className="flex flex-col h-full p-3 min-h-0 bg-stone-50/40 dark:bg-stone-900/20">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-amber-800 dark:text-amber-400 flex items-center gap-1">
+            <span className="text-xs font-medium text-primary dark:text-amber-400 flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5 text-amber-600" />
               标准网文格式预览 ({preset === 'QIDIAN' ? '起点紧凑版' : preset === 'FANQIE' ? '番茄呼吸版' : preset === 'JINJIANG' ? '晋江规范版' : '通用纯净版'})
             </span>
@@ -394,7 +463,7 @@ export const TypesetterCleanerPanel: React.FC = () => {
 
       {/* EPUB 提示条 */}
       {epubNotice && (
-        <div className="px-3 py-1.5 bg-amber-50 dark:bg-amber-950/50 border-t border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between">
+        <div className="px-3 py-1.5 bg-amber-50 dark:bg-amber-950/50 border-t border-amber-200 dark:border-amber-900 text-xs text-primary dark:text-amber-200 flex items-center justify-between">
           <span>{epubNotice}</span>
           <button onClick={() => setEpubNotice(null)} className="text-stone-400 hover:text-stone-600">×</button>
         </div>
@@ -415,7 +484,7 @@ export const TypesetterCleanerPanel: React.FC = () => {
           <button
             onClick={handleExportEpub}
             disabled={isExportingEpub || !activeNovel}
-            className="px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800/80 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-xs font-medium flex items-center gap-1.5 text-amber-700 dark:text-amber-300 transition cursor-pointer disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800/80 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-xs font-medium flex items-center gap-1.5 text-primary dark:text-amber-300 transition cursor-pointer disabled:opacity-50"
           >
             <BookOpen className="w-3.5 h-3.5" />
             <span>{isExportingEpub ? '正在打包 EPUB...' : '导出 EPUB 3 电子书'}</span>

@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useNovelStore } from '@/stores/useNovelStore';
+import type { Chapter } from '@/types';
 import {
   Bold,
   Italic,
@@ -21,11 +22,22 @@ import {
   Target,
   Check,
   X,
+  Pencil,
+  BookOpen,
+  Search,
+  Eye,
+  Disc,
+  ChevronLeft,
+  ChevronRight,
+  PlusCircle,
 } from 'lucide-react';
 import { CreateNovelModal } from '@/components/modals/CreateNovelModal';
 import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
 import { WindowControls } from '@/components/layout/WindowControls';
 import { FloatingSelectionMenu } from './FloatingSelectionMenu';
+import { ChapterPeekDrawer } from './ChapterPeekDrawer';
+import { EditorFindReplaceBar } from './EditorFindReplaceBar';
+import { toast } from '@/stores/useToastStore';
 
 type PaperTheme = 'xuan' | 'bamboo' | 'kraft' | 'midnight';
 
@@ -157,24 +169,166 @@ const PAPER_THEMES: Record<PaperTheme, PaperThemeConfig> = {
   },
 };
 
+const StreamingPreviewBox: React.FC<{ paperTheme: PaperTheme; fontSize: number }> = React.memo(
+  ({ paperTheme, fontSize }) => {
+    const isGenerating = useNovelStore((s) => s.isGenerating);
+    const streamText = useNovelStore((s) => s.streamText);
+
+    if (!isGenerating || !streamText) return null;
+
+    return (
+      <div
+        className="mt-8 p-6 rounded-xl border shadow-md transition-colors duration-200"
+        style={{
+          borderColor: PAPER_THEMES[paperTheme].variables.accentColor,
+          backgroundColor: PAPER_THEMES[paperTheme].variables.quoteBg,
+        }}
+      >
+        <div
+          className="flex items-center gap-2.5 text-xs font-semibold mb-3"
+          style={{ color: PAPER_THEMES[paperTheme].variables.accentColor }}
+        >
+          <Sparkles className="w-4 h-4 animate-spin" />
+          <span>正文作家 Agent 正在实时流式创作中...</span>
+        </div>
+        <p
+          className="whitespace-pre-wrap font-serif leading-relaxed"
+          style={{
+            fontSize: `${fontSize}px`,
+            lineHeight: fontSize >= 24 ? '2.25' : fontSize <= 14 ? '1.9' : '2.15',
+            color: PAPER_THEMES[paperTheme].variables.textColor,
+          }}
+        >
+          {streamText}
+        </p>
+      </div>
+    );
+  }
+);
+
 export const NovelEditor: React.FC = () => {
   const {
     activeNovel,
     activeChapter,
+    chapters,
+    selectChapter,
     editorContent,
     updateEditorContent,
     saveCurrentChapter,
     saveStatus,
-    streamText,
-    isGenerating,
+    updateChapterTitle,
     zenMode,
     toggleZenMode,
     themeMode,
     setThemeMode,
+    registerFlushEditorSync,
   } = useNovelStore();
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleInputValue, setTitleInputValue] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditingTitle) {
+      setTitleInputValue(activeChapter?.title || '');
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+        titleInputRef.current?.select();
+      }, 50);
+    }
+  }, [isEditingTitle, activeChapter?.title]);
+
+  const handleSaveTitle = async () => {
+    if (!activeChapter) return;
+    const trimmed = titleInputValue.trim();
+    setIsEditingTitle(false);
+    if (trimmed && trimmed !== activeChapter.title) {
+      try {
+        await updateChapterTitle(activeChapter.id, trimmed);
+      } catch (e) {
+        console.error('更新章节标题失败:', e);
+      }
+    }
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      if (e.nativeEvent.isComposing || (e as any).isComposing || e.keyCode === 229) return;
+      e.preventDefault();
+      handleSaveTitle();
+    } else if (e.key === 'Escape') {
+      setIsEditingTitle(false);
+    }
+  };
 
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showScratchpad, setShowScratchpad] = useState(false);
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  const [findReplaceMode, setFindReplaceMode] = useState<'find' | 'replace'>('find');
+  const [isFocusMode, setIsFocusMode] = useState<boolean>(() => {
+    return localStorage.getItem('novelforge_focus_mode') === 'true';
+  });
+  const [isTypewriterMode, setIsTypewriterMode] = useState<boolean>(() => {
+    return localStorage.getItem('novelforge_typewriter_mode') === 'true';
+  });
+
+  const editorScrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Chapter navigation calculation (order-based)
+  const sortedChapters = useMemo(() => {
+    return [...chapters].sort((a, b) => (a.chapter_number ?? a.sequence ?? 0) - (b.chapter_number ?? b.sequence ?? 0));
+  }, [chapters]);
+
+  const currentChapterIndex = sortedChapters.findIndex((c) => c.id === activeChapter?.id);
+  const prevChapter = currentChapterIndex > 0 ? sortedChapters[currentChapterIndex - 1] : null;
+  const nextChapter =
+    currentChapterIndex >= 0 && currentChapterIndex < sortedChapters.length - 1
+      ? sortedChapters[currentChapterIndex + 1]
+      : null;
+
+  const handleSwitchChapter = useCallback(
+    async (targetChapter: Chapter) => {
+      if (!targetChapter || targetChapter.id === activeChapter?.id) return;
+      try {
+        await selectChapter(targetChapter);
+        toast.info(
+          `已翻至第 ${targetChapter.chapter_number} 章`,
+          `《${targetChapter.title}》`
+        );
+      } catch (e) {
+        console.error('切换章节失败:', e);
+        toast.error('切换章节失败', '请检查本地数据库连接');
+      }
+    },
+    [activeChapter?.id, selectChapter]
+  );
+
+  const toggleFocusMode = useCallback(() => {
+    setIsFocusMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('novelforge_focus_mode', String(next));
+      if (next) {
+        toast.info('段落聚焦已开启', '仅高亮光标所在段落，专注单段心流 (Ctrl+Alt+F)');
+      } else {
+        toast.info('段落聚焦已关闭', '恢复全文常规浏览透明度');
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleTypewriterMode = useCallback(() => {
+    setIsTypewriterMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('novelforge_typewriter_mode', String(next));
+      if (next) {
+        toast.info('打字机滚动已开启', '光标保持居中视口黄金线 (Ctrl+Alt+T)');
+      } else {
+        toast.info('打字机滚动已关闭', '恢复标准视口滚动');
+      }
+      return next;
+    });
+  }, []);
+
   const [paperTheme, setPaperTheme] = useState<PaperTheme>(() => {
     const saved = localStorage.getItem('novelforge_paper_theme') as PaperTheme;
     if (saved) return saved;
@@ -239,13 +393,12 @@ export const NovelEditor: React.FC = () => {
     if (theme !== 'midnight') {
       localStorage.setItem('novelforge_light_paper_theme', theme);
     }
-    // If user clicked midnight, harmonize app into dark mode
     if (theme === 'midnight' && themeMode !== 'dark') {
       setThemeMode('dark');
     } else if (theme !== 'midnight' && themeMode === 'dark') {
-      // If user chose a daylight paper, harmonize app into light mode
       setThemeMode('light');
     }
+    toast.info(`切换信笺：${PAPER_THEMES[theme].label}`, PAPER_THEMES[theme].desc);
   };
 
   const handleSetFontSize = (size: number) => {
@@ -262,7 +415,38 @@ export const NovelEditor: React.FC = () => {
     handleSetFontSize(fontSize + 2);
   };
 
+  const storeUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updateFocusHighlight = useCallback(() => {
+    if (!isFocusMode) {
+      document
+        .querySelectorAll('.editor-surface .has-focus')
+        .forEach((el) => el.classList.remove('has-focus'));
+      return;
+    }
+    const domSelection = window.getSelection();
+    if (domSelection && domSelection.anchorNode) {
+      let parent = domSelection.anchorNode as HTMLElement;
+      while (
+        parent &&
+        parent.parentElement &&
+        !parent.parentElement.classList.contains('ProseMirror')
+      ) {
+        parent = parent.parentElement;
+      }
+      if (
+        parent &&
+        parent.classList &&
+        parent.parentElement?.classList.contains('ProseMirror')
+      ) {
+        document
+          .querySelectorAll('.editor-surface .has-focus')
+          .forEach((el) => el.classList.remove('has-focus'));
+        parent.classList.add('has-focus');
+      }
+    }
+  }, [isFocusMode]);
 
   const editor = useEditor({
     extensions: [
@@ -278,26 +462,81 @@ export const NovelEditor: React.FC = () => {
         class: 'prose max-w-none focus:outline-none min-h-[500px] leading-relaxed',
       },
     },
+    onSelectionUpdate: () => {
+      updateFocusHighlight();
+      if (isTypewriterMode && editorScrollContainerRef.current && editor?.isFocused) {
+        try {
+          const coords = editor.view.coordsAtPos(editor.state.selection.from);
+          const container = editorScrollContainerRef.current;
+          const containerRect = container.getBoundingClientRect();
+          const targetY = containerRect.top + containerRect.height * 0.45;
+          const diff = coords.top - targetY;
+          if (Math.abs(diff) > 24) {
+            container.scrollBy({ top: diff, behavior: 'smooth' });
+          }
+        } catch {}
+      }
+    },
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
-      updateEditorContent(html);
+      updateFocusHighlight();
+
+      // Debounce global store updates (250ms)
+      if (storeUpdateTimerRef.current) {
+        clearTimeout(storeUpdateTimerRef.current);
+      }
+      storeUpdateTimerRef.current = setTimeout(() => {
+        updateEditorContent(html);
+      }, 250);
 
       // Debounce auto-save (800ms)
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
       debounceTimerRef.current = setTimeout(() => {
+        updateEditorContent(editor.getHTML());
         saveCurrentChapter(false, 'USER_EDIT');
       }, 800);
     },
+    onBlur: ({ editor }) => {
+      if (storeUpdateTimerRef.current) {
+        clearTimeout(storeUpdateTimerRef.current);
+        storeUpdateTimerRef.current = null;
+      }
+      updateEditorContent(editor.getHTML());
+    },
   });
 
-  // Sync editor content when chapter changes
+  // Sync editor content when chapter changes or when activeChapter is refreshed externally
+  const activeChapterIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (editor && editorContent !== editor.getHTML()) {
+    if (!editor) return;
+    const isChapterSwitch = activeChapter?.id !== activeChapterIdRef.current;
+    activeChapterIdRef.current = activeChapter?.id || null;
+
+    if (isChapterSwitch) {
+      // 切换章节：无条件加载新章节内容
+      editor.commands.setContent(editorContent || '', { emitUpdate: false });
+      return;
+    }
+
+    // 同一章节内：仅当编辑器未聚焦（非主动输入中，如外部版本回滚、一键排版、批量修订采纳）且内容不一致时同步
+    if (!editor.isFocused && editorContent !== editor.getHTML()) {
       editor.commands.setContent(editorContent || '', { emitUpdate: false });
     }
-  }, [activeChapter?.id]);
+  }, [activeChapter?.id, activeChapter?.updated_at]);
+
+  // 监听外部强制刷新正文事件（如版本回滚或格式化广播）
+  useEffect(() => {
+    const handleForceReload = () => {
+      if (editor) {
+        editor.commands.setContent(editorContent || '', { emitUpdate: false });
+      }
+    };
+    window.addEventListener('novelforge:force-editor-reload', handleForceReload);
+    return () => window.removeEventListener('novelforge:force-editor-reload', handleForceReload);
+  }, [editor, editorContent]);
 
   // Sync scratch notes when active novel changes
   useEffect(() => {
@@ -313,31 +552,158 @@ export const NovelEditor: React.FC = () => {
     }
   };
 
-  // Handle Ctrl+S keyboard shortcut & Escape to exit editor fullscreen
+  const handleManualSave = useCallback(async () => {
+    if (storeUpdateTimerRef.current) {
+      clearTimeout(storeUpdateTimerRef.current);
+      storeUpdateTimerRef.current = null;
+    }
+    if (editor) {
+      updateEditorContent(editor.getHTML());
+    }
+    await saveCurrentChapter(true, 'USER_MANUAL_SAVE');
+    const curLen = (editor ? editor.getText() : editorContent).replace(/\s+/g, '').length;
+    toast.success('正文快照已存盘', `已安全写入本地 SQLite，当前章节共计 ${curLen} 字`);
+  }, [editor, updateEditorContent, saveCurrentChapter, editorContent]);
+
+  // Comprehensive keyboard shortcuts (Ctrl+S, Ctrl+F, Ctrl+H, Ctrl+Alt+F, Ctrl+Alt+T, Alt+[, Alt+], Esc)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      // Ctrl+S: Manual snapshot save
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        saveCurrentChapter(true, 'USER_MANUAL_SAVE');
+        handleManualSave();
+        return;
       }
-      // Escape exits editor's own fullscreen mode
-      if (e.key === 'Escape' && isFullScreen) {
-        setIsFullScreen(false);
+
+      // Ctrl+F: In-chapter find
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        setShowFindReplace(true);
+        setFindReplaceMode('find');
+        return;
+      }
+
+      // Ctrl+H: In-chapter find & replace
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        setShowFindReplace(true);
+        setFindReplaceMode('replace');
+        return;
+      }
+
+      // Ctrl+Alt+F: Paragraph Focus mode
+      if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        toggleFocusMode();
+        return;
+      }
+
+      // Ctrl+Alt+T: Typewriter Scroll mode
+      if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        toggleTypewriterMode();
+        return;
+      }
+
+      // Alt+Shift+F: Literature auto-format
+      if (e.altKey && e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        handleAutoFormat();
+        return;
+      }
+
+      // Alt+[: Jump to previous chapter
+      if (e.altKey && !e.ctrlKey && !e.shiftKey && e.key === '[') {
+        if (prevChapter) {
+          e.preventDefault();
+          handleSwitchChapter(prevChapter);
+        }
+        return;
+      }
+
+      // Alt+]: Jump to next chapter
+      if (e.altKey && !e.ctrlKey && !e.shiftKey && e.key === ']') {
+        if (nextChapter) {
+          e.preventDefault();
+          handleSwitchChapter(nextChapter);
+        }
+        return;
+      }
+
+      // Escape: Close find/replace or exit editor fullscreen
+      if (e.key === 'Escape') {
+        if (showFindReplace) {
+          e.preventDefault();
+          setShowFindReplace(false);
+          editor?.commands.focus();
+        } else if (isFullScreen) {
+          setIsFullScreen(false);
+        }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveCurrentChapter, isFullScreen]);
+  }, [
+    handleManualSave,
+    isFullScreen,
+    showFindReplace,
+    editor,
+    prevChapter,
+    nextChapter,
+    handleSwitchChapter,
+    toggleFocusMode,
+    toggleTypewriterMode,
+  ]);
 
-  // Clean up timer on unmount
+  // Register editor flush sync hook into store so selectChapter can flush changes synchronously
+  useEffect(() => {
+    registerFlushEditorSync(() => {
+      if (editor) {
+        if (storeUpdateTimerRef.current) {
+          clearTimeout(storeUpdateTimerRef.current);
+          storeUpdateTimerRef.current = null;
+        }
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+        return editor.getHTML();
+      }
+      return null;
+    });
+    return () => {
+      registerFlushEditorSync(undefined);
+    };
+  }, [editor, registerFlushEditorSync]);
+
+  // Clean up pending timers when chapter changes so debounced saves never run against the wrong chapter
+  const lastChapterIdRef = useRef<string | null>(activeChapter?.id || null);
+  useEffect(() => {
+    if (lastChapterIdRef.current && lastChapterIdRef.current !== activeChapter?.id) {
+      if (storeUpdateTimerRef.current) {
+        clearTimeout(storeUpdateTimerRef.current);
+        storeUpdateTimerRef.current = null;
+      }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    }
+    lastChapterIdRef.current = activeChapter?.id || null;
+  }, [activeChapter?.id]);
+
+  // Clean up timers on unmount
   useEffect(() => {
     return () => {
+      if (storeUpdateTimerRef.current) clearTimeout(storeUpdateTimerRef.current);
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
   }, []);
 
   const [showCreateNovel, setShowCreateNovel] = useState(false);
   const [showCreateChapter, setShowCreateChapter] = useState(false);
+  const [showChapterPeek, setShowChapterPeek] = useState(false);
   const { loadNovels } = useNovelStore();
 
   // One-click Literature Format: clean extra blank paragraphs and fix punctuation
@@ -348,20 +714,28 @@ export const NovelEditor: React.FC = () => {
     tempDiv.innerHTML = currentHtml;
 
     const paragraphs = tempDiv.querySelectorAll('p');
+    const walkTextNodes = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        let text = node.nodeValue || '';
+        text = text
+          .replace(/,/g, '，')
+          .replace(/\?/g, '？')
+          .replace(/!/g, '！')
+          .replace(/:/g, '：')
+          .replace(/;/g, '；');
+        node.nodeValue = text;
+      } else {
+        node.childNodes.forEach(walkTextNodes);
+      }
+    };
+
     paragraphs.forEach((p) => {
-      let text = p.innerText.trim();
+      const text = p.textContent?.trim();
       if (!text) {
         p.remove();
         return;
       }
-      // Replace English punctuations with Chinese standard
-      text = text
-        .replace(/,/g, '，')
-        .replace(/\?/g, '？')
-        .replace(/!/g, '！')
-        .replace(/:/g, '：')
-        .replace(/;/g, '；');
-      p.innerText = text;
+      walkTextNodes(p);
     });
 
     const cleanedHtml = tempDiv.innerHTML;
@@ -369,6 +743,7 @@ export const NovelEditor: React.FC = () => {
     updateEditorContent(cleanedHtml);
     saveCurrentChapter(true, 'AUTO_FORMAT');
     setFormatSuccess(true);
+    toast.info('一键排版完成', '已自动规范全角标点与空行格式');
     setTimeout(() => setFormatSuccess(false), 2000);
   };
 
@@ -380,42 +755,42 @@ export const NovelEditor: React.FC = () => {
 
   if (!activeNovel) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center select-none p-8 overflow-y-auto bg-[#f4efe6]">
+      <div className="flex-1 flex flex-col items-center justify-center select-none p-8 overflow-y-auto bg-canvas">
         <div className="max-w-2xl w-full text-center space-y-6">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-600 via-amber-700 to-orange-700 shadow-lg shadow-amber-900/15 border border-amber-600/30">
             <Sparkles className="w-8 h-8 text-white" />
           </div>
 
           <div>
-            <h2 className="text-2xl font-bold text-[#1f1d1a] tracking-tight font-serif">
-              NovelForge AI <span className="text-amber-800 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-800/10 border border-amber-800/20 align-middle">V2.0</span>
+            <h2 className="text-2xl font-bold text-ink tracking-tight font-serif">
+              NovelForge AI <span className="text-primary text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-800/10 border border-amber-800/20 align-middle">V2.0</span>
             </h2>
-            <p className="text-sm text-[#786f65] mt-2 max-w-lg mx-auto leading-relaxed">
+            <p className="text-sm text-ink-2 mt-2 max-w-lg mx-auto leading-relaxed">
               本地优先 · 多模型接入 · 多 Agent 协作 · 长期记忆驱动的专业长篇创作生产系统
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left pt-2">
-            <div className="p-4 rounded-xl bg-[#fdfbf7] border border-[#ded5c4] shadow-sm space-y-1.5 hover:border-amber-800/40 transition">
-              <div className="w-8 h-8 rounded-lg bg-amber-800/10 flex items-center justify-center text-amber-800 font-bold text-xs font-mono">L4</div>
-              <h4 className="text-xs font-semibold text-[#2b2621]">五层长期记忆</h4>
-              <p className="text-[11px] text-[#786f65] leading-normal">
+            <div className="p-4 rounded-xl bg-surface border border-line shadow-sm space-y-1.5 hover:border-amber-800/40 transition">
+              <div className="w-8 h-8 rounded-lg bg-amber-800/10 flex items-center justify-center text-primary font-bold text-xs font-mono">L4</div>
+              <h4 className="text-xs font-semibold text-ink">五层长期记忆</h4>
+              <p className="text-[11px] text-ink-2 leading-normal">
                 分层工作记忆与 FTS5 事实检索，跨越数百万字严控剧情前后矛盾。
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#fdfbf7] border border-[#ded5c4] shadow-sm space-y-1.5 hover:border-amber-800/40 transition">
+            <div className="p-4 rounded-xl bg-surface border border-line shadow-sm space-y-1.5 hover:border-amber-800/40 transition">
               <div className="w-8 h-8 rounded-lg bg-orange-800/10 flex items-center justify-center text-orange-800 font-bold text-xs font-mono">AI</div>
-              <h4 className="text-xs font-semibold text-[#2b2621]">多 Agent 智囊团</h4>
-              <p className="text-[11px] text-[#786f65] leading-normal">
+              <h4 className="text-xs font-semibold text-ink">多 Agent 智囊团</h4>
+              <p className="text-[11px] text-ink-2 leading-normal">
                 主编、编剧、作家、审稿各司其职，装载 Humanizer 文学润色体系。
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#fdfbf7] border border-[#ded5c4] shadow-sm space-y-1.5 hover:border-amber-800/40 transition">
+            <div className="p-4 rounded-xl bg-surface border border-line shadow-sm space-y-1.5 hover:border-amber-800/40 transition">
               <div className="w-8 h-8 rounded-lg bg-emerald-800/10 flex items-center justify-center text-emerald-800 font-bold text-xs font-mono">DB</div>
-              <h4 className="text-xs font-semibold text-[#2b2621]">本地 SQLite 离线</h4>
-              <p className="text-[11px] text-[#786f65] leading-normal">
+              <h4 className="text-xs font-semibold text-ink">本地 SQLite 离线</h4>
+              <p className="text-[11px] text-ink-2 leading-normal">
                 WAL 高性能存储，不可逆正文版本快照与单文件 HTML5 电子书发布。
               </p>
             </div>
@@ -431,7 +806,7 @@ export const NovelEditor: React.FC = () => {
             </button>
             <button
               onClick={() => loadNovels()}
-              className="px-4 py-2.5 rounded-xl bg-[#e8dfcf] hover:bg-[#dfd4c0] text-[#2b2621] text-xs font-medium transition border border-[#d5c9b4]"
+              className="px-4 py-2.5 rounded-xl bg-surface-3 hover:bg-surface-3-hover text-ink text-xs font-medium transition border border-line"
             >
               刷新作品列表
             </button>
@@ -445,18 +820,18 @@ export const NovelEditor: React.FC = () => {
 
   if (!activeChapter) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center select-none p-8 bg-[#f4efe6]">
-        <div className="max-w-md w-full text-center space-y-4 p-8 rounded-2xl bg-[#fdfbf7] border border-[#ded5c4] shadow-md">
-          <div className="w-12 h-12 rounded-2xl bg-amber-800/10 border border-amber-800/20 flex items-center justify-center mx-auto text-amber-800">
+      <div className="flex-1 flex flex-col items-center justify-center select-none p-8 bg-canvas">
+        <div className="max-w-md w-full text-center space-y-4 p-8 rounded-2xl bg-surface border border-line shadow-md">
+          <div className="w-12 h-12 rounded-2xl bg-amber-800/10 border border-amber-800/20 flex items-center justify-center mx-auto text-primary">
             <Quote className="w-6 h-6" />
           </div>
 
           <div>
-            <div className="text-xs text-amber-800 font-semibold mb-1">
+            <div className="text-xs text-primary font-semibold mb-1">
               《{activeNovel.title}》
             </div>
-            <h3 className="text-base font-bold text-[#1f1d1a] font-serif">未选中任何章节</h3>
-            <p className="text-xs text-[#786f65] mt-1.5 leading-relaxed">
+            <h3 className="text-base font-bold text-ink font-serif">未选中任何章节</h3>
+            <p className="text-xs text-ink-2 mt-1.5 leading-relaxed">
               请从左侧目录选择已有章节继续创作，或点击下方按钮开启新的一章。
             </p>
           </div>
@@ -479,13 +854,13 @@ export const NovelEditor: React.FC = () => {
 
   return (
     <div
-      className={`flex-1 flex flex-col min-w-0 w-full h-full transition-all ${
-        isFullScreen ? 'fixed inset-0 z-50 bg-[#f4efe6] p-6' : ''
+      className={`flex-1 flex flex-col min-w-0 w-full h-full ${
+        isFullScreen ? 'fixed inset-0 z-50 bg-canvas p-6' : ''
       }`}
     >
       {/* 全屏模式下右上角固定常驻退出/关闭控制器（无论工具栏横向滚动或缩放，始终绝对置顶于屏幕右上角，绝对显眼） */}
       {isFullScreen && (
-        <div className="fixed top-3 right-4 z-[999] flex items-center gap-2 bg-[#efe9dc]/95 dark:bg-stone-800/95 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-[#ded5c4] dark:border-stone-700 shadow-xl select-none animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed top-3 right-4 z-[999] flex items-center gap-2 bg-surface-2 dark:bg-stone-800 px-2.5 py-1.5 rounded-xl border border-line dark:border-stone-700 shadow-xl select-none animate-in fade-in zoom-in-95 duration-150">
           <button
             type="button"
             onClick={() => setIsFullScreen(false)}
@@ -501,14 +876,14 @@ export const NovelEditor: React.FC = () => {
       )}
 
       {/* Editor Formatting Floating Toolbar */}
-      <div className="h-12 border-b border-[#ded5c4] px-2.5 md:px-4 flex items-center justify-between bg-[#efe9dc]/95 backdrop-blur-xl select-none shrink-0 z-10 shadow-sm gap-1.5 overflow-hidden min-w-0">
+      <div className="h-12 border-b border-line dark:border-[#2e2a27] px-2.5 md:px-4 flex items-center justify-between bg-surface-2 dark:bg-[#1a1714] select-none shrink-0 z-10 shadow-sm gap-1.5 relative min-w-0">
         {/* Left: Text Formatting Controls & Zen Mode Indicator */}
         <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto scrollbar-none py-1">
           {zenMode && (
             <button
               type="button"
               onClick={toggleZenMode}
-              className="mr-2 px-2 py-0.5 rounded bg-amber-800/10 hover:bg-amber-800/20 text-amber-800 border border-amber-800/20 text-[10px] font-serif font-bold shrink-0 whitespace-nowrap flex items-center gap-1 transition cursor-pointer"
+              className="mr-2 px-2 py-0.5 rounded bg-amber-800/10 hover:bg-amber-800/20 text-primary border border-amber-800/20 text-[10px] font-serif font-bold shrink-0 whitespace-nowrap flex items-center gap-1 transition cursor-pointer"
               title="点击退出禅意专注模式 (Esc)"
             >
               <X className="w-3 h-3" />
@@ -529,7 +904,7 @@ export const NovelEditor: React.FC = () => {
           <button
             onClick={() => editor?.chain().focus().undo().run()}
             disabled={!editor?.can().undo()}
-            className="p-1.5 rounded-md hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] disabled:opacity-25 transition shrink-0 cursor-pointer"
+            className="p-1.5 rounded-md hover:bg-surface-3-hover text-ink-2 hover:text-ink disabled:opacity-25 transition shrink-0 cursor-pointer"
             title="撤销 (Ctrl+Z)"
           >
             <Undo className="w-3.5 h-3.5" />
@@ -537,7 +912,7 @@ export const NovelEditor: React.FC = () => {
           <button
             onClick={() => editor?.chain().focus().redo().run()}
             disabled={!editor?.can().redo()}
-            className="p-1.5 rounded-md hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] disabled:opacity-25 transition shrink-0 cursor-pointer"
+            className="p-1.5 rounded-md hover:bg-surface-3-hover text-ink-2 hover:text-ink disabled:opacity-25 transition shrink-0 cursor-pointer"
             title="重做 (Ctrl+Y)"
           >
             <Redo className="w-3.5 h-3.5" />
@@ -549,8 +924,8 @@ export const NovelEditor: React.FC = () => {
             onClick={() => editor?.chain().focus().toggleBold().run()}
             className={`p-1.5 rounded-md transition shrink-0 cursor-pointer ${
               editor?.isActive('bold')
-                ? 'bg-amber-800/15 text-amber-900 border border-amber-800/30 shadow-xs'
-                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
+                ? 'bg-amber-800/15 text-primary border border-amber-800/30 shadow-xs'
+                : 'text-ink-2 hover:text-ink hover:bg-surface-3-hover'
             }`}
             title="加粗"
           >
@@ -560,8 +935,8 @@ export const NovelEditor: React.FC = () => {
             onClick={() => editor?.chain().focus().toggleItalic().run()}
             className={`p-1.5 rounded-md transition shrink-0 cursor-pointer ${
               editor?.isActive('italic')
-                ? 'bg-amber-800/15 text-amber-900 border border-amber-800/30 shadow-xs'
-                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
+                ? 'bg-amber-800/15 text-primary border border-amber-800/30 shadow-xs'
+                : 'text-ink-2 hover:text-ink hover:bg-surface-3-hover'
             }`}
             title="斜体"
           >
@@ -572,8 +947,8 @@ export const NovelEditor: React.FC = () => {
             onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
             className={`p-1.5 rounded-md transition shrink-0 cursor-pointer ${
               editor?.isActive('heading', { level: 1 })
-                ? 'bg-amber-800/15 text-amber-900 border border-amber-800/30 shadow-xs'
-                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
+                ? 'bg-amber-800/15 text-primary border border-amber-800/30 shadow-xs'
+                : 'text-ink-2 hover:text-ink hover:bg-surface-3-hover'
             }`}
             title="一级标题"
           >
@@ -583,8 +958,8 @@ export const NovelEditor: React.FC = () => {
             onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
             className={`p-1.5 rounded-md transition shrink-0 cursor-pointer ${
               editor?.isActive('heading', { level: 2 })
-                ? 'bg-amber-800/15 text-amber-900 border border-amber-800/30 shadow-xs'
-                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
+                ? 'bg-amber-800/15 text-primary border border-amber-800/30 shadow-xs'
+                : 'text-ink-2 hover:text-ink hover:bg-surface-3-hover'
             }`}
             title="二级标题"
           >
@@ -595,8 +970,8 @@ export const NovelEditor: React.FC = () => {
             onClick={() => editor?.chain().focus().toggleBlockquote().run()}
             className={`p-1.5 rounded-md transition shrink-0 cursor-pointer ${
               editor?.isActive('blockquote')
-                ? 'bg-amber-800/15 text-amber-900 border border-amber-800/30 shadow-xs'
-                : 'text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce]'
+                ? 'bg-amber-800/15 text-primary border border-amber-800/30 shadow-xs'
+                : 'text-ink-2 hover:text-ink hover:bg-surface-3-hover'
             }`}
             title="引述"
           >
@@ -604,7 +979,7 @@ export const NovelEditor: React.FC = () => {
           </button>
           <button
             onClick={() => editor?.chain().focus().setHorizontalRule().run()}
-            className="p-1.5 rounded-md hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] transition shrink-0 cursor-pointer"
+            className="p-1.5 rounded-md hover:bg-surface-3-hover text-ink-2 hover:text-ink transition shrink-0 cursor-pointer"
             title="分割线"
           >
             <Minus className="w-3.5 h-3.5" />
@@ -615,7 +990,7 @@ export const NovelEditor: React.FC = () => {
           {/* One-click Formatting */}
           <button
             onClick={handleAutoFormat}
-            className="px-2 py-1 rounded-md bg-[#efe9dc] hover:bg-[#e4dcce] text-[#854d0e] border border-[#ded5c4] text-xs font-serif flex items-center gap-1 transition shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
+            className="px-2 py-1 rounded-md bg-surface-2 hover:bg-surface-3-hover text-primary border border-line text-xs font-serif flex items-center gap-1 transition shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
             title="一键文学规范排版：清理空行、全角标点规范化"
           >
             {formatSuccess ? <Check className="w-3.5 h-3.5 text-[#047857]" /> : <AlignLeft className="w-3.5 h-3.5" />}
@@ -626,7 +1001,7 @@ export const NovelEditor: React.FC = () => {
 
           {/* Paper Theme Selector & Ruled Lines Toggle */}
           <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
-            <div className="flex items-center gap-0.5 bg-[#e8e0d0] p-0.5 rounded-md border border-[#d5cbb8] shadow-2xs shrink-0">
+            <div className="flex items-center gap-0.5 bg-surface-3 p-0.5 rounded-md border border-line shadow-2xs shrink-0">
               {(Object.keys(PAPER_THEMES) as PaperTheme[]).map((themeKey) => {
                 const conf = PAPER_THEMES[themeKey];
                 const isActive = paperTheme === themeKey;
@@ -638,7 +1013,7 @@ export const NovelEditor: React.FC = () => {
                     className={`px-2 py-0.5 rounded text-[11px] font-serif transition-all flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
                       isActive
                         ? `${conf.activeBtnBg} text-white font-bold shadow-xs scale-102`
-                        : 'text-[#6b6255] hover:text-[#231f1a] hover:bg-[#dfd5c4]'
+                        : 'text-ink-2 hover:text-ink hover:bg-surface-3-hover'
                     }`}
                     title={`切换纸张主题：${conf.label}（${conf.desc}）`}
                   >
@@ -661,8 +1036,8 @@ export const NovelEditor: React.FC = () => {
               onClick={handleToggleRuledLines}
               className={`px-2 py-1 rounded-md text-xs font-serif flex items-center gap-1 transition-all cursor-pointer border shrink-0 whitespace-nowrap ${
                 showRuledLines
-                  ? 'bg-[#854d0e]/15 text-[#854d0e] border-[#854d0e]/30 font-bold shadow-2xs'
-                  : 'bg-[#efe9dc] hover:bg-[#e4dcce] text-[#6b6255] border-[#ded5c4]'
+                  ? 'bg-[#854d0e]/15 text-primary border-[#854d0e]/30 font-bold shadow-2xs'
+                  : 'bg-surface-2 hover:bg-surface-3-hover text-ink-2 border-line'
               }`}
               title="开启/关闭信笺稿纸行线（开启后呈现真实原稿信笺纸横格）"
             >
@@ -673,12 +1048,12 @@ export const NovelEditor: React.FC = () => {
 
           {/* Font Size Adjuster & Quick Presets */}
           <div ref={fontSizeMenuRef} className="relative flex items-center shrink-0 whitespace-nowrap">
-            <div className="flex items-center gap-0.5 bg-[#e8e0d0] p-0.5 rounded-md border border-[#d5cbb8] shadow-2xs shrink-0">
+            <div className="flex items-center gap-0.5 bg-surface-3 p-0.5 rounded-md border border-line shadow-2xs shrink-0">
               <button
                 type="button"
                 onClick={handleDecreaseFontSize}
                 disabled={fontSize <= 12}
-                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-[#6b6255] hover:text-[#231f1a] hover:bg-[#dfd5c4] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent active:scale-95 transition cursor-pointer"
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-ink-2 hover:text-ink hover:bg-surface-3-hover disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent active:scale-95 transition cursor-pointer"
                 title={`减小字号 (当前 ${fontSize}px，快捷步进 2px)`}
                 aria-label="减小字号"
               >
@@ -687,7 +1062,7 @@ export const NovelEditor: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowFontSizeMenu((prev) => !prev)}
-                className="px-1.5 py-0.5 rounded text-[10px] font-mono text-[#854d0e] font-bold hover:bg-[#dfd5c4] transition cursor-pointer flex items-center gap-0.5 whitespace-nowrap"
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono text-primary font-bold hover:bg-surface-3-hover transition cursor-pointer flex items-center gap-0.5 whitespace-nowrap"
                 title="点击快速选择字号或恢复默认"
               >
                 {fontSize}px
@@ -696,7 +1071,7 @@ export const NovelEditor: React.FC = () => {
                 type="button"
                 onClick={handleIncreaseFontSize}
                 disabled={fontSize >= 32}
-                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-[#6b6255] hover:text-[#231f1a] hover:bg-[#dfd5c4] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent active:scale-95 transition cursor-pointer"
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-ink-2 hover:text-ink hover:bg-surface-3-hover disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent active:scale-95 transition cursor-pointer"
                 title={`放大字号 (当前 ${fontSize}px，快捷步进 2px)`}
                 aria-label="放大字号"
               >
@@ -706,8 +1081,8 @@ export const NovelEditor: React.FC = () => {
 
             {/* Quick Font Size Presets Popover */}
             {showFontSizeMenu && (
-              <div className="absolute top-full left-0 mt-1.5 w-44 bg-[#fdfbf7] border border-[#ded5c4] rounded-xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                <div className="text-[10px] font-serif font-bold text-[#854d0e] px-1.5 py-1 mb-1 border-b border-[#eee6d8] flex items-center justify-between">
+              <div className="absolute top-full left-0 mt-1.5 w-44 bg-surface border border-line rounded-xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="text-[10px] font-serif font-bold text-primary px-1.5 py-1 mb-1 border-b border-line flex items-center justify-between">
                   <span>正文字号调节</span>
                   <span className="font-mono text-xs">{fontSize}px</span>
                 </div>
@@ -723,25 +1098,25 @@ export const NovelEditor: React.FC = () => {
                       className={`w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center justify-between transition cursor-pointer ${
                         fontSize === preset.size
                           ? 'bg-[#854d0e] text-white font-bold shadow-xs'
-                          : 'text-[#3d362e] hover:bg-[#f2ece0]'
+                          : 'text-ink hover:bg-surface-3'
                       }`}
                     >
                       <span>{preset.label}</span>
-                      <span className={`font-mono text-[11px] ${fontSize === preset.size ? 'text-white/90' : 'text-[#8c8273]'}`}>
+                      <span className={`font-mono text-[11px] ${fontSize === preset.size ? 'text-white/90' : 'text-ink-2'}`}>
                         {preset.desc}
                       </span>
                     </button>
                   ))}
                 </div>
                 {fontSize !== 18 && (
-                  <div className="mt-1.5 pt-1.5 border-t border-[#eee6d8]">
+                  <div className="mt-1.5 pt-1.5 border-t border-line">
                     <button
                       type="button"
                       onClick={() => {
                         handleSetFontSize(18);
                         setShowFontSizeMenu(false);
                       }}
-                      className="w-full py-1 rounded text-[11px] font-serif text-[#854d0e] hover:bg-[#f2ece0] transition text-center cursor-pointer font-medium"
+                      className="w-full py-1 rounded text-[11px] font-serif text-primary hover:bg-surface-3 transition text-center cursor-pointer font-medium"
                     >
                       恢复默认 18px
                     </button>
@@ -753,17 +1128,17 @@ export const NovelEditor: React.FC = () => {
         </div>
 
         {/* Center/Right: Target Word Count & Reading Time Tracker */}
-        <div className="hidden 2xl:flex items-center gap-3 text-xs font-serif text-[#685f54] bg-[#f7f2e7] px-3 py-1 rounded-lg border border-[#ded5c4] shrink-0 whitespace-nowrap">
+        <div className="hidden 2xl:flex items-center gap-3 text-xs font-serif text-ink-2 bg-surface px-3 py-1 rounded-lg border border-line shrink-0 whitespace-nowrap">
           <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-            <Target className="w-3.5 h-3.5 text-[#854d0e] shrink-0" />
+            <Target className="w-3.5 h-3.5 text-primary shrink-0" />
             <span>目标:</span>
-            <span className="font-bold text-[#2b2621]">
+            <span className="font-bold text-ink">
               {charCount} / {targetWords} 字
             </span>
             <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
               targetPercent >= 100
                 ? 'bg-[#047857]/10 text-[#047857] border border-[#047857]/20'
-                : 'bg-[#854d0e]/10 text-[#854d0e] border border-[#854d0e]/20'
+                : 'bg-[#854d0e]/10 text-primary border border-[#854d0e]/20'
             }`}>
               {targetPercent}%
             </span>
@@ -771,21 +1146,78 @@ export const NovelEditor: React.FC = () => {
 
           <div className="w-px h-3 bg-[#ded5c4] shrink-0" />
 
-          <div className="flex items-center gap-1 text-[#786f65] shrink-0 whitespace-nowrap">
-            <Clock className="w-3.5 h-3.5 text-[#854d0e] shrink-0" />
+          <div className="flex items-center gap-1 text-ink-2 shrink-0 whitespace-nowrap">
+            <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
             <span>~{estimatedReadMinutes} 分钟</span>
           </div>
         </div>
 
-        {/* Right: Actions (Scratchpad, Save, Fullscreen/放大) */}
+        {/* Right: Actions (Find/Replace, Focus, Typewriter, ChapterPeek, Scratchpad, Save, Fullscreen) */}
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap ml-auto z-10">
+          {/* Find & Replace Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowFindReplace(!showFindReplace);
+              if (!showFindReplace) setFindReplaceMode('find');
+            }}
+            className={`px-2 py-1 rounded-lg text-xs font-serif font-medium flex items-center gap-1 transition border shrink-0 whitespace-nowrap cursor-pointer ${
+              showFindReplace
+                ? 'bg-[#854d0e] text-white border-[#854d0e] shadow-xs'
+                : 'bg-surface-2 hover:bg-surface-3-hover text-ink border-line'
+            }`}
+            title="章内查找与替换 (Ctrl+F / Ctrl+H)"
+          >
+            <Search className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden xl:inline whitespace-nowrap">查找</span>
+          </button>
+
+          {/* Paragraph Focus Mode Toggle */}
+          <button
+            type="button"
+            onClick={toggleFocusMode}
+            className={`p-1.5 rounded-lg border text-xs font-serif transition shrink-0 cursor-pointer ${
+              isFocusMode
+                ? 'bg-[#854d0e] text-white border-[#854d0e] shadow-xs'
+                : 'bg-surface-2 hover:bg-surface-3-hover text-ink-2 hover:text-ink border-line'
+            }`}
+            title="段落聚焦模式 (Ctrl+Alt+F)：淡化非焦点段落，沉浸于单段心流"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Typewriter Scroll Mode Toggle */}
+          <button
+            type="button"
+            onClick={toggleTypewriterMode}
+            className={`p-1.5 rounded-lg border text-xs font-serif transition shrink-0 cursor-pointer ${
+              isTypewriterMode
+                ? 'bg-[#854d0e] text-white border-[#854d0e] shadow-xs'
+                : 'bg-surface-2 hover:bg-surface-3-hover text-ink-2 hover:text-ink border-line'
+            }`}
+            title="打字机居中滚动 (Ctrl+Alt+T)：光标保持在垂直视口黄金线"
+          >
+            <Disc className="w-3.5 h-3.5" />
+          </button>
+
+          {/* ChapterPeek Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowChapterPeek(true)}
+            className="px-2.5 py-1 rounded-lg text-xs font-serif font-medium flex items-center gap-1.5 transition border shrink-0 whitespace-nowrap cursor-pointer bg-surface-2 hover:bg-surface-3-hover text-ink border-line"
+            title="快捷偷看前文、章节目录与断章结尾 (无需跳出当前正文)"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-primary shrink-0" />
+            <span className="hidden lg:inline whitespace-nowrap">章节速览</span>
+          </button>
+
           {/* Scratchpad Toggle */}
           <button
             onClick={() => setShowScratchpad(!showScratchpad)}
             className={`px-2.5 py-1 rounded-lg text-xs font-serif font-medium flex items-center gap-1.5 transition border shrink-0 whitespace-nowrap cursor-pointer ${
               showScratchpad
                 ? 'bg-[#854d0e] text-[#fdfbf7] border-[#854d0e] shadow-xs'
-                : 'bg-[#efe9dc] hover:bg-[#e4dcce] text-[#2b2621] border-[#ded5c4]'
+                : 'bg-surface-2 hover:bg-surface-3-hover text-ink border-line'
             }`}
             title="展开/折叠灵感随手记便签"
           >
@@ -794,7 +1226,7 @@ export const NovelEditor: React.FC = () => {
           </button>
 
           <button
-            onClick={() => saveCurrentChapter(true, 'USER_MANUAL_SAVE')}
+            onClick={handleManualSave}
             disabled={saveStatus === 'SAVING'}
             className="px-3 py-1 rounded-lg bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] text-xs font-serif font-medium flex items-center gap-1.5 transition shadow-xs active:scale-95 disabled:opacity-40 shrink-0 whitespace-nowrap cursor-pointer"
             title="保存当前快照 (Ctrl+S)"
@@ -815,7 +1247,7 @@ export const NovelEditor: React.FC = () => {
           ) : (
             <button
               onClick={() => setIsFullScreen(true)}
-              className="p-1.5 rounded-lg hover:bg-[#e4dcce] text-[#685f54] hover:text-[#231f1a] transition shrink-0 cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-surface-3-hover text-ink-2 hover:text-ink transition shrink-0 cursor-pointer"
               title="全屏专注写作模式"
             >
               <Maximize2 className="w-4 h-4" />
@@ -827,12 +1259,25 @@ export const NovelEditor: React.FC = () => {
         </div>
       </div>
 
+      {/* In-chapter Find & Replace Floating Bar */}
+      <EditorFindReplaceBar
+        editor={editor}
+        isOpen={showFindReplace}
+        onClose={() => setShowFindReplace(false)}
+        initialMode={findReplaceMode}
+      />
+
       {/* Main Workspace (Editor Canvas + Optional Scratchpad Drawer) */}
       <div className={`flex-1 flex overflow-hidden transition-colors duration-300 ${PAPER_THEMES[paperTheme].canvasClass}`}>
         {/* Editor Content Area (Physical Paper Sheet Layout) */}
-        <div className="flex-1 overflow-y-auto px-4 md:px-12 lg:px-20 py-8">
+        <div
+          ref={editorScrollContainerRef}
+          className={`flex-1 overflow-y-auto px-3 sm:px-6 md:px-10 py-6 sm:py-8 ${
+            isTypewriterMode ? 'pb-[45vh]' : ''
+          }`}
+        >
           <div
-            className={`max-w-3xl mx-auto p-8 md:p-14 rounded-2xl transition-all duration-300 relative ${PAPER_THEMES[paperTheme].sheetClass}`}
+            className={`max-w-3xl mx-auto p-5 sm:p-8 md:p-12 rounded-2xl transition-all duration-300 relative ${PAPER_THEMES[paperTheme].sheetClass}`}
             style={{
               '--editor-text-color': PAPER_THEMES[paperTheme].variables.textColor,
               '--editor-heading-color': PAPER_THEMES[paperTheme].variables.headingColor,
@@ -871,17 +1316,67 @@ export const NovelEditor: React.FC = () => {
                 />
                 第 {activeChapter.chapter_number} 章
               </div>
-              <h1
-                className="text-2xl md:text-3xl font-bold tracking-tight leading-snug font-serif transition-colors duration-200"
-                style={{ color: PAPER_THEMES[paperTheme].variables.headingColor }}
-              >
-                {activeChapter.title}
-              </h1>
+
+              {isEditingTitle ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={titleInputRef}
+                    type="text"
+                    value={titleInputValue}
+                    onChange={(e) => setTitleInputValue(e.target.value)}
+                    onBlur={handleSaveTitle}
+                    onKeyDown={handleTitleKeyDown}
+                    className="w-full text-2xl md:text-3xl font-bold tracking-tight leading-snug font-serif bg-transparent border-b-2 focus:outline-none transition-colors duration-200 px-1 py-0.5 rounded"
+                    style={{
+                      color: PAPER_THEMES[paperTheme].variables.headingColor,
+                      borderColor: PAPER_THEMES[paperTheme].variables.accentColor,
+                    }}
+                    placeholder="输入章节标题..."
+                  />
+                  <button
+                    onClick={handleSaveTitle}
+                    className="px-2.5 py-1 text-xs rounded font-medium bg-amber-800 text-white hover:bg-amber-700 transition shrink-0 cursor-pointer"
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={() => setIsEditingTitle(false)}
+                    className="px-2 py-1 text-xs rounded font-medium text-ink-2 hover:bg-black/5 dark:hover:bg-white/5 transition shrink-0 cursor-pointer"
+                  >
+                    取消
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="group flex items-center justify-between gap-3 cursor-pointer py-1 -my-1 px-1.5 -mx-1.5 rounded-lg hover:bg-amber-800/5 transition"
+                  onClick={() => setIsEditingTitle(true)}
+                  title="点击直接修改章节标题"
+                >
+                  <h1
+                    className="text-2xl md:text-3xl font-bold tracking-tight leading-snug font-serif transition-colors duration-200"
+                    style={{ color: PAPER_THEMES[paperTheme].variables.headingColor }}
+                  >
+                    {activeChapter.title}
+                  </h1>
+                  <span
+                    className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-xs px-2 py-1 rounded transition shrink-0"
+                    style={{
+                      color: PAPER_THEMES[paperTheme].variables.accentColor,
+                      backgroundColor: PAPER_THEMES[paperTheme].variables.quoteBg,
+                    }}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span className="font-sans text-[11px]">重命名</span>
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Tiptap Editor Surface */}
             <div
-              className={`min-h-[540px] editor-surface transition-colors duration-200 ${showRuledLines ? 'paper-ruled-active' : ''}`}
+              className={`min-h-[540px] editor-surface transition-colors duration-200 ${
+                showRuledLines ? 'paper-ruled-active' : ''
+              } ${isFocusMode ? 'paragraph-focus-active' : ''}`}
               style={{
                 '--editor-font-size': `${fontSize}px`,
                 '--editor-line-height': fontSize >= 24 ? '2.25' : fontSize <= 14 ? '1.9' : '2.15',
@@ -897,6 +1392,19 @@ export const NovelEditor: React.FC = () => {
               <EditorContent editor={editor} />
               <FloatingSelectionMenu editor={editor} />
             </div>
+
+            {/* Paragraph Focus Mode Dynamic Scoped Styles */}
+            <style>{`
+              .paragraph-focus-active .ProseMirror > *:not(:hover):not(.has-focus) {
+                opacity: 0.35;
+                transition: opacity 0.2s ease, filter 0.2s ease;
+              }
+              .paragraph-focus-active .ProseMirror > *:hover,
+              .paragraph-focus-active .ProseMirror > *.has-focus {
+                opacity: 1;
+                transition: opacity 0.2s ease, filter 0.2s ease;
+              }
+            `}</style>
 
             {/* Physical Manuscript Bottom Seal Stamp */}
             <div
@@ -925,41 +1433,101 @@ export const NovelEditor: React.FC = () => {
               </div>
             </div>
 
-            {/* Stream preview box if actively generating */}
-            {isGenerating && streamText && (
-              <div
-                className="mt-8 p-6 rounded-xl border shadow-md transition-colors duration-200"
+            {/* 章节快速穿梭导航栏 (Paging Bar) */}
+            <div
+              className="mt-6 pt-5 border-t flex items-center justify-between gap-2 sm:gap-3 select-none transition-colors duration-200 flex-wrap sm:flex-nowrap min-w-0"
+              style={{ borderColor: PAPER_THEMES[paperTheme].variables.borderColor }}
+            >
+              {/* Prev Chapter */}
+              {prevChapter ? (
+                <button
+                  type="button"
+                  onClick={() => handleSwitchChapter(prevChapter)}
+                  className="group px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-serif transition cursor-pointer hover:shadow-xs active:scale-95 min-w-0 flex-1 sm:flex-initial max-w-[48%] sm:max-w-none"
+                  style={{
+                    borderColor: PAPER_THEMES[paperTheme].variables.borderColor,
+                    color: PAPER_THEMES[paperTheme].variables.textColor,
+                    backgroundColor: PAPER_THEMES[paperTheme].variables.quoteBg,
+                  }}
+                  title={`翻至上一章：第 ${prevChapter.chapter_number} 章 《${prevChapter.title}》 (Alt+[)`}
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform shrink-0" />
+                  <div className="flex flex-col text-left min-w-0">
+                    <span className="text-[10px] opacity-60 font-mono whitespace-nowrap">上一章 (Alt+[)</span>
+                    <span className="font-bold truncate max-w-[120px] sm:max-w-[190px]">
+                      第 {prevChapter.chapter_number} 章 {prevChapter.title}
+                    </span>
+                  </div>
+                </button>
+              ) : (
+                <div
+                  className="px-3 py-1.5 rounded-xl border border-dashed opacity-40 text-xs font-serif flex items-center gap-1.5 min-w-0 flex-1 sm:flex-initial justify-center sm:justify-start"
+                  style={{ borderColor: PAPER_THEMES[paperTheme].variables.borderColor }}
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
+                  <span className="whitespace-nowrap">已是第一章</span>
+                </div>
+              )}
+
+              {/* Center: Chapter Peek Drawer shortcut */}
+              <button
+                type="button"
+                onClick={() => setShowChapterPeek(true)}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-serif transition cursor-pointer hover:shadow-xs shrink-0 whitespace-nowrap"
                 style={{
-                  borderColor: PAPER_THEMES[paperTheme].variables.accentColor,
+                  borderColor: PAPER_THEMES[paperTheme].variables.borderColor,
+                  color: PAPER_THEMES[paperTheme].variables.accentColor,
                   backgroundColor: PAPER_THEMES[paperTheme].variables.quoteBg,
                 }}
+                title="打开全书目录速览"
               >
-                <div
-                  className="flex items-center gap-2.5 text-xs font-semibold mb-3"
-                  style={{ color: PAPER_THEMES[paperTheme].variables.accentColor }}
-                >
-                  <Sparkles className="w-4 h-4 animate-spin" />
-                  <span>正文作家 Agent 正在实时流式创作中...</span>
-                </div>
-                <p
-                  className="whitespace-pre-wrap font-serif leading-relaxed"
+                <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                <span>全书目录速览</span>
+              </button>
+
+              {/* Next Chapter or Create Next */}
+              {nextChapter ? (
+                <button
+                  type="button"
+                  onClick={() => handleSwitchChapter(nextChapter)}
+                  className="group px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-serif transition cursor-pointer hover:shadow-xs active:scale-95 text-right min-w-0 flex-1 sm:flex-initial max-w-[48%] sm:max-w-none justify-end"
                   style={{
-                    fontSize: `${fontSize}px`,
-                    lineHeight: fontSize >= 24 ? '2.25' : fontSize <= 14 ? '1.9' : '2.15',
+                    borderColor: PAPER_THEMES[paperTheme].variables.borderColor,
                     color: PAPER_THEMES[paperTheme].variables.textColor,
+                    backgroundColor: PAPER_THEMES[paperTheme].variables.quoteBg,
                   }}
+                  title={`翻至下一章：第 ${nextChapter.chapter_number} 章 《${nextChapter.title}》 (Alt+])`}
                 >
-                  {streamText}
-                </p>
-              </div>
-            )}
+                  <div className="flex flex-col text-right min-w-0">
+                    <span className="text-[10px] opacity-60 font-mono whitespace-nowrap">下一章 (Alt+])</span>
+                    <span className="font-bold truncate max-w-[120px] sm:max-w-[190px]">
+                      第 {nextChapter.chapter_number} 章 {nextChapter.title}
+                    </span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateChapter(true)}
+                  className="px-3 py-1.5 rounded-xl bg-amber-800 hover:bg-amber-700 text-white text-xs font-serif font-medium flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95 cursor-pointer min-w-0 flex-1 sm:flex-initial whitespace-nowrap"
+                  title="当前已是最新章节，点击立即开启新的一章"
+                >
+                  <PlusCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>续写下一章</span>
+                </button>
+              )}
+            </div>
+
+            {/* Stream preview box if actively generating */}
+            <StreamingPreviewBox paperTheme={paperTheme} fontSize={fontSize} />
           </div>
         </div>
 
         {/* Scratchpad Slide-in Board */}
         {showScratchpad && (
           <aside
-            className="w-72 md:w-80 border-l flex flex-col shrink-0 animate-in slide-in-from-right duration-200 shadow-md"
+            className="w-72 sm:w-80 max-w-[85%] border-l flex flex-col shrink-0 animate-in slide-in-from-right duration-200 shadow-md z-20"
             style={{
               backgroundColor: paperTheme === 'midnight' ? '#18181f' : paperTheme === 'kraft' ? '#ecdcb9' : paperTheme === 'bamboo' ? '#f0f5ee' : '#f7f2e7',
               borderColor: PAPER_THEMES[paperTheme].variables.borderColor,
@@ -1010,6 +1578,10 @@ export const NovelEditor: React.FC = () => {
           </aside>
         )}
       </div>
+
+      {/* ChapterPeek 章节速览抽屉 */}
+      <ChapterPeekDrawer isOpen={showChapterPeek} onClose={() => setShowChapterPeek(false)} />
     </div>
   );
 };
+

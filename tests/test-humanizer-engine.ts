@@ -64,9 +64,43 @@ function runTests() {
   assert('Prompt 包含题材定制标识', prompt.includes('修仙玄幻'));
   assert('Prompt 严厉禁止输出客套废话', prompt.includes('直接输出') || prompt.includes('绝不要带任何'));
 
+  // 测试 5: 红牌毒句式 (RED_RULES) 专项拦截
+  console.log('\n▶ [测试 5] 红牌毒句式（不是A而是B、排比三连、万能状语等）精准拦截');
+  const redText = `
+    他所追求的，不是天下第一的虚名，而是心中的大道。
+    有的修士在闭关，有的修士在争斗，有的修士在买醉。
+    他迈步向前，带着一丝不易察觉的冷笑。
+    深吸了一口气，这不容置疑。
+  `;
+  const redCards = HumanizerEngine.detectRedCards(redText, 'fiction');
+  const redKeys = redCards.map(r => r.key);
+  assert('成功拦截至少 4 类红牌毒句式', redCards.length >= 4, `实际拦截: ${redCards.length}`);
+  assert('成功拦截「不是A，而是B」假靶子', redKeys.includes('notA-butB'));
+  assert('成功拦截「同构排比三连」', redKeys.includes('elegant-parallel'));
+  assert('成功拦截「，带着…」万能状语', redKeys.includes('dai-zhe'));
+  assert('成功拦截「深吸一口气」公式化呼吸', redKeys.includes('shen-xi'));
+
+  // 测试 6: 六维人类信号量化打分与对话/叙述分离计算
+  console.log('\n▶ [测试 6] 六维人类信号量化打分与 CV 爆发度');
+  const richFictionText = `
+    第3章 风雪故人来。
+    陆沉按住腰间那柄生锈的铁剑，鞘口裂了三寸，用两道麻绳死死缠着。
+    “说实话，”老掌柜把抹布往油腻的案板上一拍，啐了口浓痰，“咱这条街，保不齐明早就要变天了。你小子咋还敢往死胡同里钻？”
+    陆沉没接话。
+    外面风刮得更狠了。雪粒子打在牛皮纸窗格子上，簌簌地响，像是有成千上万只白蚁在黑暗里啃咬着朽木。
+    “成吧，”老掌柜叹了口气，“算我多管闲事。”
+  `;
+  const signals = HumanizerEngine.auditHumanSignals(richFictionText, 'fiction');
+  assert('句长变异系数 CV > 0.4 具备自然参差感', signals.burstinessCv > 0.4, `CV: ${signals.burstinessCv}`);
+  assert('对话占比合理 (0.1 ~ 0.6 之间)', signals.dialogueRatio >= 0.1 && signals.dialogueRatio <= 0.6, `对话比: ${signals.dialogueRatio}`);
+  assert('具体性得分良好 (> 0.5)', (signals.dimensions.find(d => d.key === 'specificity')?.score || 0) > 0.5);
+  assert('台词口语与疑虑信号成功捕获', (signals.dimensions.find(d => d.key === 'voice')?.score || 0) > 0 && (signals.dimensions.find(d => d.key === 'doubt')?.score || 0) > 0);
+  assert('高质量白描对话段落综合信号分 >= 60 (达到健康人类信号标准)', signals.score >= 60, `综合信号分: ${signals.score}`);
+
   console.log('\n===============================================================');
   console.log(` 测试完成：总计 ${total} 项，通过 ${passed} 项，失败 ${total - passed} 项`);
   console.log('===============================================================\n');
 }
 
 runTests();
+

@@ -9,11 +9,32 @@ import { PANEL_METADATA_MAP } from './PanelRegistry';
 import { allPanelsInTree } from '@/utils/dockingTree';
 import { X } from 'lucide-react';
 
+const DraggingGhostPill: React.FC = React.memo(() => {
+  const draggingState = useWorkspaceStore((s) => s.draggingState);
+  if (!draggingState || draggingState.dragSource === 'floating') return null;
+
+  return (
+    <div
+      style={{
+        left: `${draggingState.currentMousePos.x - draggingState.offset.x}px`,
+        top: `${draggingState.currentMousePos.y - draggingState.offset.y}px`,
+      }}
+      className="fixed pointer-events-none z-[9999] px-3 py-1.5 rounded-lg bg-surface border-2 border-amber-800 text-primary font-bold text-xs shadow-2xl flex items-center gap-2 opacity-95 animate-pulse"
+    >
+      <span className="w-2 h-2 rounded-full bg-amber-800" />
+      <span>
+        {draggingState.panel.title ||
+          PANEL_METADATA_MAP[draggingState.panel.panelType]?.title ||
+          '拖动模块'}
+      </span>
+    </div>
+  );
+});
+
 export const DockingWorkspace: React.FC = () => {
   const {
     layout,
     loadWorkspace,
-    draggingState,
     toggleMaximizePanel,
   } = useWorkspaceStore();
   const { activeNovel, zenMode } = useNovelStore();
@@ -51,16 +72,16 @@ export const DockingWorkspace: React.FC = () => {
     : null;
 
   return (
-    <div className="flex-1 flex flex-col w-full h-full overflow-hidden relative bg-[#f4efe6]">
+    <div className="flex-1 flex flex-col w-full h-full overflow-hidden relative bg-canvas">
       {/* Workspace Sub-Toolbar */}
       {!zenMode && <WorkspaceToolbar />}
 
       {/* Main Layout Area */}
       <div className="flex-1 w-full h-full overflow-hidden relative">
         {maximizedPanel ? (
-          <div className="w-full h-full flex flex-col z-30 bg-[#fdfbf7] relative">
-            <div className="h-8 bg-[#eadecb] border-b border-[#ded5c4] px-3 flex items-center justify-between text-xs shrink-0">
-              <span className="font-bold text-[#854d0e] flex items-center gap-1.5">
+          <div className="w-full h-full flex flex-col z-30 bg-surface relative">
+            <div className="h-8 bg-surface-2 border-b border-line px-3 flex items-center justify-between text-xs shrink-0">
+              <span className="font-bold text-primary flex items-center gap-1.5">
                 <span>[已最大化独占模式]</span>
                 <span>{maximizedPanel.title || PANEL_METADATA_MAP[maximizedPanel.panelType]?.title}</span>
               </span>
@@ -89,22 +110,7 @@ export const DockingWorkspace: React.FC = () => {
         {!zenMode && !maximizedPanel && <FloatingPanelContainer />}
 
         {/* Dragging Ghost Cursor Pill */}
-        {draggingState && (
-          <div
-            style={{
-              left: `${draggingState.currentMousePos.x - draggingState.offset.x}px`,
-              top: `${draggingState.currentMousePos.y - draggingState.offset.y}px`,
-            }}
-            className="fixed pointer-events-none z-[9999] px-3 py-1.5 rounded-lg bg-[#fdfbf7] border-2 border-amber-800 text-[#854d0e] font-bold text-xs shadow-2xl flex items-center gap-2 opacity-95 animate-pulse"
-          >
-            <span className="w-2 h-2 rounded-full bg-amber-800" />
-            <span>
-              {draggingState.panel.title ||
-                PANEL_METADATA_MAP[draggingState.panel.panelType]?.title ||
-                '拖动模块'}
-            </span>
-          </div>
-        )}
+        <DraggingGhostPill />
       </div>
     </div>
   );

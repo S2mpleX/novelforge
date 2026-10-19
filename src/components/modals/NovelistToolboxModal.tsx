@@ -102,6 +102,38 @@ const TOOLBOX_ACTIONS: ToolActionMeta[] = [
     placeholder: '粘贴需要去AI味、注入生活呼吸感与文学质感的正文段落（点击下方可一键填入当前正文）...',
     defaultDestination: 'insert_editor',
   },
+  {
+    type: 'story_architect',
+    title: 'Story Architect 宏观因果架构',
+    category: '叙事架构',
+    description: '设计欲望与恐惧冲突、关键抉择与不可逆代价，输出三个异构剧情方案与逆向伏笔查证',
+    placeholder: '输入核心命题、主角欲望与困境（如：爱一个人是否意味着有权替他决定？主角习惯性错误策略为何现在失效？）...',
+    defaultDestination: 'insert_editor',
+  },
+  {
+    type: 'scene_dramaturge',
+    title: 'Scene Dramaturge 双导演方案',
+    category: '叙事架构',
+    description: '提供【后果切入】与【细节延迟】双导演方案，情绪物象化，消除匀速流水账与假和解',
+    placeholder: '输入本章/本场戏的推进目标与出场角色（点击下方可一键填入当前正文片段作为前情）...',
+    defaultDestination: 'insert_editor',
+  },
+  {
+    type: 'ending_forge',
+    title: 'Ending Forge 结局与反转锻造',
+    category: '叙事架构',
+    description: '三向价值结局（苦涩兑现/克制和解/延迟认知），主角亲自抉择，生成倒推铺垫表',
+    placeholder: '输入终局困境、已有伏笔与主角关键取舍（如：主角必须在救同伴与完成毕生夙愿之间二选一）...',
+    defaultDestination: 'insert_editor',
+  },
+  {
+    type: 'cold_reader',
+    title: 'Cold Reader 零继承读者盲审',
+    category: '质检审稿',
+    description: '完全隔离作者大纲辩解，首次读者视角诊断注意力卡顿、伪高潮、转折期许与前三项最小修复',
+    placeholder: '粘贴待盲审的完整正文章节（点击下方可一键填入当前正文），提供最真实读者反应报告...',
+    defaultDestination: 'insert_editor',
+  },
 ];
 
 interface NovelistToolboxModalProps {

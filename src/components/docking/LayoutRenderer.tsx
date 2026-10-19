@@ -7,7 +7,7 @@ interface Props {
   node: LayoutNode;
 }
 
-export const LayoutRenderer: React.FC<Props> = ({ node }) => {
+export const LayoutRenderer: React.FC<Props> = React.memo(({ node }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   if (node.type === 'tabs') {
@@ -32,7 +32,7 @@ export const LayoutRenderer: React.FC<Props> = ({ node }) => {
             <div
               style={{
                 flex: `${sizePercent} 1 0%`,
-                minWidth: isHorizontal ? 120 : 0,
+                minWidth: isHorizontal ? 240 : 0,
                 minHeight: isHorizontal ? 0 : 100,
               }}
               className="overflow-hidden flex flex-col relative"
@@ -54,4 +54,4 @@ export const LayoutRenderer: React.FC<Props> = ({ node }) => {
       })}
     </div>
   );
-};
+});

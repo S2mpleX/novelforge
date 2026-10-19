@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
 import type { VoiceProfile, SaveVoiceProfileInput } from '@/types';
+import { confirmDialog, alertDialog } from '@/utils/dialog';
 import {
   Feather,
   Check,
@@ -69,7 +70,7 @@ export const VoiceProfilePanel: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('确定要删除这套文风档案吗？')) return;
+    if (!await confirmDialog('确定要删除这套文风档案吗？')) return;
     try {
       await api.deleteVoiceProfile(id);
       if (selectedProfileId === id) setSelectedProfileId(null);
@@ -123,7 +124,7 @@ export const VoiceProfilePanel: React.FC = () => {
   const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name?.trim()) {
-      alert('请输入文风档案名称');
+      await alertDialog('请输入文风档案名称');
       return;
     }
     try {
@@ -180,26 +181,26 @@ export const VoiceProfilePanel: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#f4efe6] text-[#2c2825] text-xs overflow-hidden select-none">
+    <div className="flex flex-col h-full w-full bg-canvas text-ink text-xs overflow-hidden select-none">
       {/* 顶部标题栏 */}
-      <div className="p-2 border-b border-[#ded5c4] bg-[#efe9dc] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <Feather className="w-3.5 h-3.5 text-amber-800" />
-          <span className="font-semibold text-xs">作者文风档案工作室 (Voice Profiles)</span>
+      <div className="p-2 border-b border-line bg-surface-2 flex items-center justify-between shrink-0 gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Feather className="w-3.5 h-3.5 text-primary shrink-0" />
+          <span className="font-semibold text-xs truncate">文风工作室 (Voice Profiles)</span>
         </div>
         <button
           onClick={handleStartCreate}
-          className="px-2 py-0.5 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium transition flex items-center gap-1 shadow-xs text-[11px]"
+          className="px-2 py-0.5 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium transition flex items-center gap-1 shadow-xs text-[11px] shrink-0 whitespace-nowrap"
         >
-          <Plus className="w-3 h-3" />
-          新建专属文风
+          <Plus className="w-3 h-3 shrink-0" />
+          新建文风
         </button>
       </div>
 
       {message && (
-        <div className="px-3 py-1.5 bg-amber-800/10 text-amber-900 border-b border-amber-800/20 text-[11px] font-medium flex items-center justify-between">
-          <span>{message}</span>
-          <button onClick={() => setMessage(null)} className="text-amber-800 hover:text-amber-950 font-bold">
+        <div className="px-3 py-1.5 bg-amber-800/10 text-primary border-b border-amber-800/20 text-[11px] font-medium flex items-center justify-between gap-2 min-w-0">
+          <span className="truncate">{message}</span>
+          <button onClick={() => setMessage(null)} className="text-primary hover:text-amber-950 font-bold shrink-0">
             ×
           </button>
         </div>
@@ -208,10 +209,10 @@ export const VoiceProfilePanel: React.FC = () => {
       {/* 主体左右分栏 */}
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧文风列表 */}
-        <div className="w-64 border-r border-[#ded5c4] bg-[#faf6ef] flex flex-col shrink-0">
-          <div className="p-2 border-b border-[#ded5c4] text-[11px] font-bold text-[#786f65] flex items-center justify-between">
+        <div className="w-64 border-r border-line bg-[#faf6ef] flex flex-col shrink-0">
+          <div className="p-2 border-b border-line text-[11px] font-bold text-ink-2 flex items-center justify-between">
             <span>文风预设与专属 ({profiles.length})</span>
-            {isLoading && <RotateCcw className="w-3 h-3 animate-spin text-amber-800" />}
+            {isLoading && <RotateCcw className="w-3 h-3 animate-spin text-primary" />}
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
             {profiles.map((p) => {
@@ -227,25 +228,25 @@ export const VoiceProfilePanel: React.FC = () => {
                   className={`p-2 rounded-lg border cursor-pointer transition-all ${
                     isSelected
                       ? 'border-amber-800/50 bg-[#efe7d8] shadow-xs'
-                      : 'border-[#ded5c4] bg-white/70 hover:bg-[#f5ede0]'
+                      : 'border-line bg-white/70 hover:bg-[#f5ede0]'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-xs text-[#2c2825] truncate">{p.name}</span>
+                    <span className="font-bold text-xs text-ink truncate">{p.name}</span>
                     {p.is_active && (
                       <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-800/15 text-emerald-800 font-bold border border-emerald-800/30 flex items-center gap-0.5">
                         <Check className="w-2.5 h-2.5" /> 激活
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-[#786f65] line-clamp-2 leading-tight">
+                  <p className="text-[10px] text-ink-2 line-clamp-2 leading-tight">
                     {p.description || '暂无描述'}
                   </p>
-                  <div className="mt-1 flex items-center gap-1.5 text-[9px] text-[#8e8579]">
+                  <div className="mt-1 flex items-center gap-1.5 text-[9px] text-ink-2">
                     <span className="px-1 py-0.2 bg-[#f0ebd9] rounded">{p.sentence_rhythm}</span>
                     <span className="px-1 py-0.2 bg-[#f0ebd9] rounded">{p.vocabulary_tone}</span>
                     {p.is_builtin && (
-                      <span className="text-amber-800/70 font-semibold ml-auto">内置</span>
+                      <span className="text-primary/70 font-semibold ml-auto">内置</span>
                     )}
                   </div>
                 </div>
@@ -255,53 +256,53 @@ export const VoiceProfilePanel: React.FC = () => {
         </div>
 
         {/* 右侧详情与编辑区 */}
-        <div className="flex-1 flex flex-col overflow-y-auto p-4 bg-[#fdfbf7]">
+        <div className="flex-1 flex flex-col overflow-y-auto p-4 bg-surface">
           {isEditing ? (
             /* 编辑/新建表单 */
             <form onSubmit={handleSaveForm} className="space-y-3 max-w-xl">
-              <div className="flex items-center justify-between pb-2 border-b border-[#ded5c4]">
-                <h3 className="font-bold text-sm text-[#854d0e]">
+              <div className="flex items-center justify-between pb-2 border-b border-line">
+                <h3 className="font-bold text-sm text-primary">
                   {formData.id ? '编辑文风档案' : '新建小说专属文风档案'}
                 </h3>
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="text-xs text-[#786f65] hover:text-[#2c2825]"
+                  className="text-xs text-ink-2 hover:text-ink"
                 >
                   取消
                 </button>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-[#554b3e] mb-1">文风名称 *</label>
+                <label className="block text-[11px] font-bold text-ink-2 mb-1">文风名称 *</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="如：悬疑冷冽·硬派电影感"
-                  className="w-full px-2.5 py-1 text-xs rounded border border-[#ded5c4] bg-white focus:outline-none focus:ring-1 focus:ring-amber-800"
+                  className="w-full px-2.5 py-1 text-xs rounded border border-line bg-white focus:outline-none focus:ring-1 focus:ring-amber-800"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-[#554b3e] mb-1">风格定位与核心说明</label>
+                <label className="block text-[11px] font-bold text-ink-2 mb-1">风格定位与核心说明</label>
                 <input
                   type="text"
                   value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="简述该文风的核心调性、适合的场景类型"
-                  className="w-full px-2.5 py-1 text-xs rounded border border-[#ded5c4] bg-white focus:outline-none focus:ring-1 focus:ring-amber-800"
+                  className="w-full px-2.5 py-1 text-xs rounded border border-line bg-white focus:outline-none focus:ring-1 focus:ring-amber-800"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#554b3e] mb-1">句式节奏</label>
+                  <label className="block text-[11px] font-bold text-ink-2 mb-1">句式节奏</label>
                   <select
                     value={formData.sentence_rhythm || 'BALANCED'}
                     onChange={(e) => setFormData({ ...formData, sentence_rhythm: e.target.value })}
-                    className="w-full px-2 py-1 text-xs rounded border border-[#ded5c4] bg-white"
+                    className="w-full px-2 py-1 text-xs rounded border border-line bg-white"
                   >
                     <option value="FAST_PACED">爽利短句 (快节奏冲突)</option>
                     <option value="BALANCED">平缓均衡 (标准长篇叙事)</option>
@@ -310,11 +311,11 @@ export const VoiceProfilePanel: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-[#554b3e] mb-1">语调基调</label>
+                  <label className="block text-[11px] font-bold text-ink-2 mb-1">语调基调</label>
                   <select
                     value={formData.vocabulary_tone || 'CLASSICAL_MODERN'}
                     onChange={(e) => setFormData({ ...formData, vocabulary_tone: e.target.value })}
-                    className="w-full px-2 py-1 text-xs rounded border border-[#ded5c4] bg-white"
+                    className="w-full px-2 py-1 text-xs rounded border border-line bg-white"
                   >
                     <option value="CLASSICAL_MODERN">文白相衬 (典雅修真/历史)</option>
                     <option value="CASUAL_MODERN">通俗利落 (都市爽文/异能)</option>
@@ -326,11 +327,11 @@ export const VoiceProfilePanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#554b3e] mb-1">叙事视角</label>
+                  <label className="block text-[11px] font-bold text-ink-2 mb-1">叙事视角</label>
                   <select
                     value={formData.pov_preference || 'THIRD_LIMITED'}
                     onChange={(e) => setFormData({ ...formData, pov_preference: e.target.value })}
-                    className="w-full px-2 py-1 text-xs rounded border border-[#ded5c4] bg-white"
+                    className="w-full px-2 py-1 text-xs rounded border border-line bg-white"
                   >
                     <option value="THIRD_LIMITED">第三人称限制视角 (贴合主角心智)</option>
                     <option value="THIRD_OMNISCIENT">第三人称全知上帝视角</option>
@@ -338,11 +339,11 @@ export const VoiceProfilePanel: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-[#554b3e] mb-1">感官配比</label>
+                  <label className="block text-[11px] font-bold text-ink-2 mb-1">感官配比</label>
                   <select
                     value={formData.sensory_ratio || 'BALANCED'}
                     onChange={(e) => setFormData({ ...formData, sensory_ratio: e.target.value })}
-                    className="w-full px-2 py-1 text-xs rounded border border-[#ded5c4] bg-white"
+                    className="w-full px-2 py-1 text-xs rounded border border-line bg-white"
                   >
                     <option value="BALANCED">视听均衡 (标准叙事)</option>
                     <option value="ACTION_CENTRIC">动作导向 (突出速度与冲击)</option>
@@ -352,18 +353,18 @@ export const VoiceProfilePanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-[#554b3e] mb-1">代表性样例文本 (AI 学习参照)</label>
+                <label className="block text-[11px] font-bold text-ink-2 mb-1">代表性样例文本 (AI 学习参照)</label>
                 <textarea
                   rows={3}
                   value={formData.sample_text || ''}
                   onChange={(e) => setFormData({ ...formData, sample_text: e.target.value })}
                   placeholder="粘贴 100~300 字体现该文风语调与节奏的精选正文段落..."
-                  className="w-full p-2 text-xs rounded border border-[#ded5c4] bg-white font-serif focus:outline-none focus:ring-1 focus:ring-amber-800"
+                  className="w-full p-2 text-xs rounded border border-line bg-white font-serif focus:outline-none focus:ring-1 focus:ring-amber-800"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-[#554b3e] mb-1">文风法则与禁用词约束</label>
+                <label className="block text-[11px] font-bold text-ink-2 mb-1">文风法则与禁用词约束</label>
                 <div className="flex gap-1.5 mb-2">
                   <input
                     type="text"
@@ -376,7 +377,7 @@ export const VoiceProfilePanel: React.FC = () => {
                       }
                     }}
                     placeholder="如：段落严禁超过三行、避免'只见'等滥用词..."
-                    className="flex-1 px-2.5 py-1 text-xs rounded border border-[#ded5c4] bg-white focus:outline-none focus:ring-1 focus:ring-amber-800"
+                    className="flex-1 px-2.5 py-1 text-xs rounded border border-line bg-white focus:outline-none focus:ring-1 focus:ring-amber-800"
                   />
                   <button
                     type="button"
@@ -390,7 +391,7 @@ export const VoiceProfilePanel: React.FC = () => {
                   {rulesList.map((rule, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-0.5 bg-[#f0ebd9] border border-[#ded5c4] rounded text-[11px] text-[#554b3e] flex items-center gap-1"
+                      className="px-2 py-0.5 bg-[#f0ebd9] border border-line rounded text-[11px] text-ink-2 flex items-center gap-1"
                     >
                       {rule}
                       <button
@@ -405,11 +406,11 @@ export const VoiceProfilePanel: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#ded5c4]">
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-line">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="px-3 py-1 rounded border border-[#ded5c4] bg-[#efe9dc] text-[#554b3e] text-xs"
+                  className="px-3 py-1 rounded border border-line bg-surface-2 text-ink-2 text-xs"
                 >
                   取消
                 </button>
@@ -425,19 +426,19 @@ export const VoiceProfilePanel: React.FC = () => {
             /* 查看选中的文风 */
             <div className="space-y-4 max-w-xl">
               {/* 标题卡片 */}
-              <div className="p-3 bg-[#faf6ef] border border-[#ded5c4] rounded-lg flex items-center justify-between">
+              <div className="p-3 bg-[#faf6ef] border border-line rounded-lg flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-base text-[#854d0e]">{selectedProfile.name}</h3>
+                    <h3 className="font-bold text-base text-primary">{selectedProfile.name}</h3>
                     {selectedProfile.is_active ? (
                       <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-800/15 text-emerald-800 border border-emerald-800/30 font-bold flex items-center gap-1">
                         <Check className="w-3 h-3" /> 当前小说已激活
                       </span>
                     ) : (
-                      <span className="text-[10px] text-[#8e8579]">未激活</span>
+                      <span className="text-[10px] text-ink-2">未激活</span>
                     )}
                   </div>
-                  <p className="text-xs text-[#554b3e] mt-1">{selectedProfile.description}</p>
+                  <p className="text-xs text-ink-2 mt-1">{selectedProfile.description}</p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -454,7 +455,7 @@ export const VoiceProfilePanel: React.FC = () => {
                     <>
                       <button
                         onClick={() => handleStartEdit(selectedProfile)}
-                        className="px-2.5 py-1 rounded border border-[#ded5c4] bg-white text-[#554b3e] hover:bg-[#efe7d8] text-xs font-medium"
+                        className="px-2.5 py-1 rounded border border-line bg-white text-ink-2 hover:bg-[#efe7d8] text-xs font-medium"
                       >
                         编辑
                       </button>
@@ -472,29 +473,29 @@ export const VoiceProfilePanel: React.FC = () => {
 
               {/* 核心参数指标 */}
               <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="p-2 rounded bg-white border border-[#ded5c4]">
-                  <span className="text-[#8e8579]">句式节奏：</span>
-                  <span className="font-bold text-[#554b3e] ml-1">{selectedProfile.sentence_rhythm}</span>
+                <div className="p-2 rounded bg-white border border-line">
+                  <span className="text-ink-2">句式节奏：</span>
+                  <span className="font-bold text-ink-2 ml-1">{selectedProfile.sentence_rhythm}</span>
                 </div>
-                <div className="p-2 rounded bg-white border border-[#ded5c4]">
-                  <span className="text-[#8e8579]">词汇语调：</span>
-                  <span className="font-bold text-[#554b3e] ml-1">{selectedProfile.vocabulary_tone}</span>
+                <div className="p-2 rounded bg-white border border-line">
+                  <span className="text-ink-2">词汇语调：</span>
+                  <span className="font-bold text-ink-2 ml-1">{selectedProfile.vocabulary_tone}</span>
                 </div>
-                <div className="p-2 rounded bg-white border border-[#ded5c4]">
-                  <span className="text-[#8e8579]">叙事视角：</span>
-                  <span className="font-bold text-[#554b3e] ml-1">{selectedProfile.pov_preference}</span>
+                <div className="p-2 rounded bg-white border border-line">
+                  <span className="text-ink-2">叙事视角：</span>
+                  <span className="font-bold text-ink-2 ml-1">{selectedProfile.pov_preference}</span>
                 </div>
-                <div className="p-2 rounded bg-white border border-[#ded5c4]">
-                  <span className="text-[#8e8579]">感官配比：</span>
-                  <span className="font-bold text-[#554b3e] ml-1">{selectedProfile.sensory_ratio}</span>
+                <div className="p-2 rounded bg-white border border-line">
+                  <span className="text-ink-2">感官配比：</span>
+                  <span className="font-bold text-ink-2 ml-1">{selectedProfile.sensory_ratio}</span>
                 </div>
               </div>
 
               {/* 代表性样例文本 */}
               {selectedProfile.sample_text && (
                 <div className="space-y-1">
-                  <span className="font-bold text-xs text-[#554b3e]">代表性样例文本：</span>
-                  <div className="p-3 rounded-lg bg-white border border-[#ded5c4] font-serif text-xs text-[#2c2825] leading-relaxed italic">
+                  <span className="font-bold text-xs text-ink-2">代表性样例文本：</span>
+                  <div className="p-3 rounded-lg bg-white border border-line font-serif text-xs text-ink leading-relaxed italic">
                     “{selectedProfile.sample_text}”
                   </div>
                 </div>
@@ -502,22 +503,22 @@ export const VoiceProfilePanel: React.FC = () => {
 
               {/* 规则与约束 */}
               <div className="space-y-1">
-                <span className="font-bold text-xs text-[#554b3e]">专属文风规则与因果禁忌：</span>
+                <span className="font-bold text-xs text-ink-2">专属文风规则与因果禁忌：</span>
                 <div className="flex flex-wrap gap-1.5">
                   {(() => {
                     try {
                       const rules: string[] = JSON.parse(selectedProfile.custom_rules_json || '[]');
-                      if (rules.length === 0) return <span className="text-xs text-[#8e8579]">无特殊限制</span>;
+                      if (rules.length === 0) return <span className="text-xs text-ink-2">无特殊限制</span>;
                       return rules.map((r, i) => (
                         <span
                           key={i}
-                          className="px-2 py-0.5 rounded bg-[#efe7d8] text-amber-900 font-medium text-[11px] border border-amber-800/20"
+                          className="px-2 py-0.5 rounded bg-[#efe7d8] text-primary font-medium text-[11px] border border-amber-800/20"
                         >
                           {r}
                         </span>
                       ));
                     } catch {
-                      return <span className="text-xs text-[#8e8579]">无规则</span>;
+                      return <span className="text-xs text-ink-2">无规则</span>;
                     }
                   })()}
                 </div>
@@ -526,8 +527,8 @@ export const VoiceProfilePanel: React.FC = () => {
               {/* 试读推演体验卡片 */}
               <div className="p-3 rounded-lg bg-[#f0ebd9] border border-amber-800/20 space-y-2">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-800" />
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
                     <span>文风试读体验推演</span>
                   </div>
                   <button
@@ -550,16 +551,16 @@ export const VoiceProfilePanel: React.FC = () => {
                 </div>
 
                 {testOutput && (
-                  <div className="mt-2 p-3 rounded bg-white border border-amber-800/30 font-serif text-xs text-[#2c2825] leading-relaxed shadow-xs">
-                    <div className="text-[10px] text-amber-800 font-bold mb-1">【试读段落生成结果】</div>
+                  <div className="mt-2 p-3 rounded bg-white border border-amber-800/30 font-serif text-xs text-ink leading-relaxed shadow-xs">
+                    <div className="text-[10px] text-primary font-bold mb-1">【试读段落生成结果】</div>
                     {testOutput}
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="py-16 text-center text-[#786f65]">
-              <Feather className="w-8 h-8 mx-auto mb-2 opacity-30 text-amber-800" />
+            <div className="py-16 text-center text-ink-2">
+              <Feather className="w-8 h-8 mx-auto mb-2 opacity-30 text-primary" />
               <p>请在左侧选择一套文风档案进行查看，或点击右上角新建</p>
             </div>
           )}

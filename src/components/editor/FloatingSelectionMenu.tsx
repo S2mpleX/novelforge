@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
-import { HumanizerEngine } from '@/features/humanizer/HumanizerEngine';
+import { useSkillsStore } from '@/features/skills/useSkillsStore';
 import { InlineDiffViewer } from '@/components/common/InlineDiffViewer';
 import {
   Sparkles,
@@ -15,13 +15,14 @@ import {
   Copy,
   Loader2,
   Edit3,
+  Clapperboard,
 } from 'lucide-react';
 
 interface FloatingSelectionMenuProps {
   editor: Editor | null;
 }
 
-type ActionKey = 'humanize' | 'actionize' | 'sensory' | 'dialogue' | 'save_rule';
+type ActionKey = 'humanize' | 'dramaturgy' | 'actionize' | 'sensory' | 'dialogue' | 'save_rule';
 
 export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ editor }) => {
   const { activeNovel, saveCurrentChapter } = useNovelStore();
@@ -145,13 +146,23 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
     const genre = activeNovel.genre_profile || '长篇小说';
 
     if (action === 'humanize') {
-      systemPrompt =
-        '你是一位专精中文小说文学重构与去 AI 味大师 (Humanizer Polisher)。严格消除所有机械套话与说明文转折，将抽象结论转化为身体微反应与现场环境声色。';
-      userPrompt = HumanizerEngine.buildPolishingPrompt(
+      const { buildPolishingPrompt, getEnabledSkills } = useSkillsStore.getState();
+      const activeSkills = getEnabledSkills();
+      systemPrompt = `你是一位专精中文小说文学重构与去 AI 味大师。当前搭载已启用的专业技能规范：【${activeSkills.map((s) => s.displayName).join(' + ')}】。严格遵守白名单规则与文学守则，直接输出高质量纯小说正文。`;
+      userPrompt = buildPolishingPrompt(
         selectedText,
         genre,
-        '彻底消灭套话，强化中式小说身体微动作白描与现场呼吸感'
+        '彻底消灭套话与机械腔调，强化中式小说身体微动作白描与现场呼吸感'
       );
+    } else if (action === 'dramaturgy') {
+      const { buildSceneDramaturgePrompt } = useSkillsStore.getState();
+      systemPrompt =
+        '你是一位小说单场景戏剧导演 (Scene Dramaturge)。精通双导演进场方案（后果切入 vs 细节延迟）与场景呼吸感，严禁给情绪直接贴标签。直接输出重塑后的纯小说段落。';
+      userPrompt = buildSceneDramaturgePrompt({
+        genre,
+        prevContext: selectedText,
+        sceneGoal: '消除平淡流水账与情绪贴标签，重构戏剧张力与真实行动后坐力',
+      });
     } else if (action === 'actionize') {
       systemPrompt =
         '你是一名小说动作白描大师。擅长将抽象情绪、心理独白与说明文宣告，彻底转化为具体可感的身体微反应、手头动作、物理受力与环境互动。';
@@ -197,6 +208,9 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
       .insertContent(generatedText)
       .run();
 
+    // 立即同步更新 store 中正文，避免 250ms 防抖延迟导致快照存盘旧正文
+    useNovelStore.getState().updateEditorContent(editor.getHTML());
+
     // 触发安全保存并生成快照
     await saveCurrentChapter(true, 'INLINE_AI_APPLY');
 
@@ -212,14 +226,39 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
 
   if (!visible) return null;
 
+  const isExpanded = Boolean(activeAction);
+  const isNearTop = position.top < (isExpanded ? 360 : 110);
+
+  let topStyle: string;
+  let transformStyle: string;
+  let leftStyle: string;
+
+  if (isExpanded) {
+    const cardTop = Math.max(68, Math.min(window.innerHeight - 420, position.top - 100));
+    const cardLeft = Math.max(250, Math.min(window.innerWidth - 250, position.left));
+    topStyle = `${cardTop}px`;
+    leftStyle = `${cardLeft}px`;
+    transformStyle = 'translate(-50%, 0)';
+  } else {
+    const capsuleLeft = Math.max(190, Math.min(window.innerWidth - 190, position.left));
+    leftStyle = `${capsuleLeft}px`;
+    if (isNearTop) {
+      topStyle = `${Math.max(65, position.top + 28)}px`;
+      transformStyle = 'translate(-50%, 0)';
+    } else {
+      topStyle = `${position.top}px`;
+      transformStyle = 'translate(-50%, -100%)';
+    }
+  }
+
   return (
     <div
       ref={menuRef}
       style={{
         position: 'fixed',
-        top: `${Math.max(16, position.top)}px`,
-        left: `${Math.min(window.innerWidth - 300, Math.max(160, position.left))}px`,
-        transform: 'translate(-50%, -100%)',
+        top: topStyle,
+        left: leftStyle,
+        transform: transformStyle,
       }}
       className="z-50 select-none animate-in fade-in zoom-in-95 duration-150"
     >
@@ -234,6 +273,16 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>去AI味</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTriggerAction('dramaturgy')}
+            className="px-2.5 py-1.5 rounded-lg hover:bg-orange-600/30 text-orange-300 font-medium flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+            title="Scene Dramaturge 双导演方案进场重塑（消除流水账与情绪贴标签）"
+          >
+            <Clapperboard className="w-3.5 h-3.5 text-orange-400" />
+            <span>戏剧重塑</span>
           </button>
 
           <button
@@ -287,11 +336,11 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
           </button>
         </div>
       ) : (
-        /* 展开卡片：红绿两色原地 Diff 对比与采纳面板 */
-        <div className="w-96 md:w-[480px] p-4 rounded-2xl bg-[#fdfbf7] dark:bg-[#1f1c18] border border-[#d5cbb8] dark:border-amber-900/30 shadow-2xl space-y-3 text-xs text-[#2c2825] dark:text-stone-200">
+        /* 展开卡片：红绿两色原地 Diff 对比与采纳面板 (自适应最大高度与滚动，防上下截断) */
+        <div className="w-[92vw] max-w-[480px] max-h-[82vh] overflow-y-auto p-4 rounded-2xl bg-surface dark:bg-[#1f1c18] border border-line dark:border-amber-900/30 shadow-2xl space-y-3 text-xs text-ink dark:text-stone-200">
           {/* 卡片头部 */}
-          <div className="flex items-center justify-between border-b border-[#eee6d8] dark:border-stone-800 pb-2">
-            <div className="flex items-center gap-2 font-serif font-bold text-sm text-[#854d0e] dark:text-amber-400">
+          <div className="flex items-center justify-between border-b border-line dark:border-stone-800 pb-2">
+            <div className="flex items-center gap-2 font-serif font-bold text-sm text-primary dark:text-amber-400">
               <Sparkles className="w-4 h-4 text-amber-600" />
               <span>
                 {activeAction === 'humanize' && 'Humanizer 去AI味重塑'}
@@ -319,7 +368,7 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
 
           {/* 错误或提示信息 */}
           {message && !isGenerating && (
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-800 dark:text-amber-300 text-[11px]">
+            <div className="p-2 rounded-lg bg-amber-500/10 text-primary dark:text-amber-300 text-[11px]">
               {message}
             </div>
           )}
@@ -332,7 +381,7 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
                 <button
                   type="button"
                   onClick={() => setIsEditingDraft(!isEditingDraft)}
-                  className="text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-primary dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Edit3 className="w-3 h-3" />
                   <span>{isEditingDraft ? '查看Diff' : '手动微调'}</span>
@@ -355,7 +404,7 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
               )}
 
               {/* 底部操作按钮栏 */}
-              <div className="flex items-center justify-between pt-2 border-t border-[#eee6d8] dark:border-stone-800">
+              <div className="flex items-center justify-between pt-2 border-t border-line dark:border-stone-800">
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"

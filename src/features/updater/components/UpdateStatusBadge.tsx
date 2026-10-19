@@ -20,7 +20,7 @@ export const UpdateStatusBadge: React.FC<Props> = ({ status }) => {
   switch (status) {
     case 'CHECKING':
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-serif font-semibold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-serif font-semibold bg-amber-100 text-primary border border-amber-300 shadow-2xs">
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
           正在检查远端版本...
         </span>
@@ -76,7 +76,7 @@ export const UpdateStatusBadge: React.FC<Props> = ({ status }) => {
 
     case 'RESTART_REQUIRED':
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-serif font-semibold bg-amber-100 text-amber-900 border border-amber-400 shadow-2xs">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-serif font-semibold bg-amber-100 text-primary border border-amber-400 shadow-2xs">
           <RotateCw className="w-3.5 h-3.5" />
           需要重新启动以应用新版本
         </span>
@@ -109,7 +109,7 @@ export const UpdateStatusBadge: React.FC<Props> = ({ status }) => {
     case 'IDLE':
     default:
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-serif font-semibold bg-[#efe9dc] text-[#5e5549] border border-[#ded5c4] shadow-2xs">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-serif font-semibold bg-surface-2 text-ink-2 border border-line shadow-2xs">
           <RefreshCw className="w-3.5 h-3.5" />
           就绪状态（待检查）
         </span>

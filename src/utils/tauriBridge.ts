@@ -68,6 +68,8 @@ import type {
   ArenaDuelResult,
   MergeArenaOutputsInput,
   EpubExportResult,
+  OptimizeWritingPromptInput,
+  OptimizeWritingPromptResult,
 } from '@/types';
 
 /**
@@ -123,11 +125,33 @@ export const api = {
     language?: string;
     writing_style?: string;
     chapter_target_length?: number;
+    cover_url?: string;
   }) => safeInvoke<Novel>('create_novel', { input }),
   deleteNovel: (id: string) => safeInvoke<void>('delete_novel', { id }),
+  updateNovel: (input: {
+    id: string;
+    title: string;
+    description?: string;
+    genre_profile?: string;
+    writing_style?: string;
+    cover_url?: string;
+  }) => safeInvoke<Novel>('update_novel', { input }),
 
   // Volumes & Chapters
   listVolumes: (novelId: string) => safeInvoke<Volume[]>('list_volumes', { novelId }),
+  createVolume: (input: {
+    novel_id: string;
+    title: string;
+    part_id?: string;
+    order_index?: number;
+    summary?: string;
+  }) => safeInvoke<Volume>('create_volume', { input }),
+  updateVolume: (input: {
+    id: string;
+    title: string;
+    summary?: string;
+  }) => safeInvoke<Volume>('update_volume', { input }),
+  deleteVolume: (id: string) => safeInvoke<void>('delete_volume', { id }),
   listChapters: (novelId: string) => safeInvoke<Chapter[]>('list_chapters', { novelId }),
   getChapter: (id: string) => safeInvoke<Chapter>('get_chapter', { id }),
   createChapter: (input: {
@@ -137,6 +161,8 @@ export const api = {
     title: string;
     initial_content?: string;
   }) => safeInvoke<Chapter>('create_chapter', { input }),
+  updateChapterTitle: (chapterId: string, title: string) =>
+    safeInvoke<Chapter>('update_chapter_title', { chapterId, title }),
   saveChapterContent: (
     chapterId: string,
     content: string,
@@ -164,6 +190,19 @@ export const api = {
     background?: string;
     motivation?: string;
   }) => safeInvoke<Character>('create_character', { input }),
+  updateCharacterStatus: (id: string, status: string) =>
+    safeInvoke<void>('update_character_status', { id, status }),
+  updateCharacter: (input: {
+    id: string;
+    name: string;
+    aliases?: string;
+    profile?: string;
+    personality?: string;
+    background?: string;
+    motivation?: string;
+    status?: string;
+  }) => safeInvoke<Character>('update_character', { input }),
+  deleteCharacter: (id: string) => safeInvoke<void>('delete_character', { id }),
 
   listWorldRules: (novelId: string) => safeInvoke<WorldRule[]>('list_world_rules', { novelId }),
   createWorldRule: (input: {
@@ -172,6 +211,14 @@ export const api = {
     rule_content: string;
     authority_level?: string;
   }) => safeInvoke<WorldRule>('create_world_rule', { input }),
+  updateWorldRule: (input: {
+    id: string;
+    title: string;
+    rule_content: string;
+    authority_level?: string;
+    status?: string;
+  }) => safeInvoke<WorldRule>('update_world_rule', { input }),
+  deleteWorldRule: (id: string) => safeInvoke<void>('delete_world_rule', { id }),
 
   listPlotThreads: (novelId: string) => safeInvoke<PlotThread[]>('list_plot_threads', { novelId }),
   createPlotThread: (input: {
@@ -181,6 +228,18 @@ export const api = {
     introduced_chapter_id?: string;
     expected_resolution?: string;
   }) => safeInvoke<PlotThread>('create_plot_thread', { input }),
+  updatePlotThreadStatus: (id: string, status: string) =>
+    safeInvoke<void>('update_plot_thread_status', { id, status }),
+  updatePlotThread: (input: {
+    id: string;
+    title: string;
+    description?: string;
+    introduced_chapter_id?: string;
+    expected_resolution?: string;
+    resolved_chapter_id?: string;
+    status?: string;
+  }) => safeInvoke<PlotThread>('update_plot_thread', { input }),
+  deletePlotThread: (id: string) => safeInvoke<void>('delete_plot_thread', { id }),
 
   // Phase 2: Relationships, Plot Arcs, Scenes, Events
   listCharacterRelationships: (novelId: string) =>
@@ -218,6 +277,8 @@ export const api = {
   }) => safeInvoke<StoryArc>('create_story_arc', { input }),
   updateStoryArcStatus: (id: string, status: string) =>
     safeInvoke<void>('update_story_arc_status', { id, status }),
+  deleteStoryArc: (id: string) =>
+    safeInvoke<void>('delete_story_arc', { id }),
 
   listScenes: (chapterId: string) =>
     safeInvoke<Scene[]>('list_scenes', { chapterId }),
@@ -551,4 +612,8 @@ export const api = {
   // --- V2.5: EPUB 3 Export ---
   exportNovelEpub: (novelId: string, outputPath?: string) =>
     safeInvoke<EpubExportResult>('export_novel_epub', { novelId, outputPath }),
+
+  // --- V2.5.1: AI Prompt Optimizer ---
+  optimizeWritingPrompt: (input: OptimizeWritingPromptInput) =>
+    safeInvoke<OptimizeWritingPromptResult>('optimize_writing_prompt', { input }),
 };

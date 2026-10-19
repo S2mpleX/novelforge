@@ -84,6 +84,7 @@ pub struct Novel {
     pub language: String,
     pub writing_style: String,
     pub status: String,
+    pub cover_url: Option<String>,
     pub series_id: Option<String>,
     pub series_order: Option<i64>,
     pub hierarchy_config: Option<String>,
@@ -103,6 +104,17 @@ pub struct CreateNovelInput {
     pub chapter_target_length: Option<i64>,
     pub series_id: Option<String>,
     pub hierarchy_config: Option<HierarchyConfig>,
+    pub cover_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateNovelInput {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub genre_profile: Option<String>,
+    pub writing_style: Option<String>,
+    pub cover_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +136,13 @@ pub struct CreateVolumeInput {
     pub title: String,
     pub summary: Option<String>,
     pub order_index: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateVolumeInput {
+    pub id: String,
+    pub title: String,
+    pub summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -154,6 +173,12 @@ pub struct CreateChapterInput {
     pub title: String,
     pub chapter_goal: Option<String>,
     pub initial_content: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateChapterTitleInput {
+    pub id: String,
+    pub title: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -195,6 +220,18 @@ pub struct CreateCharacterInput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateCharacterInput {
+    pub id: String,
+    pub name: String,
+    pub aliases: Option<String>,
+    pub profile: Option<String>,
+    pub personality: Option<String>,
+    pub background: Option<String>,
+    pub motivation: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldRule {
     pub id: String,
     pub novel_id: String,
@@ -211,6 +248,15 @@ pub struct CreateWorldRuleInput {
     pub title: String,
     pub rule_content: String,
     pub authority_level: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateWorldRuleInput {
+    pub id: String,
+    pub title: String,
+    pub rule_content: String,
+    pub authority_level: Option<String>,
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -234,6 +280,17 @@ pub struct CreatePlotThreadInput {
     pub description: Option<String>,
     pub introduced_chapter_id: Option<String>,
     pub expected_resolution: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdatePlotThreadInput {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub introduced_chapter_id: Option<String>,
+    pub expected_resolution: Option<String>,
+    pub resolved_chapter_id: Option<String>,
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1120,3 +1177,27 @@ pub struct MergeArenaOutputsInput {
     pub output_b: String,
     pub merge_focus: Option<String>,
 }
+
+// ==========================================
+// V2.5.1 AI PROMPT OPTIMIZER MODELS
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizeWritingPromptInput {
+    pub novel_id: Option<String>,
+    pub chapter_id: Option<String>,
+    pub raw_prompt: String,
+    pub target_length: Option<i64>,
+    pub optimization_angle: Option<String>,
+    pub style_mode: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizeWritingPromptResult {
+    pub original_prompt: String,
+    pub optimized_prompt: String,
+    pub enhancement_points: Vec<String>,
+    pub suggested_hooks: Option<String>,
+    pub suggested_tags: Vec<String>,
+}
+

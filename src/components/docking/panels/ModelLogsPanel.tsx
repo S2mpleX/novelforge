@@ -68,29 +68,29 @@ export const ModelLogsPanel: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#f4efe6] text-[#2c2825] text-xs overflow-hidden select-none">
+    <div className="flex flex-col h-full w-full bg-canvas text-ink text-xs overflow-hidden select-none">
       {/* Top action bar */}
-      <div className="p-2 border-b border-[#ded5c4] bg-[#efe9dc] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <Activity className="w-3.5 h-3.5 text-amber-800" />
-          <span className="font-semibold text-xs">模型调用与审计日志 ({logs.length})</span>
+      <div className="p-2 border-b border-line bg-surface-2 flex items-center justify-between shrink-0 gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Activity className="w-3.5 h-3.5 text-primary shrink-0" />
+          <span className="font-semibold text-xs truncate">调用与审计日志 ({logs.length})</span>
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] text-[#786f65]">
-          <Cpu className="w-3 h-3 text-amber-800" />
-          <span>当前网关：{activeProvider?.name || '本地兼容网关'}</span>
+        <div className="flex items-center gap-1.5 text-[10px] text-ink-2 shrink-0 whitespace-nowrap">
+          <Cpu className="w-3 h-3 text-primary shrink-0" />
+          <span className="truncate max-w-[120px]">{activeProvider?.name || '本地网关'}</span>
         </div>
       </div>
 
       {/* Filter */}
-      <div className="p-2 border-b border-[#ded5c4] bg-[#fdfbf7]/80">
+      <div className="p-2 border-b border-line bg-surface/80">
         <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-[#8e8476]" />
+          <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-ink-2" />
           <input
             type="text"
             placeholder="搜索调用操作或模型名称..."
             value={filterQuery}
             onChange={(e) => setFilterQuery(e.target.value)}
-            className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded pl-7 pr-2 py-1 text-xs text-[#2b2621] placeholder-[#8e8476] focus:outline-none focus:border-amber-700"
+            className="w-full bg-surface border border-line rounded pl-7 pr-2 py-1 text-xs text-ink placeholder-[#8e8476] focus:outline-none focus:border-amber-700"
           />
         </div>
       </div>
@@ -99,7 +99,7 @@ export const ModelLogsPanel: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-2">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-[#ded5c4] text-[#786f65] text-[10px] uppercase font-semibold">
+            <tr className="border-b border-line text-ink-2 text-[10px] uppercase font-semibold">
               <th className="py-1.5 px-2">时间</th>
               <th className="py-1.5 px-2">操作动作</th>
               <th className="py-1.5 px-2">模型</th>
@@ -111,13 +111,13 @@ export const ModelLogsPanel: React.FC = () => {
           <tbody className="divide-y divide-[#eee6d8]">
             {filtered.map((log) => (
               <tr key={log.id} className="hover:bg-[#fcf9f2] transition font-serif">
-                <td className="py-2 px-2 font-mono text-[10px] text-[#786f65]">{log.time}</td>
-                <td className="py-2 px-2 font-medium text-[#2c2825]">{log.operation}</td>
-                <td className="py-2 px-2 font-mono text-[10px] text-[#854d0e]">{log.model}</td>
-                <td className="py-2 px-2 font-mono text-[10px] text-right text-[#554b3e]">
+                <td className="py-2 px-2 font-mono text-[10px] text-ink-2">{log.time}</td>
+                <td className="py-2 px-2 font-medium text-ink">{log.operation}</td>
+                <td className="py-2 px-2 font-mono text-[10px] text-primary">{log.model}</td>
+                <td className="py-2 px-2 font-mono text-[10px] text-right text-ink-2">
                   {log.latencyMs}ms
                 </td>
-                <td className="py-2 px-2 font-mono text-[10px] text-right text-[#2c2825]">
+                <td className="py-2 px-2 font-mono text-[10px] text-right text-ink">
                   {log.tokens.total.toLocaleString()}
                 </td>
                 <td className="py-2 px-2 text-center">

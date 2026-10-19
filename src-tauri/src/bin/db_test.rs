@@ -6,14 +6,18 @@ use novelforge_ai_lib::models::{
     CreateCharacterArcInput, CreateParallelThreadInput, CreatePlotAssociationInput, HierarchyConfig,
     MoveNodeInput, SplitChapterInput, MergeChaptersInput, SplitSceneInput, MergeScenesInput,
     RenumberHierarchyInput, CreateWorkflowRunInput, AdvanceWorkflowStepInput, ExecuteToolboxActionInput,
-    SaveVoiceProfileInput, SaveModelArenaRunInput,
+    SaveVoiceProfileInput, SaveModelArenaRunInput, UpdateNovelInput, UpdateVolumeInput,
+    UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput, CreatePlotThreadInput,
 };
 
 fn main() {
     println!("=== 开始 NovelForge AI 本地数据库与全功能验证 ===");
 
-    let db = DbManager::new().expect("初始化本地 SQLite 数据库失败");
-    println!("1. 数据库初始化成功，路径: {}", db.get_db_path());
+    // 使用完全隔离的临时沙箱目录与临时 SQLite 数据库，杜绝污染真实用户数据
+    let test_dir = std::env::temp_dir().join(format!("novelforge_test_{}", Uuid::new_v4()));
+    let test_db_path = test_dir.join("novelforge_test.db");
+    let db = DbManager::new_at_path(test_db_path).expect("初始化测试 SQLite 数据库失败");
+    println!("1. 临时沙箱数据库初始化成功，路径: {}", db.get_db_path());
 
     // 1. 创建小说
     let novel = db
@@ -26,6 +30,7 @@ fn main() {
             chapter_target_length: Some(4000),
             series_id: None,
             hierarchy_config: None,
+            cover_url: Some("preset:deep_cosmos".to_string()),
         })
         .expect("创建小说失败");
     println!("2. 成功创建小说: 《{}》 (ID: {})", novel.title, novel.id);
@@ -149,6 +154,22 @@ fn main() {
         .expect("创建剧情弧失败");
     println!("11. 验证大纲规划: 阶段【{}】 -> 剧情弧【{}】", phase.title, arc.title);
 
+    // 验证剧情弧删除
+    let temp_arc = db
+        .create_story_arc(novelforge_ai_lib::models::CreateStoryArcInput {
+            novel_id: novel.id.clone(),
+            phase_id: Some(phase.id.clone()),
+            title: "临时待删剧情弧".to_string(),
+            goal: Some("测试删除功能".to_string()),
+            description: None,
+            priority: Some("SUB".to_string()),
+        })
+        .expect("创建临时剧情弧失败");
+    db.delete_story_arc(&temp_arc.id).expect("删除剧情弧失败");
+    let arcs_after_delete = db.list_story_arcs(&novel.id).expect("读取剧情弧列表失败");
+    assert!(arcs_after_delete.iter().all(|a| a.id != temp_arc.id));
+    println!("11b. 验证剧情弧删除: 成功删除临时剧情弧【{}】", temp_arc.title);
+
     // 10. 验证章节场景细纲拆解 (Phase 2)
     let scene = db
         .create_scene(novelforge_ai_lib::models::CreateSceneInput {
@@ -262,7 +283,16 @@ fn main() {
     assert!(archive_json.contains("先驱者号"));
     let imported_novel = db.import_novel_archive(&archive_json).expect("全书归档恢复失败");
     assert!(imported_novel.title.contains("导入副本"));
-    println!("23. 验证全书工程归档与导入恢复: 归档 JSON 长度 {} 字符，成功复原小说【{}】", archive_json.len(), imported_novel.title);
+    let imported_chars = db.list_characters(&imported_novel.id).expect("读取导入角色失败");
+    assert!(!imported_chars.is_empty(), "导入角色列表不应为空");
+    let imported_rels = db.list_character_relationships(&imported_novel.id).expect("读取导入角色关系失败");
+    assert!(!imported_rels.is_empty(), "导入角色关系不应为空");
+    let imported_phases = db.list_story_phases(&imported_novel.id).expect("读取导入故事阶段失败");
+    assert!(!imported_phases.is_empty(), "导入故事阶段不应为空");
+    let imported_arcs = db.list_story_arcs(&imported_novel.id).expect("读取导入剧情弧失败");
+    assert!(!imported_arcs.is_empty(), "导入剧情弧不应为空");
+    println!("23. 验证全书工程归档与导入恢复: 归档 JSON 长度 {} 字符，成功复原小说【{}】(含 {} 人物/{} 关系/{} 阶段/{} 剧情弧)", 
+        archive_json.len(), imported_novel.title, imported_chars.len(), imported_rels.len(), imported_phases.len(), imported_arcs.len());
 
     // ==========================================
     // V2.0 多层级结构与独立剧情关系系统专项验证 (24 ~ 36)
@@ -721,10 +751,278 @@ fn main() {
 
     println!("53. 验证系统安全防御: 非法空字符路径拦截、.epub 扩展名自动补齐、单行元数据换行过滤验证通过");
 
-    // 清理临时文件
-    let _ = std::fs::remove_file(&epub_res.file_path);
+    // 54. 验证作品项目元数据热更新 (update_novel)
+    let updated_novel = db.update_novel(UpdateNovelInput {
+        id: novel.id.clone(),
+        title: "星穹之门：起源与终局".to_string(),
+        description: Some("重新定义的硬核科幻史诗全本".to_string()),
+        genre_profile: Some("硬核科幻".to_string()),
+        writing_style: Some("冷峻克制、宏大沉思".to_string()),
+        cover_url: Some("preset:gilded_amber".to_string()),
+    }).expect("更新作品项目元数据失败");
+    assert_eq!(updated_novel.title, "星穹之门：起源与终局");
+    assert_eq!(updated_novel.genre_profile, "硬核科幻");
+    assert_eq!(updated_novel.cover_url.as_deref(), Some("preset:gilded_amber"));
+    println!("54. 验证作品项目元数据更新 (update_novel): 新书名《{}》, 流派[{}], 封面装帧[{}]",
+        updated_novel.title, updated_novel.genre_profile, updated_novel.cover_url.unwrap_or_default());
 
-    println!("=== 100% 测试验证通过！V2.5 核心业务与安全防御 53 项验证完毕！ ===");
+    // 55. 验证分卷重命名与摘要更新 (update_volume)
+    let updated_vol = db.update_volume(UpdateVolumeInput {
+        id: vol1.id.clone(),
+        title: "先驱者的涅槃远征".to_string(),
+        summary: Some("全新修正的终极远征大纲".to_string()),
+    }).expect("更新分卷失败");
+    assert_eq!(updated_vol.title, "先驱者的涅槃远征");
+    println!("55. 验证分卷重命名与大纲更新 (update_volume): 《{}》, 摘要[{}]", updated_vol.title, updated_vol.summary);
+
+    // 56. 验证章节重命名与 FTS 全文索引联动 (update_chapter_title)
+    let updated_ch = db.update_chapter_title(&ch1.id, "第一章：星海彼岸的终极觉醒").expect("更新章节标题失败");
+    assert_eq!(updated_ch.title, "第一章：星海彼岸的终极觉醒");
+    // 验证 FTS 检索能立即搜到新标题
+    let fts_results = db.search_chapters_fts(&novel.id, "第一章*").expect("检索更新后的章节标题失败");
+    assert!(!fts_results.is_empty(), "FTS5 必须能检索到更新后的新章节标题");
+    println!("56. 验证章节重命名与 FTS5 全文索引联动 (update_chapter_title): 新标题《{}》, FTS 命中[{}]条", updated_ch.title, fts_results.len());
+
+    // 57. 验证作品封面设定与持久化 (Book Cover Presets & Custom Image Data URL)
+    let custom_cover_data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    let cover_updated = db.update_novel(UpdateNovelInput {
+        id: novel.id.clone(),
+        title: updated_novel.title.clone(),
+        description: None,
+        genre_profile: None,
+        writing_style: None,
+        cover_url: Some(custom_cover_data.to_string()),
+    }).expect("设定自定义封面失败");
+    assert_eq!(cover_updated.cover_url.as_deref(), Some(custom_cover_data));
+
+    let fetched_novel = db.get_novel(&novel.id).expect("重新读取小说失败");
+    assert_eq!(fetched_novel.cover_url.as_deref(), Some(custom_cover_data));
+
+    let all_novels = db.list_novels().expect("读取小说列表包含封面失败");
+    let target_in_list = all_novels.iter().find(|n| n.id == novel.id).expect("列表中必须包含该小说");
+    assert_eq!(target_in_list.cover_url.as_deref(), Some(custom_cover_data));
+    println!("57. 验证作品封面设计工坊 (Book Cover Studio): 自定义封面 Base64 存储成功 (长度: {}), 列表与详情持久化一致",
+        custom_cover_data.len());
+
+    // 58. 验证角色档案全生命周期与多维度级联清理 (update_character & delete_character)
+    let char_crud = db.create_character(CreateCharacterInput {
+        novel_id: novel.id.clone(),
+        name: "陈渊".to_string(),
+        aliases: Some("深空巡察使".to_string()),
+        profile: Some("帝国巡察官".to_string()),
+        personality: Some("冷酷严正".to_string()),
+        background: Some("皇室近卫出身".to_string()),
+        motivation: Some("查明跃迁引擎失控真相".to_string()),
+    }).expect("创建待测角色失败");
+
+    let updated_char = db.update_character(UpdateCharacterInput {
+        id: char_crud.id.clone(),
+        name: "陈渊 (终极形态)".to_string(),
+        aliases: Some("苍穹巡察总督".to_string()),
+        profile: Some("已掌握折叠时空技术的执政官".to_string()),
+        personality: Some("深沉博爱、运筹帷幄".to_string()),
+        background: Some("跨越因果律循环后的觉醒者".to_string()),
+        motivation: Some("引导人类文明避开大过滤器".to_string()),
+        status: Some("ACTIVE".to_string()),
+    }).expect("更新角色档案失败");
+    assert_eq!(updated_char.name, "陈渊 (终极形态)");
+    assert_eq!(updated_char.personality, "深沉博爱、运筹帷幄");
+
+    // 为该角色建立关系、人物弧、关联场景与 plot_association
+    let char_rel = db.create_character_relationship(novelforge_ai_lib::models::CreateCharacterRelationshipInput {
+        novel_id: novel.id.clone(),
+        source_character_id: char_crud.id.clone(),
+        target_character_id: character.id.clone(),
+        relation_type: "师徒宿敌".to_string(),
+        description: Some("亦师亦敌的命运纠葛".to_string()),
+    }).expect("创建角色关系失败");
+
+    let _char_arc = db.create_character_arc(CreateCharacterArcInput {
+        novel_id: novel.id.clone(),
+        character_id: char_crud.id.clone(),
+        title: "苍穹远征心智蜕变".to_string(),
+        stage_from: Some("铁血奉公".to_string()),
+        stage_to: Some("觉醒背叛".to_string()),
+        current_stage: Some("潜伏动摇".to_string()),
+        internal_conflict: Some("忠诚与真相的博弈".to_string()),
+    }).expect("创建人物弧失败");
+
+    let pov_scene = db.create_scene(CreateSceneInput {
+        chapter_id: ch1.id.clone(),
+        sequence: 99,
+        order_index: Some(99),
+        title: Some("苍穹号舰桥决议".to_string()),
+        scene_number: Some(99),
+        objective: "对峙与决断".to_string(),
+        outline: "大副与巡察使决裂".to_string(),
+        pov_character_id: Some(char_crud.id.clone()),
+        location_id: None,
+        content: Some("决议场景".to_string()),
+        time_anchor: None,
+        conflict_target: None,
+    }).expect("创建角色视点场景失败");
+    assert_eq!(pov_scene.pov_character_id.as_deref(), Some(char_crud.id.as_str()));
+
+    let _char_assoc = db.create_plot_association(CreatePlotAssociationInput {
+        novel_id: novel.id.clone(),
+        relation_type: "CHARACTER".to_string(),
+        entity_id: char_crud.id.clone(),
+        target_type: "CHAPTER".to_string(),
+        target_id: ch1.id.clone(),
+        role_in_target: Some("POV".to_string()),
+        notes: Some("角色出场".to_string()),
+        weight: Some(10),
+    }).expect("创建角色关联失败");
+
+    // 执行删除角色，验证多表级联清理
+    db.delete_character(&char_crud.id).expect("删除角色失败");
+    assert!(db.get_character(&char_crud.id).is_err(), "被删除的角色应该无法读取");
+
+    let rels_after = db.list_character_relationships(&novel.id).expect("获取关系列表失败");
+    assert!(!rels_after.iter().any(|r| r.id == char_rel.id), "关联的角色关系必须被级联删除");
+
+    let arcs_after = db.list_character_arcs(&novel.id).expect("获取人物弧失败");
+    assert!(!arcs_after.iter().any(|a| a.character_id == char_crud.id), "角色的人物弧必须被级联删除");
+
+    let scenes_after = db.list_scenes(&ch1.id).expect("获取场景列表失败");
+    let target_scene = scenes_after.iter().find(|s| s.id == pov_scene.id).expect("场景本身不应被删除");
+    assert_eq!(target_scene.pov_character_id, None, "场景的 pov_character_id 必须被级联置为 NULL");
+
+    let assocs_after = db.list_plot_associations_for_entity("CHARACTER", &char_crud.id).expect("获取关联列表失败");
+    assert!(assocs_after.is_empty(), "角色的 plot_association 必须被级联清理");
+    println!("58. 验证角色档案全生命周期与级联清理 (update_character & delete_character): 角色/关系/人物弧/场景POV解绑/剧情关联级联验证通过");
+
+    // 59. 验证世界观铁律全生命周期管理 (update_world_rule & delete_world_rule)
+    let rule_crud = db.create_world_rule(CreateWorldRuleInput {
+        novel_id: novel.id.clone(),
+        title: "超光速通信时延公理".to_string(),
+        rule_content: "量子纠缠信道跨越100光年后产生纳秒级衰减。".to_string(),
+        authority_level: Some("CANON".to_string()),
+    }).expect("创建待测世界观法则失败");
+
+    let updated_rule = db.update_world_rule(UpdateWorldRuleInput {
+        id: rule_crud.id.clone(),
+        title: "量子纠缠衰减律 (修正版)".to_string(),
+        rule_content: "量子纠缠信道在重力透镜附近产生指数级拓扑畸变。".to_string(),
+        authority_level: Some("CANON".to_string()),
+        status: Some("ACTIVE".to_string()),
+    }).expect("更新世界观法则失败");
+    assert_eq!(updated_rule.title, "量子纠缠衰减律 (修正版)");
+
+    let _rule_assoc = db.create_plot_association(CreatePlotAssociationInput {
+        novel_id: novel.id.clone(),
+        relation_type: "WORLD_RULE".to_string(),
+        entity_id: rule_crud.id.clone(),
+        target_type: "CHAPTER".to_string(),
+        target_id: ch1.id.clone(),
+        role_in_target: Some("RULE_LIMIT".to_string()),
+        notes: Some("跳跃受限".to_string()),
+        weight: Some(8),
+    }).expect("创建世界观关联失败");
+
+    db.delete_world_rule(&rule_crud.id).expect("删除世界观法则失败");
+    assert!(db.get_world_rule(&rule_crud.id).is_err(), "被删除的世界观法则必须无法读取");
+    let assocs_after_rule = db.list_plot_associations_for_entity("WORLD_RULE", &rule_crud.id).expect("获取关联失败");
+    assert!(assocs_after_rule.is_empty(), "世界观法则的 plot_association 必须被级联清理");
+    println!("59. 验证世界观铁律全生命周期管理 (update_world_rule & delete_world_rule): 修改/删除/剧情关联级联清理验证通过");
+
+    // 60. 验证剧情伏笔线索状态推进与闭合清理 (update_plot_thread_status, update_plot_thread, delete_plot_thread)
+    let thread_crud = db.create_plot_thread(CreatePlotThreadInput {
+        novel_id: novel.id.clone(),
+        title: "遗落的量子密钥".to_string(),
+        description: Some("藏在逃生舱底层的陈旧数据芯片".to_string()),
+        introduced_chapter_id: Some(ch1.id.clone()),
+        expected_resolution: Some("第三卷揭示先驱者遗言".to_string()),
+    }).expect("创建伏笔失败");
+    assert_eq!(thread_crud.status, "PLANTED");
+
+    db.update_plot_thread_status(&thread_crud.id, "DEVELOPING").expect("推进伏笔状态失败");
+    let thread_status = db.get_plot_thread(&thread_crud.id).expect("读取伏笔失败");
+    assert_eq!(thread_status.status, "DEVELOPING");
+
+    let updated_thread = db.update_plot_thread(UpdatePlotThreadInput {
+        id: thread_crud.id.clone(),
+        title: "遗落的先驱者星核密钥".to_string(),
+        description: Some("已解密第一层防护，显露出古代智械坐标".to_string()),
+        introduced_chapter_id: Some(ch1.id.clone()),
+        expected_resolution: Some("决战前夕引爆核心反应堆".to_string()),
+        resolved_chapter_id: None,
+        status: Some("READY_TO_RESOLVE".to_string()),
+    }).expect("全量更新伏笔失败");
+    assert_eq!(updated_thread.title, "遗落的先驱者星核密钥");
+    assert_eq!(updated_thread.status, "READY_TO_RESOLVE");
+
+    let _thread_assoc = db.create_plot_association(CreatePlotAssociationInput {
+        novel_id: novel.id.clone(),
+        relation_type: "PLOT_THREAD".to_string(),
+        entity_id: thread_crud.id.clone(),
+        target_type: "CHAPTER".to_string(),
+        target_id: ch1.id.clone(),
+        role_in_target: Some("THREAD_HOOK".to_string()),
+        notes: Some("芯片线索".to_string()),
+        weight: Some(6),
+    }).expect("创建伏笔关联失败");
+
+    db.delete_plot_thread(&thread_crud.id).expect("删除伏笔失败");
+    assert!(db.get_plot_thread(&thread_crud.id).is_err(), "被删除的伏笔必须无法读取");
+    let assocs_after_thread = db.list_plot_associations_for_entity("PLOT_THREAD", &thread_crud.id).expect("获取关联失败");
+    assert!(assocs_after_thread.is_empty(), "伏笔的 plot_association 必须被级联清理");
+    println!("60. 验证剧情伏笔全生命周期推进与闭合 (update_plot_thread_status/update/delete): 状态流转与级联解绑验证通过");
+
+    // 61. 验证故事大纲阶段与情节弧级联解绑 (delete_story_arc, delete_story_phase)
+    let test_phase = db.create_story_phase(novelforge_ai_lib::models::CreateStoryPhaseInput {
+        novel_id: novel.id.clone(),
+        title: "过渡阶段：深渊跃迁".to_string(),
+        order_index: Some(99),
+        goal: Some("跨越重力陷阱".to_string()),
+    }).expect("创建故事阶段失败");
+
+    let test_arc = db.create_story_arc(novelforge_ai_lib::models::CreateStoryArcInput {
+        novel_id: novel.id.clone(),
+        phase_id: Some(test_phase.id.clone()),
+        title: "幽灵信号捕获弧".to_string(),
+        goal: Some("追踪未知频率".to_string()),
+        description: Some("伏笔交织情节弧".to_string()),
+        priority: Some("SUB".to_string()),
+    }).expect("创建故事剧情弧失败");
+
+    let _arc_assoc = db.create_plot_association(CreatePlotAssociationInput {
+        novel_id: novel.id.clone(),
+        relation_type: "STORY_ARC".to_string(),
+        entity_id: test_arc.id.clone(),
+        target_type: "CHAPTER".to_string(),
+        target_id: ch1.id.clone(),
+        role_in_target: Some("ARC_INTRO".to_string()),
+        notes: Some("信号捕获".to_string()),
+        weight: Some(5),
+    }).expect("创建故事弧关联失败");
+
+    // 删除 story_arc，验证 plot_associations 级联清理
+    db.delete_story_arc(&test_arc.id).expect("删除故事弧失败");
+    let assocs_after_arc = db.list_plot_associations_for_entity("STORY_ARC", &test_arc.id).expect("获取关联失败");
+    assert!(assocs_after_arc.is_empty(), "情节弧的 plot_association 必须被级联清理");
+
+    // 重建一个关联 test_phase 的情节弧，测试删除 phase 时的 phase_id 置空解绑
+    let test_arc2 = db.create_story_arc(novelforge_ai_lib::models::CreateStoryArcInput {
+        novel_id: novel.id.clone(),
+        phase_id: Some(test_phase.id.clone()),
+        title: "二次突进弧".to_string(),
+        goal: Some("备用路线突进".to_string()),
+        description: Some("测试 phase 解绑".to_string()),
+        priority: Some("MAIN".to_string()),
+    }).expect("创建测试故事弧2失败");
+
+    db.delete_story_phase(&test_phase.id).expect("删除故事大纲阶段失败");
+    let arcs_all = db.list_story_arcs(&novel.id).expect("获取所有情节弧失败");
+    let arc2_found = arcs_all.iter().find(|a| a.id == test_arc2.id).expect("情节弧自身不应被删除");
+    assert_eq!(arc2_found.phase_id, None, "当阶段被删除时，情节弧的 phase_id 必须被安全解绑置为 NULL");
+    println!("61. 验证故事大纲阶段与情节弧级联解绑 (delete_story_arc & delete_story_phase): 阶段解绑与关联清理验证通过");
+
+    // 清理临时文件与沙箱数据库目录，保障环境零污染
+    let _ = std::fs::remove_file(&epub_res.file_path);
+    let _ = std::fs::remove_dir_all(&test_dir);
+
+    println!("=== 100% 测试验证通过！V2.6 核心业务与设定生命周期 61 项验证完毕！ ===");
 }
 
 

@@ -23,6 +23,8 @@ use crate::models::{
     WorkflowStepRecord, AdvanceWorkflowStepInput,
     WorkflowRunDetails, ExecuteToolboxActionInput, ExecuteToolboxActionResult,
     VoiceProfile, SaveVoiceProfileInput, ModelArenaRun, SaveModelArenaRunInput,
+    UpdateNovelInput, UpdateVolumeInput,
+    UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput,
 };
 
 #[derive(Clone)]
@@ -37,8 +39,14 @@ impl DbManager {
             .map(|p| p.join("NovelForgeAI"))
             .unwrap_or_else(|| PathBuf::from("./data"));
         
-        let _ = std::fs::create_dir_all(&db_dir);
         let db_path = db_dir.join("novelforge.db");
+        Self::new_at_path(db_path)
+    }
+
+    pub fn new_at_path(db_path: PathBuf) -> Result<Self> {
+        if let Some(parent) = db_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
 
         let conn = Connection::open(&db_path)?;
 
@@ -70,6 +78,7 @@ impl DbManager {
             "ALTER TABLE scenes ADD COLUMN word_count INTEGER DEFAULT 0",
             "ALTER TABLE scenes ADD COLUMN time_anchor TEXT DEFAULT ''",
             "ALTER TABLE scenes ADD COLUMN conflict_target TEXT DEFAULT ''",
+            "ALTER TABLE novels ADD COLUMN cover_url TEXT DEFAULT ''",
         ];
         for sql in migrations {
             let _ = conn.execute(sql, []);
@@ -145,8 +154,8 @@ impl DbManager {
         let novel_id = Uuid::new_v4().to_string();
 
         conn.execute(
-            "INSERT INTO novels (id, title, description, genre_profile, language, writing_style, status, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'ACTIVE', ?7, ?8)",
+            "INSERT INTO novels (id, title, description, genre_profile, language, writing_style, status, cover_url, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'ACTIVE', 'preset:deep_cosmos', ?7, ?8)",
             params![
                 &novel_id,
                 "《星穹之门：终极纪元》",
@@ -167,70 +176,75 @@ impl DbManager {
         let volume_id = Uuid::new_v4().to_string();
         conn.execute(
             "INSERT INTO volumes (id, novel_id, title, order_index, summary, status, created_at)
-             VALUES (?1, ?2, '第一卷：深空破晓', 1, '跨越柯伊伯带与未知脉冲接战', 'PLANNING', ?3)",
+             VALUES (?1, ?2, '深空破晓', 1, '跨越柯伊伯带与未知脉冲接战', 'PLANNING', ?3)",
             params![&volume_id, &novel_id, now],
         )?;
 
         let chapter_id = Uuid::new_v4().to_string();
+        let version_id = Uuid::new_v4().to_string();
         let sample_content = "<p>冰冷的冷凝水顺着重巡洋舰“先驱者号”舰桥厚重的铅灰色合金装甲壁缓缓淌下，在低重力环境下凝结成一串悬垂的深蓝色水珠。</p><p>林远站在舷窗前，舷窗外是浩瀚无垠的柯伊伯带暗区，远处太阳的光芒已被削弱成一颗冰冷的苍白星芒。他的右手食指无意识地摩挲着舰长指引徽章边缘的缺口，那是三年前土星轨道战役中留下的弹片擦痕。</p><p>“曲率核心自检完成，工质流速稳定在百分之九十七。”首席科学官安雅的声音从战术投影台后方传来，沉稳中透着一丝不易察觉的紧绷，“但引力波雷达刚刚捕捉到底噪层有极其微弱的周期性脉冲。周期是十三点七秒，不是自然天体辐射。”</p><p>林远缓缓转过身，目光落在三维全息星图上闪烁的暗红光点上。“通报全舰，取消常规巡航状态，进入二级战备。还有三十分钟进入预定跃迁盲区，把所有无源传感器功率推到峰值。”</p><p>“明白。”安雅迅速敲击操作台，战术控制台上泛起层层淡青色的光晕，“如果那道信号是冲着我们的曲率核心来的，一旦跃迁启动，我们可能就无法回头了。”</p><p>林远凝视着虚空中沉默的星河，深吸了一口气。“这片星空从来不允许回头的人活下来。通知轮机舱，按计划注入反物质催化剂。”</p>";
         
         conn.execute(
-            "INSERT INTO chapters (id, novel_id, volume_id, chapter_number, title, content, word_count, status, created_at, updated_at)
-             VALUES (?1, ?2, ?3, 1, '跃迁前夕', ?4, 512, 'DRAFT', ?5, ?6)",
-            params![&chapter_id, &novel_id, &volume_id, sample_content, now, now],
+            "INSERT INTO chapters (id, novel_id, volume_id, chapter_number, order_index, title, active_version_id, word_count, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, 1, 1, '跃迁前夕', NULL, 512, 'DRAFT', ?4, ?5)",
+            params![&chapter_id, &novel_id, &volume_id, now, now],
         )?;
 
         // Initial snapshot
-        let version_id = Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO chapter_versions (id, chapter_id, version_number, content, word_count, change_summary, source_agent, created_at)
-             VALUES (?1, ?2, 1, ?3, 512, '初始示范草稿', 'DEMO_SEED', ?4)",
+            "INSERT INTO chapter_versions (id, chapter_id, version_number, content, source_type, created_by, created_at)
+             VALUES (?1, ?2, 1, ?3, 'AI_GENERATED', 'SYSTEM', ?4)",
             params![&version_id, &chapter_id, sample_content, now],
+        )?;
+
+        conn.execute(
+            "UPDATE chapters SET active_version_id = ?1 WHERE id = ?2",
+            params![&version_id, &chapter_id],
         )?;
 
         // Seed Characters
         let char1_id = Uuid::new_v4().to_string();
         let char2_id = Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO characters (id, novel_id, name, role_type, identity, personality, motivation, secret, current_status, arc_stage, tags, created_at, updated_at)
-             VALUES (?1, ?2, '林远', 'PROTAGONIST', '先驱者号远征舰队旗舰舰长', '冷峻沉着、极度理智、内心负有创伤', '探寻失落先驱者文明遗迹真相', '三年前土星轨道撤退战中有未解指令', '担任先驱者号最高决策人', '觉醒破局期', '硬汉,舰长,深空探索', ?3, ?4)",
+            "INSERT INTO characters (id, novel_id, name, aliases, profile, personality, background, motivation, status, created_at, updated_at)
+             VALUES (?1, ?2, '林远', '林舰长', '先驱者号远征舰队旗舰舰长', '冷峻沉着、极度理智、内心负有创伤', '三年前土星轨道撤退战中有未解指令', '探寻失落先驱者文明遗迹真相', 'ACTIVE', ?3, ?4)",
             params![&char1_id, &novel_id, now, now],
         )?;
         conn.execute(
-            "INSERT INTO characters (id, novel_id, name, role_type, identity, personality, motivation, secret, current_status, arc_stage, tags, created_at, updated_at)
-             VALUES (?1, ?2, '安雅', 'MAJOR', '首席科学官兼战术参谋', '敏锐执着、思维缜密、对未解物理现象高度着迷', '解密原初暗物质脉冲物理公式', '曾接触过第一代暗区禁忌标本', '正解析13.7秒微弱脉冲', '初识探知期', '天才科学家,参谋,冷静', ?3, ?4)",
+            "INSERT INTO characters (id, novel_id, name, aliases, profile, personality, background, motivation, status, created_at, updated_at)
+             VALUES (?1, ?2, '安雅', '安博士', '首席科学官兼战术参谋', '敏锐执着、思维缜密、对未解物理现象高度着迷', '曾接触过第一代暗区禁忌标本', '解密原初暗物质脉冲物理公式', 'ACTIVE', ?3, ?4)",
             params![&char2_id, &novel_id, now, now],
         )?;
 
         // Seed Relationship
         let rel_id = Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO character_relationships (id, novel_id, source_character_id, target_character_id, relation_type, description, trust_level, tension_level, updated_at)
-             VALUES (?1, ?2, ?3, ?4, '生死战友', '在多次深空危机中建立起绝对背靠背信任', 95, 10, ?5)",
+            "INSERT INTO character_relationships (id, novel_id, source_character_id, target_character_id, relation_type, description, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, '生死战友', '在多次深空危机中建立起绝对背靠背信任', 'ACTIVE', ?5)",
             params![&rel_id, &novel_id, &char1_id, &char2_id, now],
         )?;
 
         // Seed World Rule
         let rule_id = Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO world_rules (id, novel_id, category, name, rule_content, authority_level, is_active, created_at, updated_at)
-             VALUES (?1, ?2, 'PHYSICS', '曲率泡稳定法则', '在未校准引力扰动区启动曲率泡，必须维持工质流速>=95%，否则将引发时空剪切坍缩。', 'CANON', 1, ?3, ?4)",
-            params![&rule_id, &novel_id, now, now],
+            "INSERT INTO world_rules (id, novel_id, title, rule_content, authority_level, status, created_at)
+             VALUES (?1, ?2, '曲率泡稳定法则', '在未校准引力扰动区启动曲率泡，必须维持工质流速>=95%，否则将引发时空剪切坍缩。', 'CANON', 'ACTIVE', ?3)",
+            params![&rule_id, &novel_id, now],
         )?;
 
         // Seed Story Phase & Arc
         let phase_id = Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO story_phases (id, novel_id, phase_number, title, goal, status, created_at)
-             VALUES (?1, ?2, 1, '第一阶段：破晓远征', '突围柯伊伯带封锁区，安全抵达跳跃折叠坐标', 'ACTIVE', ?3)",
+            "INSERT INTO story_phases (id, novel_id, title, order_index, goal, status, created_at)
+             VALUES (?1, ?2, '第一阶段：破晓远征', 1, '突围柯伊伯带封锁区，安全抵达跳跃折叠坐标', 'ACTIVE', ?3)",
             params![&phase_id, &novel_id, now],
         )?;
 
         let arc_id = Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO story_arcs (id, phase_id, arc_name, arc_type, main_conflict, status, created_at)
-             VALUES (?1, ?2, '柯伊伯带突围弧', 'MAIN', '在未知暗区脉冲干扰下完成先驱者号首次超维曲率跃迁', 'IN_PROGRESS', ?3)",
-            params![&arc_id, &phase_id, now],
+            "INSERT INTO story_arcs (id, novel_id, phase_id, title, priority, goal, status, created_at)
+             VALUES (?1, ?2, ?3, '柯伊伯带突围弧', 'MAIN', '在未知暗区脉冲干扰下完成先驱者号首次超维曲率跃迁', 'DEVELOPING', ?4)",
+            params![&arc_id, &novel_id, &phase_id, now],
         )?;
 
         Ok(())
@@ -400,6 +414,7 @@ impl DbManager {
         let language = input.language.unwrap_or_else(|| "zh-CN".to_string());
         let writing_style = input.writing_style.unwrap_or_else(|| "通俗流畅、生动细腻".to_string());
         let chapter_target_length = input.chapter_target_length.unwrap_or(3000);
+        let cover_url = input.cover_url.unwrap_or_default();
         let series_id = input.series_id;
         let hierarchy_config_str = input
             .hierarchy_config
@@ -409,8 +424,8 @@ impl DbManager {
             });
 
         conn.execute(
-            "INSERT INTO novels (id, title, description, genre_profile, language, writing_style, status, series_id, series_order, hierarchy_config, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'ACTIVE', ?7, 1, ?8, ?9, ?10)",
+            "INSERT INTO novels (id, title, description, genre_profile, language, writing_style, status, cover_url, series_id, series_order, hierarchy_config, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'ACTIVE', ?7, ?8, 1, ?9, ?10, ?11)",
             params![
                 &id,
                 &title,
@@ -418,6 +433,7 @@ impl DbManager {
                 &genre_profile,
                 &language,
                 &writing_style,
+                &cover_url,
                 &series_id,
                 &hierarchy_config_str,
                 now,
@@ -431,14 +447,6 @@ impl DbManager {
             params![&id, chapter_target_length],
         )?;
 
-        // Create default Volume 1
-        let volume_id = Uuid::new_v4().to_string();
-        conn.execute(
-            "INSERT INTO volumes (id, novel_id, part_id, title, order_index, summary, status, created_at)
-             VALUES (?1, ?2, NULL, '第一卷：初入尘世', 1, '故事开端与核心矛盾引入', 'PLANNING', ?3)",
-            params![&volume_id, &id, now],
-        )?;
-
         Ok(Novel {
             id,
             title,
@@ -447,6 +455,7 @@ impl DbManager {
             language,
             writing_style,
             status: "ACTIVE".to_string(),
+            cover_url: if cover_url.is_empty() { None } else { Some(cover_url) },
             series_id,
             series_order: Some(1),
             hierarchy_config: Some(hierarchy_config_str),
@@ -461,7 +470,7 @@ impl DbManager {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
             "SELECT n.id, n.title, n.description, n.genre_profile, n.language, n.writing_style, n.status,
-                    n.series_id, n.series_order, n.hierarchy_config, n.created_at, n.updated_at,
+                    n.cover_url, n.series_id, n.series_order, n.hierarchy_config, n.created_at, n.updated_at,
                     COUNT(c.id) as chapter_count,
                     COALESCE(SUM(c.word_count), 0) as total_word_count
              FROM novels n
@@ -479,13 +488,14 @@ impl DbManager {
                 language: row.get(4)?,
                 writing_style: row.get(5)?,
                 status: row.get(6)?,
-                series_id: row.get(7)?,
-                series_order: row.get(8)?,
-                hierarchy_config: row.get(9)?,
-                created_at: row.get(10)?,
-                updated_at: row.get(11)?,
-                chapter_count: Some(row.get(12)?),
-                total_word_count: Some(row.get(13)?),
+                cover_url: row.get(7)?,
+                series_id: row.get(8)?,
+                series_order: row.get(9)?,
+                hierarchy_config: row.get(10)?,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
+                chapter_count: Some(row.get(13)?),
+                total_word_count: Some(row.get(14)?),
             })
         })?;
 
@@ -500,7 +510,7 @@ impl DbManager {
         let conn = self.conn.lock();
         conn.query_row(
             "SELECT n.id, n.title, n.description, n.genre_profile, n.language, n.writing_style, n.status,
-                    n.series_id, n.series_order, n.hierarchy_config, n.created_at, n.updated_at,
+                    n.cover_url, n.series_id, n.series_order, n.hierarchy_config, n.created_at, n.updated_at,
                     COUNT(c.id) as chapter_count,
                     COALESCE(SUM(c.word_count), 0) as total_word_count
              FROM novels n
@@ -517,13 +527,14 @@ impl DbManager {
                     language: row.get(4)?,
                     writing_style: row.get(5)?,
                     status: row.get(6)?,
-                    series_id: row.get(7)?,
-                    series_order: row.get(8)?,
-                    hierarchy_config: row.get(9)?,
-                    created_at: row.get(10)?,
-                    updated_at: row.get(11)?,
-                    chapter_count: Some(row.get(12)?),
-                    total_word_count: Some(row.get(13)?),
+                    cover_url: row.get(7)?,
+                    series_id: row.get(8)?,
+                    series_order: row.get(9)?,
+                    hierarchy_config: row.get(10)?,
+                    created_at: row.get(11)?,
+                    updated_at: row.get(12)?,
+                    chapter_count: Some(row.get(13)?),
+                    total_word_count: Some(row.get(14)?),
                 })
             },
         )
@@ -531,8 +542,60 @@ impl DbManager {
 
     pub fn delete_novel(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock();
+        // 清理 FTS5 虚拟表中关联此小说的章节和事实索引（虚拟表不支持外键级联）
+        let _ = conn.execute("DELETE FROM chapters_fts WHERE novel_id = ?1", params![id]);
+        let _ = conn.execute("DELETE FROM canon_facts_fts WHERE novel_id = ?1", params![id]);
+        let _ = conn.execute("DELETE FROM usage_records WHERE novel_id = ?1", params![id]);
         conn.execute("DELETE FROM novels WHERE id = ?1", params![id])?;
         Ok(())
+    }
+
+    pub fn update_novel(&self, input: UpdateNovelInput) -> Result<Novel> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+
+        let mut existing_desc = String::new();
+        let mut existing_genre = String::new();
+        let mut existing_style = String::new();
+        let mut existing_cover = String::new();
+
+        if let Ok((d, g, s, c)) = conn.query_row(
+            "SELECT description, genre_profile, writing_style, COALESCE(cover_url, '') FROM novels WHERE id = ?1",
+            params![&input.id],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?)),
+        ) {
+            existing_desc = d;
+            existing_genre = g;
+            existing_style = s;
+            existing_cover = c;
+        }
+
+        let desc = input.description.unwrap_or(existing_desc);
+        let genre = input.genre_profile.unwrap_or(existing_genre);
+        let style = input.writing_style.unwrap_or(existing_style);
+        let cover = input.cover_url.unwrap_or(existing_cover);
+
+        conn.execute(
+            "UPDATE novels 
+             SET title = ?1, 
+                 description = ?2,
+                 genre_profile = ?3,
+                 writing_style = ?4,
+                 cover_url = ?5,
+                 updated_at = ?6
+             WHERE id = ?7",
+            params![
+                &input.title,
+                &desc,
+                &genre,
+                &style,
+                &cover,
+                now,
+                &input.id
+            ],
+        )?;
+        drop(conn);
+        self.get_novel(&input.id)
     }
 
     // --- VOLUMES ---
@@ -827,9 +890,59 @@ impl DbManager {
 
     pub fn delete_chapter(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock();
-        conn.execute("DELETE FROM chapters WHERE id = ?1", params![id])?;
         let _ = conn.execute("DELETE FROM chapters_fts WHERE chapter_id = ?1", params![id]);
+        let _ = conn.execute("DELETE FROM plot_associations WHERE target_type = 'CHAPTER' AND target_id = ?1", params![id]);
+        let _ = conn.execute(
+            "DELETE FROM plot_associations WHERE target_type = 'SCENE' AND target_id IN (SELECT id FROM scenes WHERE chapter_id = ?1)",
+            params![id],
+        );
+        let _ = conn.execute(
+            "DELETE FROM plot_associations WHERE target_type = 'BEAT' AND target_id IN (
+                SELECT b.id FROM plot_beats b JOIN scenes s ON b.scene_id = s.id WHERE s.chapter_id = ?1
+            )",
+            params![id],
+        );
+        let _ = conn.execute("DELETE FROM usage_records WHERE chapter_id = ?1", params![id]);
+        conn.execute("DELETE FROM chapters WHERE id = ?1", params![id])?;
         Ok(())
+    }
+
+    pub fn update_chapter_title(&self, chapter_id: &str, title: &str) -> Result<Chapter> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+
+        let (novel_id, content): (String, Option<String>) = conn.query_row(
+            "SELECT c.novel_id, v.content
+             FROM chapters c
+             LEFT JOIN chapter_versions v ON c.active_version_id = v.id
+             WHERE c.id = ?1",
+            params![chapter_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+
+        conn.execute(
+            "UPDATE chapters SET title = ?1, updated_at = ?2 WHERE id = ?3",
+            params![title, now, chapter_id],
+        )?;
+
+        // Update novels updated_at
+        conn.execute(
+            "UPDATE novels SET updated_at = ?1 WHERE id = ?2",
+            params![now, &novel_id],
+        )?;
+
+        // Update FTS index
+        let _ = conn.execute(
+            "DELETE FROM chapters_fts WHERE chapter_id = ?1",
+            params![chapter_id],
+        );
+        let _ = conn.execute(
+            "INSERT INTO chapters_fts (chapter_id, novel_id, title, content) VALUES (?1, ?2, ?3, ?4)",
+            params![chapter_id, &novel_id, title, content.as_deref().unwrap_or("")],
+        );
+
+        drop(conn);
+        self.get_chapter(chapter_id)
     }
 
     // --- STORY BIBLE & CHARACTERS ---
@@ -906,6 +1019,70 @@ impl DbManager {
         })
     }
 
+    pub fn get_character(&self, id: &str) -> Result<Character> {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT id, novel_id, name, aliases, profile, personality, background, motivation, status, created_at, updated_at
+             FROM characters WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(Character {
+                    id: row.get(0)?,
+                    novel_id: row.get(1)?,
+                    name: row.get(2)?,
+                    aliases: row.get(3)?,
+                    profile: row.get(4)?,
+                    personality: row.get(5)?,
+                    background: row.get(6)?,
+                    motivation: row.get(7)?,
+                    status: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
+                })
+            },
+        )
+    }
+
+    pub fn update_character(&self, input: UpdateCharacterInput) -> Result<Character> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        let aliases = input.aliases.unwrap_or_default();
+        let profile = input.profile.unwrap_or_default();
+        let personality = input.personality.unwrap_or_default();
+        let background = input.background.unwrap_or_default();
+        let motivation = input.motivation.unwrap_or_default();
+        let status = input.status.unwrap_or_else(|| "ACTIVE".to_string());
+
+        conn.execute(
+            "UPDATE characters SET name = ?1, aliases = ?2, profile = ?3, personality = ?4, background = ?5, motivation = ?6, status = ?7, updated_at = ?8 WHERE id = ?9",
+            params![&input.name, &aliases, &profile, &personality, &background, &motivation, &status, now, &input.id],
+        )?;
+        drop(conn);
+        self.get_character(&input.id)
+    }
+
+    pub fn update_character_status(&self, id: &str, status: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE characters SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            params![status, now, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_character(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        let _ = conn.execute("UPDATE scenes SET pov_character_id = NULL WHERE pov_character_id = ?1", params![id]);
+        let _ = conn.execute("UPDATE parallel_threads SET pov_character_id = NULL WHERE pov_character_id = ?1", params![id]);
+        let _ = conn.execute("DELETE FROM plot_associations WHERE entity_id = ?1", params![id]);
+        let _ = conn.execute("DELETE FROM character_arcs WHERE character_id = ?1", params![id]);
+        let _ = conn.execute("DELETE FROM character_relationships WHERE source_character_id = ?1 OR target_character_id = ?1", params![id]);
+        let _ = conn.execute("DELETE FROM character_state_events WHERE character_id = ?1", params![id]);
+        conn.execute("DELETE FROM characters WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
     // --- WORLD RULES ---
 
     pub fn list_world_rules(&self, novel_id: &str) -> Result<Vec<WorldRule>> {
@@ -932,6 +1109,26 @@ impl DbManager {
             rules.push(r?);
         }
         Ok(rules)
+    }
+
+    pub fn get_world_rule(&self, id: &str) -> Result<WorldRule> {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT id, novel_id, title, rule_content, authority_level, status, created_at
+             FROM world_rules WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(WorldRule {
+                    id: row.get(0)?,
+                    novel_id: row.get(1)?,
+                    title: row.get(2)?,
+                    rule_content: row.get(3)?,
+                    authority_level: row.get(4)?,
+                    status: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            },
+        )
     }
 
     pub fn create_world_rule(&self, input: CreateWorldRuleInput) -> Result<WorldRule> {
@@ -964,6 +1161,25 @@ impl DbManager {
         })
     }
 
+    pub fn update_world_rule(&self, input: UpdateWorldRuleInput) -> Result<WorldRule> {
+        let conn = self.conn.lock();
+        let auth = input.authority_level.unwrap_or_else(|| "CANON".to_string());
+        let status = input.status.unwrap_or_else(|| "ACTIVE".to_string());
+        conn.execute(
+            "UPDATE world_rules SET title = ?1, rule_content = ?2, authority_level = ?3, status = ?4 WHERE id = ?5",
+            params![&input.title, &input.rule_content, &auth, &status, &input.id],
+        )?;
+        drop(conn);
+        self.get_world_rule(&input.id)
+    }
+
+    pub fn delete_world_rule(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        let _ = conn.execute("DELETE FROM plot_associations WHERE entity_id = ?1", params![id]);
+        conn.execute("DELETE FROM world_rules WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
     // --- PLOT THREADS ---
 
     pub fn list_plot_threads(&self, novel_id: &str) -> Result<Vec<PlotThread>> {
@@ -993,6 +1209,29 @@ impl DbManager {
             threads.push(r?);
         }
         Ok(threads)
+    }
+
+    pub fn get_plot_thread(&self, id: &str) -> Result<PlotThread> {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT id, novel_id, title, description, introduced_chapter_id, expected_resolution, resolved_chapter_id, status, created_at, updated_at
+             FROM plot_threads WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(PlotThread {
+                    id: row.get(0)?,
+                    novel_id: row.get(1)?,
+                    title: row.get(2)?,
+                    description: row.get(3)?,
+                    introduced_chapter_id: row.get(4)?,
+                    expected_resolution: row.get(5)?,
+                    resolved_chapter_id: row.get(6)?,
+                    status: row.get(7)?,
+                    created_at: row.get(8)?,
+                    updated_at: row.get(9)?,
+                })
+            },
+        )
     }
 
     pub fn create_plot_thread(&self, input: CreatePlotThreadInput) -> Result<PlotThread> {
@@ -1029,6 +1268,38 @@ impl DbManager {
             created_at: now,
             updated_at: now,
         })
+    }
+
+    pub fn update_plot_thread_status(&self, id: &str, status: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE plot_threads SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            params![status, now, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_plot_thread(&self, input: UpdatePlotThreadInput) -> Result<PlotThread> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        let desc = input.description.unwrap_or_default();
+        let exp = input.expected_resolution.unwrap_or_default();
+        let status = input.status.unwrap_or_else(|| "PLANTED".to_string());
+
+        conn.execute(
+            "UPDATE plot_threads SET title = ?1, description = ?2, introduced_chapter_id = ?3, expected_resolution = ?4, resolved_chapter_id = ?5, status = ?6, updated_at = ?7 WHERE id = ?8",
+            params![&input.title, &desc, &input.introduced_chapter_id, &exp, &input.resolved_chapter_id, &status, now, &input.id],
+        )?;
+        drop(conn);
+        self.get_plot_thread(&input.id)
+    }
+
+    pub fn delete_plot_thread(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        let _ = conn.execute("DELETE FROM plot_associations WHERE entity_id = ?1", params![id]);
+        conn.execute("DELETE FROM plot_threads WHERE id = ?1", params![id])?;
+        Ok(())
     }
 
     // --- AI PROVIDERS & MODELS ---
@@ -1349,6 +1620,7 @@ impl DbManager {
 
     pub fn delete_story_phase(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock();
+        let _ = conn.execute("UPDATE story_arcs SET phase_id = NULL WHERE phase_id = ?1", params![id]);
         conn.execute("DELETE FROM story_phases WHERE id = ?1", params![id])?;
         Ok(())
     }
@@ -1417,6 +1689,13 @@ impl DbManager {
     pub fn update_story_arc_status(&self, id: &str, status: &str) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute("UPDATE story_arcs SET status = ?1 WHERE id = ?2", params![status, id])?;
+        Ok(())
+    }
+
+    pub fn delete_story_arc(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        let _ = conn.execute("DELETE FROM plot_associations WHERE entity_id = ?1", params![id]);
+        conn.execute("DELETE FROM story_arcs WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -1516,6 +1795,11 @@ impl DbManager {
 
     pub fn delete_scene(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock();
+        let _ = conn.execute("DELETE FROM plot_associations WHERE target_type = 'SCENE' AND target_id = ?1", params![id]);
+        let _ = conn.execute(
+            "DELETE FROM plot_associations WHERE target_type = 'BEAT' AND target_id IN (SELECT id FROM plot_beats WHERE scene_id = ?1)",
+            params![id],
+        );
         conn.execute("DELETE FROM scenes WHERE id = ?1", params![id])?;
         Ok(())
     }
@@ -1730,6 +2014,25 @@ impl DbManager {
         Ok(())
     }
 
+    pub fn sanitize_fts5_query(input: &str) -> String {
+        let cleaned: String = input
+            .chars()
+            .map(|c| match c {
+                '"' | '\'' | '*' | '^' | ':' | '(' | ')' | '{' | '}' | '[' | ']' | '!' | '?' => ' ',
+                _ => c,
+            })
+            .collect();
+        let words: Vec<&str> = cleaned.split_whitespace().collect();
+        if words.is_empty() {
+            return String::new();
+        }
+        words
+            .into_iter()
+            .map(|w| format!("\"{}\"", w.replace('"', "")))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     // --- PHASE 4: CANON FACTS & LAYERED MEMORY ---
 
     pub fn list_canon_facts(&self, novel_id: &str, query: Option<&str>) -> Result<Vec<CanonFact>> {
@@ -1737,16 +2040,54 @@ impl DbManager {
         if let Some(q) = query {
             let trimmed = q.trim();
             if !trimmed.is_empty() {
-                let fts_res = conn.prepare(
-                    "SELECT f.id, f.novel_id, f.subject_id, f.predicate, f.object_value, f.truth_scope, f.authority_level, f.status, f.effective_from, f.effective_until, f.source_chapter_id, f.version, f.created_at
-                     FROM canon_facts f
-                     JOIN canon_facts_fts ON canon_facts_fts.fact_id = f.id
-                     WHERE f.novel_id = ?1 AND canon_facts_fts MATCH ?2
-                     ORDER BY f.created_at DESC",
-                );
+                let safe_q = Self::sanitize_fts5_query(trimmed);
+                if !safe_q.is_empty() {
+                    let fts_res = conn.prepare(
+                        "SELECT f.id, f.novel_id, f.subject_id, f.predicate, f.object_value, f.truth_scope, f.authority_level, f.status, f.effective_from, f.effective_until, f.source_chapter_id, f.version, f.created_at
+                         FROM canon_facts f
+                         JOIN canon_facts_fts ON canon_facts_fts.fact_id = f.id
+                         WHERE f.novel_id = ?1 AND canon_facts_fts MATCH ?2
+                         ORDER BY f.created_at DESC",
+                    );
 
-                if let Ok(mut stmt) = fts_res {
-                    let rows = stmt.query_map(params![novel_id, trimmed], |row| {
+                    if let Ok(mut stmt) = fts_res {
+                        if let Ok(rows) = stmt.query_map(params![novel_id, &safe_q], |row| {
+                            Ok(CanonFact {
+                                id: row.get(0)?,
+                                novel_id: row.get(1)?,
+                                subject_id: row.get(2)?,
+                                predicate: row.get(3)?,
+                                object_value: row.get(4)?,
+                                truth_scope: row.get(5)?,
+                                authority_level: row.get(6)?,
+                                status: row.get(7)?,
+                                effective_from: row.get(8)?,
+                                effective_until: row.get(9)?,
+                                source_chapter_id: row.get(10)?,
+                                version: row.get(11)?,
+                                created_at: row.get(12)?,
+                            })
+                        }) {
+                            let mut list = Vec::new();
+                            for r in rows.flatten() {
+                                list.push(r);
+                            }
+                            if !list.is_empty() {
+                                return Ok(list);
+                            }
+                        }
+                    }
+                }
+
+                // FTS 匹配为空或语法有误时，降级为安全的 LIKE 模糊查询
+                let like_pat = format!("%{}%", trimmed.replace('%', "\\%").replace('_', "\\_"));
+                if let Ok(mut like_stmt) = conn.prepare(
+                    "SELECT id, novel_id, subject_id, predicate, object_value, truth_scope, authority_level, status, effective_from, effective_until, source_chapter_id, version, created_at
+                     FROM canon_facts
+                     WHERE novel_id = ?1 AND (subject_id LIKE ?2 ESCAPE '\\' OR predicate LIKE ?2 ESCAPE '\\' OR object_value LIKE ?2 ESCAPE '\\')
+                     ORDER BY created_at DESC",
+                ) {
+                    if let Ok(rows) = like_stmt.query_map(params![novel_id, &like_pat], |row| {
                         Ok(CanonFact {
                             id: row.get(0)?,
                             novel_id: row.get(1)?,
@@ -1762,16 +2103,14 @@ impl DbManager {
                             version: row.get(11)?,
                             created_at: row.get(12)?,
                         })
-                    })?;
-
-                    let mut list = Vec::new();
-                    for r in rows {
-                        if let Ok(item) = r {
-                            list.push(item);
+                    }) {
+                        let mut list = Vec::new();
+                        for r in rows.flatten() {
+                            list.push(r);
                         }
-                    }
-                    if !list.is_empty() {
-                        return Ok(list);
+                        if !list.is_empty() {
+                            return Ok(list);
+                        }
                     }
                 }
             }
@@ -1936,24 +2275,52 @@ impl DbManager {
             return Ok(Vec::new());
         }
 
-        let mut stmt = conn.prepare(
-            "SELECT chapter_id, title, snippet(chapters_fts, 3, '【', '】', '...', 15)
-             FROM chapters_fts
-             WHERE novel_id = ?1 AND chapters_fts MATCH ?2
-             LIMIT 5",
-        )?;
-
-        let rows = stmt.query_map(params![novel_id, trimmed], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        })?;
-
-        let mut results = Vec::new();
-        for r in rows {
-            if let Ok(item) = r {
-                results.push(item);
+        let safe_query = Self::sanitize_fts5_query(trimmed);
+        if !safe_query.is_empty() {
+            if let Ok(mut stmt) = conn.prepare(
+                "SELECT chapter_id, title, snippet(chapters_fts, 3, '【', '】', '...', 15)
+                 FROM chapters_fts
+                 WHERE novel_id = ?1 AND chapters_fts MATCH ?2
+                 LIMIT 5",
+            ) {
+                if let Ok(rows) = stmt.query_map(params![novel_id, &safe_query], |row| {
+                    Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                }) {
+                    let mut results = Vec::new();
+                    for r in rows.flatten() {
+                        results.push(r);
+                    }
+                    if !results.is_empty() {
+                        return Ok(results);
+                    }
+                }
             }
         }
-        Ok(results)
+
+        // 降级为 LIKE 模糊搜索
+        let like_pat = format!("%{}%", trimmed.replace('%', "\\%").replace('_', "\\_"));
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT c.id, c.title, COALESCE(SUBSTR(c.content, 1, 80), '')
+             FROM chapters c
+             WHERE c.novel_id = ?1 AND (c.title LIKE ?2 ESCAPE '\\' OR c.content LIKE ?2 ESCAPE '\\')
+             LIMIT 5",
+        ) {
+            if let Ok(rows) = stmt.query_map(params![novel_id, &like_pat], |row| {
+                let id: String = row.get(0)?;
+                let title: String = row.get(1)?;
+                let text: String = row.get(2)?;
+                let snippet = format!("【{}】...", text.trim());
+                Ok((id, title, snippet))
+            }) {
+                let mut results = Vec::new();
+                for r in rows.flatten() {
+                    results.push(r);
+                }
+                return Ok(results);
+            }
+        }
+
+        Ok(Vec::new())
     }
 
     // --- FIVE-LAYER MEMORY CONTEXT PACK ASSEMBLER ---
@@ -2514,13 +2881,16 @@ impl DbManager {
             chapter_target_length: None,
             series_id: None,
             hierarchy_config: None,
+            cover_url: archive.novel.cover_url,
         };
 
         let new_novel = self.create_novel(novel_input)?;
 
-        // Import characters
+        // Import characters and build old_id -> new_id map
+        let mut char_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
         for c in archive.characters {
-            let _ = self.create_character(CreateCharacterInput {
+            let old_id = c.id.clone();
+            if let Ok(new_c) = self.create_character(CreateCharacterInput {
                 novel_id: new_novel.id.clone(),
                 name: c.name,
                 aliases: Some(c.aliases),
@@ -2528,7 +2898,38 @@ impl DbManager {
                 personality: Some(c.personality),
                 background: Some(c.background),
                 motivation: Some(c.motivation),
-            });
+            }) {
+                char_map.insert(old_id, new_c.id);
+            }
+        }
+
+        // Import character relationships using mapped IDs
+        for rel in archive.character_relationships {
+            let mapped_src = char_map.get(&rel.source_character_id);
+            let mapped_tgt = char_map.get(&rel.target_character_id);
+            if let (Some(src), Some(tgt)) = (mapped_src, mapped_tgt) {
+                let _ = self.create_character_relationship(CreateCharacterRelationshipInput {
+                    novel_id: new_novel.id.clone(),
+                    source_character_id: src.clone(),
+                    target_character_id: tgt.clone(),
+                    relation_type: rel.relation_type,
+                    description: Some(rel.description),
+                });
+            }
+        }
+
+        // Import character states using mapped IDs
+        for s in archive.character_states {
+            if let Some(new_cid) = char_map.get(&s.character_id) {
+                let _ = self.create_character_state_event(CreateCharacterStateEventInput {
+                    character_id: new_cid.clone(),
+                    source_chapter_id: None,
+                    effective_time: Some(s.effective_time),
+                    field_name: s.field_name,
+                    previous_value: Some(s.previous_value),
+                    new_value: s.new_value,
+                });
+            }
         }
 
         // Import chapters
@@ -2565,6 +2966,44 @@ impl DbManager {
                 truth_scope: Some(f.truth_scope),
                 authority_level: Some(f.authority_level),
                 source_chapter_id: None,
+            });
+        }
+
+        // Import story phases and build old_id -> new_id map
+        let mut phase_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        for p in archive.story_phases {
+            let old_id = p.id.clone();
+            if let Ok(new_p) = self.create_story_phase(CreateStoryPhaseInput {
+                novel_id: new_novel.id.clone(),
+                title: p.title,
+                order_index: Some(p.order_index),
+                goal: Some(p.goal),
+            }) {
+                phase_map.insert(old_id, new_p.id);
+            }
+        }
+
+        // Import story arcs using mapped phase IDs
+        for a in archive.story_arcs {
+            let mapped_phase = a.phase_id.and_then(|pid| phase_map.get(&pid).cloned());
+            let _ = self.create_story_arc(CreateStoryArcInput {
+                novel_id: new_novel.id.clone(),
+                phase_id: mapped_phase,
+                title: a.title,
+                goal: Some(a.goal),
+                description: Some(a.description),
+                priority: Some(a.priority),
+            });
+        }
+
+        // Import plot threads
+        for t in archive.plot_threads {
+            let _ = self.create_plot_thread(CreatePlotThreadInput {
+                novel_id: new_novel.id.clone(),
+                title: t.title,
+                description: Some(t.description),
+                introduced_chapter_id: None,
+                expected_resolution: Some(t.expected_resolution),
             });
         }
 
@@ -2741,6 +3180,9 @@ impl DbManager {
 
     pub fn delete_part(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock();
+        let _ = conn.execute("UPDATE chapters SET part_id = NULL WHERE part_id = ?1", params![id]);
+        let _ = conn.execute("UPDATE volumes SET part_id = NULL WHERE part_id = ?1", params![id]);
+        let _ = conn.execute("DELETE FROM plot_associations WHERE target_type = 'PART' AND target_id = ?1", params![id]);
         conn.execute("DELETE FROM parts WHERE id = ?1", params![id])?;
         Ok(())
     }
@@ -2815,8 +3257,46 @@ impl DbManager {
     pub fn delete_volume(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock();
         let _ = conn.execute("UPDATE chapters SET volume_id = NULL WHERE volume_id = ?1", params![id]);
+        let _ = conn.execute("DELETE FROM plot_associations WHERE target_type = 'VOLUME' AND target_id = ?1", params![id]);
         conn.execute("DELETE FROM volumes WHERE id = ?1", params![id])?;
         Ok(())
+    }
+
+    pub fn update_volume(&self, input: UpdateVolumeInput) -> Result<Volume> {
+        let conn = self.conn.lock();
+        let mut existing_summary = String::new();
+        if let Ok(s) = conn.query_row(
+            "SELECT summary FROM volumes WHERE id = ?1",
+            params![&input.id],
+            |r| r.get::<_, String>(0),
+        ) {
+            existing_summary = s;
+        }
+
+        let summary = input.summary.unwrap_or(existing_summary);
+
+        conn.execute(
+            "UPDATE volumes SET title = ?1, summary = ?2 WHERE id = ?3",
+            params![&input.title, &summary, &input.id],
+        )?;
+
+        conn.query_row(
+            "SELECT id, novel_id, part_id, title, order_index, summary, status, created_at
+             FROM volumes WHERE id = ?1",
+            params![&input.id],
+            |row| {
+                Ok(Volume {
+                    id: row.get(0)?,
+                    novel_id: row.get(1)?,
+                    part_id: row.get(2)?,
+                    title: row.get(3)?,
+                    order_index: row.get(4)?,
+                    summary: row.get(5)?,
+                    status: row.get(6)?,
+                    created_at: row.get(7)?,
+                })
+            },
+        )
     }
 
     // --- PLOT BEATS (情节节拍) ---
@@ -2898,6 +3378,7 @@ impl DbManager {
 
     pub fn delete_plot_beat(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock();
+        let _ = conn.execute("DELETE FROM plot_associations WHERE target_type = 'BEAT' AND target_id = ?1", params![id]);
         conn.execute("DELETE FROM plot_beats WHERE id = ?1", params![id])?;
         Ok(())
     }
@@ -2974,6 +3455,7 @@ impl DbManager {
 
     pub fn delete_character_arc(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock();
+        let _ = conn.execute("DELETE FROM plot_associations WHERE entity_id = ?1", params![id]);
         conn.execute("DELETE FROM character_arcs WHERE id = ?1", params![id])?;
         Ok(())
     }
@@ -3047,6 +3529,7 @@ impl DbManager {
 
     pub fn delete_parallel_thread(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock();
+        let _ = conn.execute("DELETE FROM plot_associations WHERE entity_id = ?1", params![id]);
         conn.execute("DELETE FROM parallel_threads WHERE id = ?1", params![id])?;
         Ok(())
     }
@@ -3381,6 +3864,8 @@ impl DbManager {
         );
 
         // 4. Delete source chapter (cascades versions)
+        let _ = conn.execute("DELETE FROM chapters_fts WHERE chapter_id = ?1", params![&src.id]);
+        let _ = conn.execute("DELETE FROM usage_records WHERE chapter_id = ?1", params![&src.id]);
         conn.execute("DELETE FROM chapters WHERE id = ?1", params![&src.id])?;
 
         // 5. Shift subsequent chapter numbers down
@@ -4555,6 +5040,38 @@ impl DbManager {
                 ),
                 "insert_editor".to_string(),
             ),
+            "story_architect" => (
+                "你是一位专业长篇小说故事架构师 (Story Architect)。精通宏观节奏、因果链设计与人物不可逆代价。".to_string(),
+                format!(
+                    "请为小说《{}》（题材：{}）设计因果剧情架构方案。\n【参考角色】:\n{}\n【世界法则】:\n{}\n【创作者构想/命题】:\n{}\n\n【架构交付要求】:\n1. 拒绝匀速流水账与换皮反转，拒绝固定百分比推进；\n2. 交付三个因果结构真正不同的剧情方案（角色先犯错/先赢后失去/持续不作为引发滚雪球代价等）；\n3. 每个方案明确：主角真正欲望 vs 内心恐惧、关键抉择与【不可逆代价】（失去信任、打破自我认识等）、核心因果链（因为 A 选择导致 B 代价因此 C 改变策略）、逆向伏笔查证表；\n4. 严格输出结构方案，不要直接代写正文！",
+                    novel_title, novel_genre, char_contexts.join("\n"), rule_contexts.join("\n"), custom_req
+                ),
+                "insert_editor".to_string(),
+            ),
+            "scene_dramaturge" => (
+                "你是一位小说单场景戏剧导演 (Scene Dramaturge)。精通双导演进场方案、微观节奏与潜台词博弈。".to_string(),
+                format!(
+                    "请为小说《{}》（题材：{}）设计单场景戏剧张力方案并成稿。\n【前文因果/场景输入】:\n{}\n【关联人物】:\n{}\n【作者导演诉求】:\n{}\n\n【导演执行守则】:\n1. 先给出两条不同导演方案（方案甲：从冲突后果或剧变现场进入；方案乙：从平静日常生活微细节切入延迟揭露）；\n2. 择优输出成稿小说段落，用可观察物象与动作呈现情绪，严禁向读者报幕宣告；\n3. 保留真实后坐力，允许在不完整情绪中自然停步，不强求每章爆点或金句。",
+                    novel_title, novel_genre, if !custom_req.is_empty() { &custom_req } else { &prev_chapter_text }, char_contexts.join("\n"), custom_req
+                ),
+                "insert_editor".to_string(),
+            ),
+            "ending_forge" => (
+                "你是一位小说结局与转折锻造师 (Ending Forge)。擅长利用不可逆代价、前文伏笔与价值冲突设计有力量的终局。".to_string(),
+                format!(
+                    "请为小说《{}》（题材：{}）锻造有深度代价的结局方案。\n【故事前提与伏笔】:\n{}\n【核心角色】:\n{}\n【世界法则】:\n{}\n【终局诉求】:\n{}\n\n【结局锻造要求】:\n1. 给出三种价值取向不同的结局路线（苦涩兑现、克制和解、延迟认知），拒绝单纯替换伤亡名单；\n2. 确保主角亲自做决定，反转必须重新解释旧信息而非临时天降新设定；\n3. 交付“结局倒推铺垫表”，标明前文哪个场景需要提前埋设公平证据；\n4. 给出推荐案收束段落，留出平静半步，严禁旁白喊口号。",
+                    novel_title, novel_genre, if !custom_req.is_empty() { &custom_req } else { &prev_chapter_text }, char_contexts.join("\n"), rule_contexts.join("\n"), custom_req
+                ),
+                "insert_editor".to_string(),
+            ),
+            "cold_reader" => (
+                "你是一位首次阅读这部作品的挑剔读者与零继承盲审质检员 (Cold Reader)。处于完全隔离的盲审模式。".to_string(),
+                format!(
+                    "请对小说《{}》（题材：{}）的以下正文段落执行严格的【零继承读者盲审】：\n【待审正文】:\n{}\n【受众定位】:\n{}\n\n【盲审契约输出】:\n1. 用 3-5 句复述普通读者认知；\n2. 制作【带证据的诊断表】：标明何处注意力下降、何时预见反转、何处怀疑角色动机、是否存在伪高潮（偶然救援/机械断章/旁白煽情）；\n3. 制作【转折期许表】：列出关键节点的原本期待 vs 实际发生 vs 情绪效应；\n4. 交付【最高优先级前三项最小修复建议】及过度修复风险；\n5. 只做诊断建议，严禁擅自重写正文！",
+                    novel_title, novel_genre, if !custom_req.is_empty() { &custom_req } else { &prev_chapter_text }, custom_req
+                ),
+                "insert_editor".to_string(),
+            ),
             _ => (
                 "你是一名专业 AI 创作助手。".to_string(),
                 format!("请协助创作小说《{}》：\n{}", novel_title, custom_req),
@@ -4986,6 +5503,7 @@ mod tests {
             chapter_target_length: Some(4000),
             series_id: None,
             hierarchy_config: None,
+            cover_url: None,
         }).unwrap();
 
         assert_eq!(novel.title, "星穹之门");
@@ -5033,6 +5551,7 @@ mod tests {
             chapter_target_length: None,
             series_id: None,
             hierarchy_config: None,
+            cover_url: None,
         }).unwrap();
 
         let chara = db.create_character(CreateCharacterInput {

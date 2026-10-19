@@ -44,6 +44,7 @@ pub fn run() {
             commands::list_novels,
             commands::get_novel,
             commands::delete_novel,
+            commands::update_novel,
             // Volumes & Chapters
             commands::list_volumes,
             commands::list_chapters,
@@ -52,13 +53,22 @@ pub fn run() {
             commands::save_chapter_content,
             commands::list_chapter_versions,
             commands::delete_chapter,
+            commands::update_chapter_title,
             // Story Bible
             commands::list_characters,
             commands::create_character,
+            commands::update_character_status,
+            commands::update_character,
+            commands::delete_character,
             commands::list_world_rules,
             commands::create_world_rule,
+            commands::update_world_rule,
+            commands::delete_world_rule,
             commands::list_plot_threads,
             commands::create_plot_thread,
+            commands::update_plot_thread_status,
+            commands::update_plot_thread,
+            commands::delete_plot_thread,
             // Providers & Models
             commands::list_providers,
             commands::list_models,
@@ -80,6 +90,7 @@ pub fn run() {
             commands::list_story_arcs,
             commands::create_story_arc,
             commands::update_story_arc_status,
+            commands::delete_story_arc,
             // Scenes & Events (Phase 2)
             commands::list_scenes,
             commands::create_scene,
@@ -131,6 +142,7 @@ pub fn run() {
             commands::update_novel_hierarchy_config,
             commands::create_volume,
             commands::delete_volume,
+            commands::update_volume,
             commands::delete_scene,
             commands::create_plot_beat,
             commands::list_plot_beats,
@@ -179,6 +191,8 @@ pub fn run() {
             commands::list_model_arena_runs,
             commands::save_model_arena_run,
             commands::delete_model_arena_run,
+            // V2.5.1 AI Prompt Optimizer
+            commands::optimize_writing_prompt,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovelForge AI application");

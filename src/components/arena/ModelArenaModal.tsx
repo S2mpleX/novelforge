@@ -11,7 +11,7 @@ export const ModelArenaModal: React.FC<ModelArenaModalProps> = ({ isOpen, onClos
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-6xl h-[92vh] max-h-[920px] rounded-2xl shadow-2xl overflow-hidden border border-[#ded5c4] bg-[#f4efe6] flex flex-col">
+      <div className="relative w-full max-w-6xl h-[92vh] max-h-[920px] rounded-2xl shadow-2xl overflow-hidden border border-line bg-canvas flex flex-col">
         <ModelArenaPanel isModal={true} onClose={onClose} />
       </div>
     </div>

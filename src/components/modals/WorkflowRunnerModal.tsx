@@ -124,13 +124,13 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
     setStatusMessage(`正在执行步骤 [${currentStep.title}]...`);
 
     try {
-      // 1. 动态变量替换：将前面步骤的 output 替换到当前 prompt 中
+      // 1. 动态变量替换：将前面步骤的 output 替换到当前 prompt 中（采用函数返回值杜绝 $ 字符捕获组吞字缺陷）
       let renderedPrompt = currentStep.prompt_rendered;
       steps.forEach((prevStep, prevIdx) => {
         const val = prevStep.edited_output || prevStep.raw_output || '';
         renderedPrompt = renderedPrompt
-          .replace(new RegExp(`\\{\\{step_${prevIdx + 1}_output\\}\\}`, 'g'), val)
-          .replace(new RegExp(`\\{\\{${prevStep.step_key}\\}\\}`, 'g'), val);
+          .replace(new RegExp(`\\{\\{step_${prevIdx + 1}_output\\}\\}`, 'g'), () => val)
+          .replace(new RegExp(`\\{\\{${prevStep.step_key}\\}\\}`, 'g'), () => val);
       });
 
       // 2. 调用真实的 LLM 生成

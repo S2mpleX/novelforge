@@ -36,6 +36,52 @@ pub fn xml_escape_single_line(s: &str) -> String {
     xml_escape(single.trim())
 }
 
+/// 将富文本编辑器 HTML 或换行纯文本统一转换为纯文本段落（剥除 HTML 标签并解码实体）
+pub fn html_to_plain_text(input: &str) -> String {
+    if !input.contains('<') && !input.contains('&') {
+        return input.to_string();
+    }
+    let s = input
+        .replace("<br>", "\n")
+        .replace("<br/>", "\n")
+        .replace("<br />", "\n")
+        .replace("</p>", "\n")
+        .replace("</div>", "\n")
+        .replace("</h1>", "\n\n")
+        .replace("</h2>", "\n\n")
+        .replace("</h3>", "\n\n");
+
+    let mut in_tag = false;
+    let mut cleaned = String::with_capacity(s.len());
+    for ch in s.chars() {
+        if ch == '<' {
+            in_tag = true;
+        } else if ch == '>' {
+            in_tag = false;
+        } else if !in_tag {
+            cleaned.push(ch);
+        }
+    }
+
+    let decoded = cleaned
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'");
+
+    let mut result = Vec::new();
+    for line in decoded.lines() {
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            result.push(trimmed);
+        }
+    }
+    result.join("\n\n")
+}
+
 struct ZipEntry {
     name: String,
     data: Vec<u8>,
@@ -469,10 +515,11 @@ ol.toc-list li a:hover {
 
     fn build_chapter_xhtml(&self, _index: usize, chapter: &Chapter) -> String {
         let ch_title = xml_escape_single_line(&chapter.title);
-        let content = chapter.content.as_deref().unwrap_or_default();
+        let raw_content = chapter.content.as_deref().unwrap_or_default();
+        let plain = html_to_plain_text(raw_content);
         
         let mut paragraphs = String::new();
-        for line in content.lines() {
+        for line in plain.lines() {
             let trimmed = line.trim();
             if !trimmed.is_empty() {
                 paragraphs.push_str(&format!("    <p>{}</p>\n", xml_escape(trimmed)));

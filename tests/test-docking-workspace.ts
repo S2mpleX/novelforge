@@ -12,6 +12,8 @@ import {
   updateSplitSizes,
   validateAndSanitizeLayout,
   allPanelsInTree,
+  findLeftmostTabGroup,
+  findRightmostTabGroup,
 } from '../src/utils/dockingTree';
 import {
   FOCUS_WRITING_LAYOUT,
@@ -21,7 +23,8 @@ import {
   FREE_CUSTOM_LAYOUT,
   BUILTIN_WORKSPACE_PRESETS,
 } from '../src/config/workspacePresets';
-import { PanelInstance, WorkspaceLayout } from '../src/types/docking';
+import { PanelInstance, WorkspaceLayout, TabGroupNode } from '../src/types/docking';
+import { useWorkspaceStore } from '../src/stores/useWorkspaceStore';
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -286,6 +289,87 @@ console.log('\n▶ [测试十] 预设连续循环切换与面板可访问性全�
   }
 }
 
+// ----------------------------------------------------
+// 测试十一：悬浮窗自动吸附侧边栏与停靠还原 (Floating Snap to Sidebar & Auto-Dock)
+// ----------------------------------------------------
+console.log('\n▶ [测试十一] 悬浮窗自动吸附侧边栏与停靠还原 (Floating Snap to Sidebar)');
+{
+  const root = cloneTree(FOCUS_WRITING_LAYOUT.root);
+  const leftGroup = findLeftmostTabGroup(root);
+  const rightGroup = findRightmostTabGroup(root);
+
+  assert(leftGroup !== null, '成功定位最左侧侧边栏 TabGroup');
+  assert(leftGroup?.panels.some((p) => p.panelType === 'chapters') === true, '最左侧确实为章节目录侧边栏');
+  assert(rightGroup !== null, '成功定位最右侧工具栏 TabGroup');
+  assert(rightGroup?.panels.some((p) => p.panelType === 'ai_assistant') === true, '最右侧确实为AI助手栏');
+
+  // 测试悬浮窗吸附到左侧侧边栏 (合并为标签页)
+  const floatingCharacterPanel: PanelInstance = {
+    instanceId: 'character_profiles_float',
+    panelType: 'character_profiles',
+    title: '角色档案',
+  };
+
+  const dockedToLeft = addTabToGroup(root, leftGroup!.id, floatingCharacterPanel);
+  const foundInLeft = findTabGroupByPanel(dockedToLeft, 'character_profiles_float');
+  assert(foundInLeft?.id === leftGroup?.id, '悬浮窗成功自动吸附并融入左侧侧边栏');
+  assert(foundInLeft?.panels.some((p) => p.panelType === 'chapters') === true, '左侧侧边栏原章节目录保持完整');
+
+  // 测试悬浮窗吸附到最左侧独立拆分侧边栏
+  const floatingToolboxPanel: PanelInstance = {
+    instanceId: 'novelist_toolbox_float',
+    panelType: 'novelist_toolbox',
+    title: '小说工具箱',
+  };
+  const splitLeftRoot = splitTabGroup(root, leftGroup!.id, floatingToolboxPanel, 'left');
+  const newLeftmost = findLeftmostTabGroup(splitLeftRoot);
+  assert(newLeftmost !== null && newLeftmost.panels.some((p) => p.panelType === 'novelist_toolbox'), '悬浮窗成功作为独立最左侧侧边栏停靠');
+}
+
+// ----------------------------------------------------
+// 测试十二：关闭最后一个面板后保留纯净空工作区，严禁自动复活初始三栏面板
+// ----------------------------------------------------
+console.log('\n▶ [测试十二] 关闭最后一个面板保留纯净空工作区 (Empty Workspace Clean Close)');
+{
+  // 模拟用户场景：屏幕上仅剩最后一个 AI 写作助手的单面板布局
+  const singlePanelRoot: TabGroupNode = {
+    type: 'tabs',
+    id: 'tab_single_assistant',
+    panels: [{ instanceId: 'ai_assistant_main', panelType: 'ai_assistant', title: 'AI 写作助手' }],
+    activeInstanceId: 'ai_assistant_main',
+  };
+
+  useWorkspaceStore.setState({
+    layout: {
+      version: 1,
+      activePresetKey: 'custom',
+      maximizedInstanceId: null,
+      floatingPanels: [],
+      root: singlePanelRoot,
+    },
+  });
+
+  // 用户点击 AI 写作助手 Tab 上的 X 按钮关闭最后一个面板
+  useWorkspaceStore.getState().closePanel('ai_assistant_main');
+
+  const currentLayout = useWorkspaceStore.getState().layout;
+  assert(currentLayout.root.type === 'tabs', '关闭后根节点保持为单 TabGroup 容器');
+  const currentTabGroup = currentLayout.root as TabGroupNode;
+  assert(currentTabGroup.panels.length === 0, '当前面板数组已彻底清空，成功关闭最后一个面板');
+  assert(currentTabGroup.id === 'tab_empty_workspace', '空工作区标记标识正常');
+
+  // 核心断言：绝对没有复活初始的三个面板 (chapters_main, editor_main, ai_assistant_main)
+  const remainingPanels = allPanelsInTree(currentLayout.root);
+  assert(remainingPanels.length === 0, '树中面板总数为 0，绝未擅自复活初始三栏面板！');
+
+  // 测试在空工作区中通过 openPanel 正常打开新面板
+  useWorkspaceStore.getState().openPanel('editor');
+  const afterOpenLayout = useWorkspaceStore.getState().layout;
+  const afterOpenPanels = allPanelsInTree(afterOpenLayout.root);
+  assert(afterOpenPanels.length === 1 && afterOpenPanels[0].panelType === 'editor', '空工作区中可自由打开正文编辑器面板');
+}
+
 console.log('\n====================================================');
-console.log('🎉 全部 10 项端到端验收测试 100% 通过！系统稳健完备！');
+console.log('🎉 全部 12 项端到端验收测试 100% 通过！系统稳健完备！');
 console.log('====================================================');
+

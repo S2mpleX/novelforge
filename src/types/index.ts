@@ -15,6 +15,7 @@ export interface Novel {
   language: string;
   writing_style: string;
   status: string;
+  cover_url?: string;
   series_id?: string;
   hierarchy_config?: HierarchyConfig;
   created_at: number;
@@ -654,7 +655,11 @@ export type ToolboxActionType =
   | 'gold_opening'
   | 'chapter_outline'
   | 'dialogue_polish'
-  | 'humanizer_polish';
+  | 'humanizer_polish'
+  | 'story_architect'
+  | 'scene_dramaturge'
+  | 'ending_forge'
+  | 'cold_reader';
 
 export interface ExecuteToolboxActionInput {
   novel_id: string;
@@ -852,6 +857,29 @@ export interface TypesetResult {
   cleanedCharCount: number;
   paragraphCount: number;
   censorMatches: CensorMatch[];
+}
+
+// ==========================================
+// V2.5.1 AI PROMPT OPTIMIZER TYPES
+// ==========================================
+
+export type PromptOptimizationAngle = 'DRAMA_CONFLICT' | 'SENSORY_DETAIL' | 'PLOT_HOOK' | 'CONCISE_PUNCHY';
+
+export interface OptimizeWritingPromptInput {
+  novel_id?: string;
+  chapter_id?: string;
+  raw_prompt: string;
+  target_length?: number;
+  optimization_angle?: PromptOptimizationAngle | string;
+  style_mode?: string;
+}
+
+export interface OptimizeWritingPromptResult {
+  original_prompt: string;
+  optimized_prompt: string;
+  enhancement_points: string[];
+  suggested_hooks?: string;
+  suggested_tags: string[];
 }
 
 

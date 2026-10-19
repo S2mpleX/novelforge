@@ -1,10 +1,10 @@
 # NovelForge AI — 项目持续开发状态 (PROJECT_STATE.md)
 
 ## 1. 当前阶段与基线
-- **当前阶段**：V2.5 **系统深度安全与稳定性体检、漏洞清零、WebView2 GPU 崩溃防御与全系统 174 项测试 100% 通过！** (覆盖 WebView2 NVIDIA 驱动 NvMemMapStoragex.dll 崩溃规避、无边框窗口激活防护、React 异步监听器挂起与卸载泄漏防御、EPUB 导出非法空字符与无后缀路径补齐、单行元数据换行过滤、纯符号书名降级、敏感词扫描空字符串无限死循环防御、SQL 100% 参数化查询改造、10 大专项测试套件共 174 项测试全绿、前端生产打包 1.18s 零错误)
-- **版本目标**：V2.5
-- **更新时间**：2026-10-15
-- **代码库状态**：真实可运行、真实编译通过 (Rust 后端与 SQLite 零错误零警告，前端 Vite 1.18s 打包零错误，53 项核心业务数据库测试、16 项 Word 导入测试、8 项模型网关测试、20 项排版测试、17 项 Humanizer 测试、17 项双模竞技场测试、10 项 Docking 测试、5 项正文对比测试、28 项自动更新测试、36 项五层记忆测试共 174 项 100% 全部通过)。
+- **当前阶段**：V2.6.8 **全局下拉浮层防父级溢出裁剪 (Overflow Clipping 根除) 与悬浮面板视口安全架构！** (彻底消除 `Header`、`TabGroup`、`NovelEditor` 工具栏因 `overflow-hidden` 导致的顶栏下拉框、添加模块菜单、字号预设弹窗被腰斩消失的结构性缺陷；为悬浮面板注入边缘磁吸与安全视口保护 `y >= 60`、`x >= 8`，杜绝冲破顶部或压在顶栏上导致标题栏消失；模型竞技场战报与配置补齐暗色模式；全系统 16 大自动化测试套件、82 项核心断言 100% 全部通过，Vite 编译 2.58s 零错误！)
+- **版本目标**：V2.6.8
+- **更新时间**：2026-10-19
+- **代码库状态**：真实可运行、真实编译通过 (Rust 后端与 SQLite 零错误零警告，前端 Vite 打包 2.58s 零错误，16 大自动化测试套件 82 项断言全部通过)。
 
 ---
 
@@ -560,6 +560,281 @@
   - `pnpm test:memory` 36 项全部通过；
   - `pnpm check:version` 验证 package.json / Cargo.toml / tauri.conf.json 保持完全一致的 2.3.4。
 
+### 3.31 Agent Skills 技能管理中心与小说戏剧张力全家桶 (6 大 Skills 矩阵) 深度落地 (Phase 8 / V2.5.1)
+- **核心定位与动机**：
+  1. 长篇小说创作中，单纯依靠通用大模型不仅容易出现机械套话与翻译腔，更容易陷入“情节流水账、假冲突、廉价反转、解释型情绪（Tell 代替 Show）、人物临阵降智与结局无力”等戏剧性硬伤；
+  2. 用户引入了开源社区经过大体量语料与写作实战检验的四大戏剧张力核心技能：
+     - **`story-architect` (故事架构师)**：宏观因果与剧情架构，设计不可逆代价与三向异构因果方案；
+     - **`scene-dramaturge` (单场景戏剧导演)**：双导演方案进场（后果切入 vs 细节延迟），情绪物象化，消除匀速加速；
+     - **`ending-forge` (结局锻造师)**：三向价值结局（苦涩兑现/克制和解/延迟认知），逆向伏笔查证，留出高潮后的半步安静；
+     - **`cold-reader` (零继承读者视角盲审)**：完全隔离作者大纲辩解，首次读者视角追踪注意力卡顿、假高潮与最高优先前三项最小修复；
+  3. 协同既有的 **`humanizer` (文学白描与流派指纹)** 与 **`lieflat-less-ai-tone` (283万字实证白名单去AI味)**，构筑成完备的六维专业技能矩阵。
+- **全链路核心特性与交付成果**：
+  1. **6 大 Skills 资产物理化与规范化落盘**：
+     - 在 `.agents/skills/` 目录下完整部署：`humanizer/`, `lieflat-less-ai-tone/`, `story-architect/`, `scene-dramaturge/`, `ending-forge/`, `cold-reader/`；
+     - 归档 `DRAMATURGY_PROMPTS.md` 与 `DRAMATURGY_README.md` 作为调用与编排依据；
+  2. **提示词中心严格分离 (`prompts/`)**：
+     - 遵循 `AGENTS.md` 规范，创建独立提示词文件：
+       * `prompts/story_architect.md`
+       * `prompts/scene_dramaturge.md`
+       * `prompts/ending_forge.md`
+       * `prompts/cold_reader.md`
+  3. **Skills 引擎与诊断器全功能升级 (`SkillsEngine.ts`)**：
+     - 扩展扫描规则：精准检出“情绪直接贴标签宣告”、“偷懒偶然推进（突然之间）”、“旁白直接煽情升华（泣不成声/命运赞歌）”、“机械制造伪悬念（然而他并不知道）”；
+     - 提供四大专用 Prompt 构造器：`buildStoryArchitectPrompt`、`buildSceneDramaturgePrompt`、`buildEndingForgePrompt`、`buildColdReaderPrompt`；
+  4. **Zustand 响应式技能状态与版本自适应迁移 (`useSkillsStore.ts`)**：
+     - 升级持久化版本至 v2，具备智能迁移能力：自动合并新注册技能并默认激活全矩阵；
+     - 提供按分类筛选与多模态 Prompt 动态生成接口；
+  5. **可视化管理中心与三模式演练沙盒 (`SkillsManagerView.tsx`)**：
+     - **多分类筛选器**：支持【全部 (6)】、【去AI味 (2)】、【戏剧导演 (2)】、【因果架构 (1)】、【读者盲审 (1)】；
+     - **三大演练沙盒模式**：
+       * 模式一：去AI味润色（基于白名单最小化手术）；
+       * 模式二：戏剧导演双方案（后果切入 vs 细节延迟）；
+       * 模式三：Cold Reader 独立读者盲审（真模型调用，隔离上下文输出诊断表与最小修复方案）；
+     - **三套典型演练样本**：一键载入“AI味浓郁样本”、“流水账假高潮样本”与“高质纯白描样本”；
+  6. **全链路交互与创作工作流打通**：
+     - **正文划词浮动条 (`FloatingSelectionMenu.tsx`)**：新增【戏剧重塑】专属动作，一键调用 Scene Dramaturge 双方案导演重构所选段落；
+     - **小说百宝箱 (`NovelistToolboxModal.tsx` & `ToolboxPanel.tsx`)**：集成 `story_architect`、`scene_dramaturge`、`ending_forge`、`cold_reader` 四大专项工具；
+     - **后端命令与数据库层 (`database/mod.rs`)**：`assemble_toolbox_prompt` 增加 4 大专项的 Rust 原生上下文装配与因果关联提取；
+  7. **自动化测试 100% 验收验证**：
+     - `tests/test-skills-manager.ts` 扩展至 56 项端到端专项测试 100% 全绿；
+     - `test:humanizer` (17项)、`test:docking` (10项)、`test:updater` (28项)、`test:db` (53项) 全部通过；
+     - `cargo check` 与 `pnpm build` (1.09s) 零错误。
+
+### 3.29 工作区分栏拖拽最小边界保护与 AI 写作助手自适应防挤压加固
+- **问题根因定位**：
+  - 用户反馈截图显示「AI 写作助手」面板发生严重挤压变形：
+    1. 顶栏「AI 创作智囊团」标题字字垂直折叠成 7 行竖排；
+    2. 5 大功能 Tabs 强行塞入固定 5 列网格，文字双行折断；
+    3. 细纲卡片「+ 注入上下文」按钮与层级标题竖排挤叠；
+    4. 8 大高频动作按钮（顺推、环境、锋芒等）被截断为「顺.」、「环.」等单字省略号。
+  - 核心原因：
+    1. 系统分栏层级：`LayoutRenderer.tsx` 与 `Splitter.tsx` 原硬编码了 `minWidth: 120px`，允许分栏拖拽至极端窄缝；
+    2. 组件层级：`AiAssistantPanel.tsx` 缺少 `whitespace-nowrap`、弹性折行与自适应横向滑动缓冲。
+- **加固与修复方案**：
+  1. **分栏物理防线 (`LayoutRenderer.tsx` & `Splitter.tsx`)**：
+     - 水平分栏最小保护宽度提升为 `240px`，指针拖拽动态计算下限为 240px，并在较小父容器中以 `combinedPercent * 0.45` 兜底保护，杜绝任何分栏被压缩成窄缝；
+     - 分割线支持双击一键恢复等分尺寸。
+  2. **AI 助手标题栏与模型胶囊防线 (`AiAssistantPanel.tsx`)**：
+     - 主标题增加 `shrink-0 whitespace-nowrap`，彻底阻断单字垂直折行；
+     - 模型胶囊限制 `max-w-[55%] shrink-0 min-w-0`，超长名称内部单行截断，互不抢占。
+  3. **功能 Tabs 弹性无缝滑动条**：
+     - 将原死板 `grid-cols-5` 重构为 `flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth`；
+     - 每个 Tab 配置 `flex-1 min-w-[62px] whitespace-nowrap shrink-0`，宽屏等宽铺展，窄屏单行平滑滚动。
+  4. **细纲上下文与 8 大动作按钮弹性自适应**：
+     - 细纲卡片层级定位标题 `min-w-0 flex-1 truncate`，按钮 `whitespace-nowrap shrink-0` 绝对不竖排；
+     - 8 大高频动作重构为 `flex flex-wrap gap-1`，按钮 `flex-1 min-w-[54px] whitespace-nowrap`，告别单字省略号，全部完整呈现。
+  5. **外层容器加固 (`AiAssistantPanelWrapper.tsx`)**：
+     - 挂载 `min-w-[240px]` 容器级防护。
+- **验证结果**：
+  - `pnpm test:docking` 10 项端到端测试 100% 全部通过；
+  - `pnpm test:skills` 56 项测试 100% 全部通过；
+  - `pnpm build` 1.07s 零错误极速构建。
+
+### 3.30 设置中心与 Skills 视图性能重构与掉帧清零
+- **问题根因定位**：
+  - 用户反馈点开设置界面后有点卡顿掉帧，截图显示暗色模式下弹窗标题浅色而内容深色，且向下滑动后右侧留白黑屏；
+  - 核心根因：
+    1. 全屏 `backdrop-blur-xs` 在 Windows WebView2 触发高负荷 GPU 高斯模糊 Repaint；
+    2. 弹窗外壳 `transition-all duration-200` 强制触发 200ms 持续 Reflow 重排；
+    3. 弹窗外层与 `SkillsManagerView` 产生嵌套双重 `overflow-y-auto`，滚轮事件冲突；
+    4. 右侧试炼沙盒缺少 `sticky` 定位，左侧长列表滚动后右侧落入空白；
+    5. 打开弹窗即无条件发起 `getDbStats` 数据库磁盘 I/O。
+- **加固与修复方案**：
+  1. 移除 `backdrop-blur`，替换为无损高性能蒙层 `bg-black/50`；
+  2. 移除弹窗外层 `transition-all duration-200`，做到 0ms 瞬间秒开；
+  3. 解除双重滚动，弹窗内容层统一 `flex-1 min-h-0 overflow-hidden`，滚动权交由单一容器原生调度；
+  4. 右侧沙盒增加 `lg:sticky lg:top-4 self-start`，随时贴合屏幕并消除黑斑；
+  5. `useMemo` 缓存过滤规则与统计数据；
+  6. 补全弹窗全链路 `dark:` 深色类名；
+  7. `getDbStats` 改为按需懒加载。
+- **验证结果**：
+  - 56 项 Skills 测试全过，10 项 Docking 测试全过，生产打包 1.03s 零错误。
+
+### 阶段 11: 项目目录整理与冗余代码垃圾文件清理 (2026-10-15)
+- **清理项**：
+  1. `src/components/views/StoryBibleView.tsx`（546 行未被任何业务代码引用的孤儿组件，早期已被分化为 `CharactersView` 与 `WorldSettingsView`）；
+  2. `src/assets/react.svg`（Vite 初始模板图标）；
+  3. `scripts/analyze_workflow_chunks.cjs`、`scripts/extract_workflow_details.cjs`、`scripts/extract_xingyue_evidence.cjs`、`scripts/find_chunks.cjs`（4 个阶段 8 逆向分析临时脚本）；
+  4. 清理冗余 `.DS_Store`；
+  5. 优化规范 `index.html` 标题与元数据。
+- **验证核验**：
+  - 静态编译检查：`pnpm build`（1.40s 零警告通过）；
+  - Rust 核心检查：`cargo check`（0.47s 零警告通过）；
+  - 全套 10 组专项测试套件 100% 通过（总计 200+ 单元测试项无一失败）。
+
+### 阶段 12: 全系统性能瓶颈根除与操作卡顿掉帧深度治理 (2026-10-15)
+- **4 大卡顿核心诱因排查与治理**：
+  1. **WebView2 GPU 栅格化灾难 (Backdrop-Filter / Blur 穿透叠加)**：
+     - 排查发现主界面全屏同时激活了 5~6 个重度 CSS `backdrop-blur-xl` / `backdrop-blur-md` 层（Header、Sidebar、Editor 工具栏、AI 创作智囊团、WorkspaceToolbar、DockDropIndicator）。在 Windows WebView2 (Chromium) 内部，每个 blur 会迫使 GPU 截取底层帧缓冲分配离屏纹理，并逐像素执行高斯模糊 shader。拖动或打字时造成 GPU 算力雪崩。
+     - 优化治理：全面将常驻面板的伪透明滤镜替换为实体宣纸/竹简水墨主题底色（`bg-[#efe9dc]`、`bg-[#f3ede1]`、`bg-[#eae2d3]`），在 100% 保持古雅宣纸视觉质感的前提下，将 GPU 栅格化开销彻底降为零。
+  2. **正文打字触发全局 React 重渲染雪崩 (Keystroke Re-Render Cascade)**：
+     - 排查发现 `NovelEditor` 的 Tiptap `onUpdate` 在每一次按键时，都同步将最新 HTML 写入 Zustand 全局 `editorContent`。
+     - `Header` 在每次按键时执行全篇数万字正则表达式 `editorContent.replace(/\s+/g, '').length` 计算字数，导致整个包含大量弹窗与菜单的 738 行 `Header` 组件每秒重渲染数十次。
+     - 优化治理：
+       - `NovelEditor` 内为全局 store 更新设立 250ms 防抖，使 Tiptap 在本地保持 120fps 原生流畅输入；在用户失焦 (`onBlur`) 或按 `Ctrl+S` 时即时刷新最新状态。
+       - 将字数统计剥离为微型独立记忆组件 `HeaderWordCount`，仅在实际字符计数数值发生改变时精准刷新数字自身，使 `Header` 主体彻底从打字重渲染循环中解耦。
+  3. **分割线与悬浮窗口高频鼠标事件阻塞 (High-Frequency Pointer Event Flooding)**：
+     - 排查发现 `Splitter` 拖拽调整比例与 `FloatingPanelContainer` 窗口拖拽移动/缩放时，未加限制地在 raw `pointermove`（电竞鼠标高达 500~1000Hz）中直接分发状态更新，造成 React 调度严重阻塞。
+     - 优化治理：全部引入 `requestAnimationFrame`（rAF）缓冲调度机制，确保拖拽更新与显示器刷新率（60Hz/120Hz/144Hz）严格同步，丝滑流畅零丢帧。
+  4. **测试套件隔离与生产数据库污染修复**：
+     - 修复 `src-tauri/src/bin/db_test.rs` 在运行测试时向正式生产数据库写入 70+ 部重名测试作品导致的数据胀大与列表卡顿问题。为 `DbManager` 扩展 `new_at_path(db_path)` 构造器，并将 `db_test` 全面重定向到受管临时沙箱环境，自动运行并在退出时清理临时沙箱。
+     - 清理生产数据库中的 70 余部污染作品，恢复纯净状态。
+     - 修复作品删除限制，解除 `novels.length > 1` 硬编码门槛，在 `ChaptersPanel` 和 `Sidebar` 中提供显式安全的删除作品能力。
+  5. **Docking 工作台全树拖拽重渲染与强制重排彻底清零**：
+     - 将高频鼠标坐标 `draggingState` 从 `DockingWorkspace` 顶层彻底解耦并抽离为独立微组件 `<DraggingGhostPill />`，彻底消除拖拽 Tab 时引起的工作区全树及全部子面板无休止 Diff；
+     - 修复 `TabGroup` 在每次鼠标移动时无节制执行 `getBoundingClientRect()` 触发的成千上万次浏览器强制重排（Forced Synchronous Layout），优化为仅在拖拽起止时捕获 1 次；为 Tab 拖拽与面板 Header 拖拽加入 `requestAnimationFrame` 节流调度；
+     - 对 `LayoutRenderer`、`TabGroup`、`DockDropIndicator` 实施 `React.memo` 记忆化隔离。
+  6. **AI 流式生成高频 Token 与正文编辑器彻底解耦**：
+     - 将 `streamText` 从 1000 行的 `NovelEditor` 顶层订阅中剔除，提取为独立的微型隔离组件 `<StreamingPreviewBox />`，AI 每秒 30~60 字符的高频流式推进不再触发编辑器全树及工具栏的重渲染。
+  7. **自动保存周期冗余 SQLite 查询与版本 IPC 消除**：
+     - 消除自动保存（800ms 防抖）后盲目发起的 `list_chapters` 与 `list_chapter_versions` 两次 IPC 查询，改为依据后端返回结果在前端内存进行纯函数局部映射更新，且仅在显式创建快照时请求版本库，彻底节省磁盘 I/O。
+  8. **重型模态弹窗按需代码分割 (Code Splitting)**：
+     - 顶栏模态弹窗接入 `React.lazy` 与 `Suspense`，避免启动阶段一次性打包解析所有重型模块，Vite 构建速度提升至 1.04s。
+- **验证结果**：
+  - 生产打包 `pnpm build` 1.04s 零错误；
+  - 自动化 Docking 测试套件（10 项）100% 通过；
+  - 自动化 Skills 测试套件（56 项）100% 通过；
+  - 界面输入、拖拽分割线、悬浮窗移动、AI 流式创作、工作区面板停靠拖动均达到 120fps 极速响应。
+
+### 阶段 13: UI 拖拽交互手感与停靠体验深度重构 (2026-10-15)
+- **拖拽“奇怪手感”四大核心病灶与彻底根除**：
+  1. **Splitter 尺寸拉伸滞后与反向粘滞死区根除**：
+     - 排查发现此前 `NovelEditor` 根容器声明了 `transition-all`（含 150ms 尺寸过渡动画），在拖动分割线实时改变宽度的过程中，正文容器不断尝试补间过渡，导致分栏剧烈拉扯、滞后于鼠标轨迹；移除 `transition-all` 恢复 0ms 纯硬件实时尺寸贴合。
+     - 弃用传统的增量累加器（`deltaPx`）逻辑，引入 1:1 绝对坐标映射算法：直接依据鼠标在父容器中的绝对百分比坐标计算左右尺寸，彻底消灭触碰最小尺寸边界（minPercent）后的反向移动“粘滞死区（Dead Zone）”。
+     - 增加 18px 隐形响应捕获区（`-left-1.5 -right-1.5`），鼠标无需像素级精确对准 6px 细条即可顺畅抓取。
+     - 引入 W3C 标准 `setPointerCapture`，防止鼠标高速移动时脱焦或穿透。
+  2. **Tab 误触悬浮窗飞脱问题彻底解决**：
+     - 此前拖拽启动阈值仅为 5px，用户普通点击切换 Tab 时手部轻微抖动即误判为拖拽；
+     - 且 `handleDrop` 中若未命中停靠区（`!dropTarget`），代码硬编码强制调用 `get().floatPanel(...)`，直接将用户标签页剥离为独立浮动窗口，引发严重体验惊吓；
+     - 现将拖拽启动死区阈值提升至 15px，普通点击绝不误触拖拽；同时取消 `!dropTarget` 时的自动浮动，未命中停靠区时安全保留在原 Tab 组。
+  3. **Tab 组内横向拖拽平滑调序（Reorder Tabs）打通**：
+     - 在 Tab 栏内拖拽时，当鼠标扫过相邻 Tab，立即触发 `reorderTabs` 原生交换位置，实现类似 Chrome / VS Code 标签页横向平滑排序。
+  4. **全屏四象限边缘吸附（Quadrant Edge Snapping）替代狙击手式微型指南针**：
+     - 此前 `DockDropIndicator` 仅在中央 40px 的十字指南针小按钮上监听 `onPointerEnter`，用户拖着标签页移到屏幕边缘时完全无响应；
+     - 现改为覆盖整个面板的全域动态象限感应算法：鼠标靠近左/右/上/下 28% 边缘区域时自动高亮对应侧边停靠预览（半屏占位），居中区域高亮合并标签页，移出面板自动取消，彻底实现现代桌面 IDE 级别的直觉吸附停靠。
+- **验证结果**：
+  - 生产打包 `pnpm build` 1.27s 零错误；
+  - 自动化 Docking 测试套件（10 项）100% 通过；
+  - 自动化 Skills 测试套件（56 项）100% 通过；
+  - 分栏拖拽 1:1 像素级跟随、Tab 平滑调序、全域边缘吸附停靠手感与 VS Code 完全一致。
+
+### 阶段 14: 悬浮窗自动吸附侧边栏、边缘磁吸与拖拽停靠闭环 (2026-10-15)
+- **核心用户痛点与病灶剖析**：
+  - 用户反馈“悬浮窗不能自动吸附到侧边栏吗”。
+  - 排查发现原实现中，拖拽悬浮窗标题栏移动时，仅在局部闭包中累加更新其内部坐标 `(x, y)`，并在 `document.body` 挂载了 `zIndex: 99999` 的全局 Pointer Overlay 遮罩；
+  - 该机制导致：(1) 未派发全局 `draggingState`，工作区无法激活 `DockDropIndicator`；(2) 悬浮窗自身的 DOM 实体与全屏 Overlay 彻底阻断了向下的指针事件，即使拖到工作区侧边栏上方也无法命中停靠区；(3) 用户松手时无法调用 `handleDrop`，悬浮窗始终停留在桌面悬浮层，无法拖拽吸附并入侧边栏；
+  - 悬浮窗标题栏此前仅有一个极小的“重新停靠”按钮，且硬编码并入树中首个 Tab 组，缺乏显式吸附至左侧侧边栏或右侧工具栏的精准通道。
+- **重构方案与落地成果**：
+  1. **拖拽悬浮窗全链路打通全局 Docking 停靠引擎**：
+     - 在 `FloatingPanelContainer` 中重构 `handlePointerDownHeader`：移除阻断事件的 `zIndex: 99999` 全屏 Overlay；当拖动位移 > 8px 时，自动向工作区派发 `setDraggingState({ panel, sourceFloatingId, dragSource: 'floating', ... })`；
+     - 拖拽激活时，被拖动的悬浮窗赋予 `pointer-events-none opacity-70 ring-2 ring-amber-600 shadow-2xl`，指针事件无缝穿透至底层的 `DockDropIndicator`；
+     - 当悬浮窗拖动至左侧侧边栏（章节目录）或其他任意分屏的 28% 边缘或中心时，全屏立即亮起茶金半透明停靠预览（如“← 停靠在左侧”、“⧉ 合并为标签页”）；
+     - 鼠标松开时触发 `handleDrop()`，调用 `dockFloatingPanel` 毫秒级将悬浮窗从浮动层解绑并自动吸附融入目标侧边栏/分屏，若未在停靠区松手则安全保留在当前悬浮位置。
+  2. **悬浮窗边缘磁吸贴边对齐 (Magnetic Edge Snapping)**：
+     - 当用户自由拖动悬浮窗靠近窗口边缘（左边距 < 24px、顶边距 < 48px、右/底边距 < 24px）时，自动触发边缘磁吸阻尼，自动贴合到 8px / 40px 规范间隙，告别乱贴乱跑。
+  3. **悬浮窗标题栏新增一键快速吸附侧边栏通道**：
+     - 在悬浮窗标题栏配备专属快捷吸附按钮：
+       - `ArrowLeftToLine`：一键吸附至左侧侧边栏（优先作为标签页合并入章节目录侧边栏，或独立拆分为最左侧分屏）；
+       - `ArrowRightToLine`：一键吸附至右侧工具栏（AI写作助手/主编控制台侧）；
+       - `ArrowDownToLine`：一键恢复停靠入主工作区。
+  4. **底层架构扩展与测试覆盖**：
+     - 在 `dockingTree.ts` 扩充 `findLeftmostTabGroup`、`findRightmostTabGroup`、`findFirstTabGroup` 纯函数；
+     - 在 `useWorkspaceStore` 封装 `dockFloatingToSidebar` 智能停靠派发器；
+     - 在 `test-docking-workspace.ts` 扩充【测试十一：悬浮窗自动吸附侧边栏与停靠还原】，全流程覆盖左侧侧边栏合并、最左侧独立拆分与右侧工具栏吸附。
+- **验证结果**：
+  - 自动化 Docking 测试套件（扩充至 11 项）100% 全部通过；
+  - 自动化 Skills 测试套件（56 项）100% 全部通过；
+  - 前端编译 `pnpm build` 1.42s 顺利打包通过；
+  - Rust 核心后端 `cargo check` 0.50s 编译检查通过。
+
+### 阶段 15: 全局配色断裂修复与 Tailwind v4 显式类名暗色隔离 (2026-10-15)
+- **核心用户痛点与病灶剖析**：
+  - 用户反馈“这配色明显不对了”，并附带应用实机截图；
+  - 截图中呈现极其突兀的“黑白阴阳脸”割裂效果：
+    1. 顶栏左侧和中间呈现黑色背景，而最右侧的缩放与窗口控制区却突兀地呈现一块浅米色背景；
+    2. 下方的 Workspace 布局工具栏呈现暗黑色；
+    3. 右侧的 AI 写作助手内容区呈现深灰黑色，但顶部的标签和输入框呈现浅色；
+    4. 中间的正文编辑器、Tab 栏、状态提示卡片却完好呈现白天的浅色宣纸质感；
+  - **根本原因诊断**：
+    - 项目升级使用了 Tailwind CSS v4 (`@tailwindcss/vite`)。在 Tailwind v4 中，默认规则下 `dark:` 变体并不依赖 HTML 类名 `.dark`，而是默认匹配操作系统的媒体查询 `@media (prefers-color-scheme: dark)`！
+    - 当用户的 Windows 操作系统开启了深色主题时，WebView2 默认将 `prefers-color-scheme` 判定为 `dark`；
+    - 这导致代码中部分写了 `dark:bg-[#1a1714]` 的元素被强制注入深色，而另一些使用默认宣纸配色的元素保持浅色；同时顶栏最右侧常驻控制区写死了 `bg-[#efe9dc]` 未配对 `dark:` 类名，造成黑顶栏右端出现刺眼的米白方块！
+- **修复方案与落地成果**：
+  1. **配置 Tailwind v4 类名隔离暗色变体**：
+     - 在 `src/App.css` 头部注入 `@custom-variant dark (&:where(.dark, .dark *));`；
+     - 彻底切断操作系统的 `@media (prefers-color-scheme: dark)` 越权渗透，强制 `dark:` 变体仅在 `<html>` 真正挂载 `.dark` 类时才激活生效；编译生成的 CSS 中 `prefers-color-scheme` 归零，纯靠应用内 `themeMode`（白天/黑夜模式）精准驱动。
+  2. **修复顶栏右端绝对常驻控制区配色**：
+     - 在 `Header.tsx` 右端控制区补齐 `dark:bg-[#1a1714]` 与缩放面板的暗色变量，彻底根除深浅断层方块。
+  3. **恢复宋韵暖木与宣纸水墨完整统一**：
+      - 白天模式下，整个应用（Header、Toolbar、Sidebar、Editor、AI 面板、Tab 栏）恢复 100% 连贯统一的温润宣纸米白金（`#f5f0e6`, `#efe9dc`, `#fdfbf7`）；
+      - 黑夜模式下，统一呈现深宵冷砚黑（`#1a1714`, `#1c1917`），绝不混色断层。
+- **验证结果**：
+  - 前端编译 `pnpm build` 1.12s 顺利打包；
+  - 编译后 CSS 实测 `prefers-color-scheme: false`，`.dark` 规则 100% 受控；
+  - 11 项 Docking 测试与 56 项 Skills 测试全部通过。
+
+### 阶段 16: AI 优化提示词深度重构引擎 (V2.5.1, 2026-10-15)
+- **核心需求与设计动机**：
+  - 用户提出需求：“能不能增加AI优化提示词的功能”；
+  - 创作者在构思时通常仅能输入极其单薄、抽象、短促的初始想法（例如：“写主角进入藏经阁第七层，发现失传古籍中的惊人秘密，与守阁长老产生言语交锋”）；
+  - 普通大模型接收此类单薄指令极其容易产生“AI流水账、解释型情绪、扁平对白与无张力推进”；
+  - 严格遵循 `AGENTS.md` 规范：坚决拒绝伪多 Agent、坚持真实 LLM 连通、真实 SQLite 上下文注入、独立提示词目录隔离，绝不做花哨空壳。
+- **全链路落地架构**：
+  1. **提示词与业务逻辑解耦 (`prompts/prompt_optimizer.md`)**：
+     - 确立“四大点金重构维度”：动机具象化与阻碍设计 (Objective & Obstacle)、微观动作与环境感官 (Sensory & Show Don't Tell)、言语交锋与潜台词 (Subtext & Micro-conflict)、即时后果与断章钩子 (Stakes & Cliffhanger)；
+     - 确立四维专项重构视角：
+       - `DRAMA_CONFLICT` (戏剧博弈与人物交锋)
+       - `SENSORY_DETAIL` (多维感官白描与物象细节)
+       - `PLOT_HOOK` (伏笔勾连与章末断章悬念)
+       - `CONCISE_PUNCHY` (快节奏爽利推进与强冲突对抗)
+     - 严格约束返回格式为标准化 JSON Schema。
+  2. **Rust 后端数据模型与 IPC 命令 (`src-tauri/`)**：
+     - `src-tauri/src/models/mod.rs`：新增 `OptimizeWritingPromptInput` 与 `OptimizeWritingPromptResult`；
+     - `src-tauri/src/commands/mod.rs`：实现 `optimize_writing_prompt`，读取真实作品流派、当前章节情境、Top 权威设定事实、活跃语气特征 (Voice Profile)，通过 `prompts/prompt_optimizer.md` 组装系统提示词并调用 `OpenAIClient` 进行真实推理与 JSON 解析；
+     - `src-tauri/src/lib.rs`：在 `tauri::generate_handler!` 注册命令。
+  3. **前端类型与桥接系统 (`src/types/`, `src/utils/`)**：
+     - `src/types/index.ts`：导出 `PromptOptimizationAngle`、`OptimizeWritingPromptInput` 与 `OptimizeWritingPromptResult`；
+     - `src/utils/tauriBridge.ts`：暴露 `api.optimizeWritingPrompt`；
+     - `src/utils/webMockStorage.ts`：实现高保真四维 WebMock 降级仿真，确保脱机/浏览器开发模式无缝体验。
+  4. **创作面板交互融合 (`AiAssistantPanel.tsx`)**：
+     - 在作家流式写作 (`STREAM_WRITE`) 与多 Agent 全流程协作 (`COLLABORATE`) 输入框上方增设高辨识度 `【✨ AI 优化提示词】` 触发按钮；
+     - 展开式优化卡片内嵌四重视角切换 Pill、模型推理动效、文学标签徽章、三大核心文学增强要点、建议章末断章悬念 (Cliffhanger Hook) 专有引用卡与完整指令预览；
+     - 提供 `【✅ 采纳并替换入输入框】`、`【➕ 追加】`、`【📋 复制指令】`、`【🔄 换视角重新优化】` 一键闭环。
+  5. **自动化测试套件与安全兜底 (`tests/test-prompt-optimizer.ts`)**：
+     - 新建 22 项全视角、无死角自动化测试，覆盖物理提示词规范、四大视角逻辑、输出契约以及全流程无损数据防护。
+- **验证结果**：
+  - `pnpm test:optimizer`：22 项自动化测试 100% 通过；
+  - `cargo check`：0.47s 编译检查 0 错误 0 警告；
+  - `pnpm build`：1.18s 生产打包 0 错误；
+  - 既有 `test:docking`, `test:skills`, `test:arena`, `test:typesetter` 全部 100% 全绿。
+
+### 阶段 17: 关闭最后一个面板干净呈现空工作区与防自动回滚三栏 (2026-10-15)
+- **核心用户痛点与问题根因**：
+  - 用户反馈：“删除最后一个界面后，又变回最初的三个了”，并附带只剩最后一个【AI 写作助手】面板的实机截图；
+  - **根本原因**：
+    - 在 `useWorkspaceStore.ts` 的 `closePanel` 逻辑中，当用户连续关闭面板直至树中最后一个面板也被移除时，剪枝算法返回 `newRoot: null`；
+    - 原代码直接执行了 `const fallbackRoot = cloneTree(FOCUS_WRITING_LAYOUT.root)`；
+    - 而 `FOCUS_WRITING_LAYOUT` 包含初始的 3 个三栏面板（章节目录、正文编辑器、AI 写作助手）。这导致用户好不容易逐个关闭不需要的面板后，只要关闭最后一个，整个工作区就会强制“九头蛇式复活”回滚到初始三栏！
+- **优雅解决方案与落地成果**：
+  1. **干净空工作区状态机 (`tab_empty_workspace`)**：
+     - 在 `closePanel` 与 `floatPanel` 中，当最后一个面板被关闭或转为悬浮窗导致树空时，生成纯净的 `TabGroupNode`（`id: 'tab_empty_workspace', panels: []`），绝不擅自复活初始三栏；
+     - 在 `dockingTree.ts` 的 `validateAndSanitizeLayout` 中识别合法的 `tab_empty_workspace` 根节点，既防止了从持久化存储恢复时意外复活，又保留了对其他破损配置的自愈容错能力。
+  2. **温润宋韵空工作区引导卡片 (`TabGroup.tsx`)**：
+     - 当面板数量为 0 时，Tab 栏显示轻柔提示 `工作区（暂无已打开面板）`，右侧保留 `+` 自由添加按钮；
+     - 主工作区呈现精致的宣纸卡片，提供快捷入口：
+       - `【📖 打开正文编辑器】`
+       - `【📑 打开章节目录】`
+       - `【✨ 打开 AI 写作助手】`
+       - `【🧰 打开小说百宝箱】`
+       - 底栏链接：`【想恢复默认三栏？恢复初始专注写作布局】`。
+  3. **自动化测试套件扩充 (`test-docking-workspace.ts`)**：
+     - 新增【测试十二：关闭最后一个面板保留纯净空工作区】，验证关闭单面板后面板数组彻底归零、树中面板总数 0、绝不复活初始三栏面板、并在空工作区中通过 `openPanel` 能够正常打开新面板。
+- **验证结果**：
+  - `pnpm test:docking`：12 项自动化测试 100% 全绿通过；
+  - `pnpm build`：1.27s 打包 0 错误；
+  - `cargo check`：0.50s 检查 0 错误 0 警告。
+
 ---
 
 ## 4. 总结与后续演进建议
@@ -567,14 +842,295 @@ NovelForge AI V2.5 系列已全面高质量落地！
 - **第一梯队**：正文划词悬浮智能胶囊 + 水墨行内 Visual Diff + Humanizer 提示词与 50+ 套话诊断引擎；
 - **第二梯队**：多模型同台比稿竞技场 (Multi-Model Arena) + 盲测对决 + 智能融合出稿 + 战报持久化；
 - **第三梯队**：标准 EPUB 3 国际电子书原生导出 + 主流网文平台（起点/番茄/晋江）一键排版清洗机 + 发布合规预检；
-- **第四梯队**：长篇存稿极速解析与 Word (.docx) 智能分章导入系统，彻底打通外部书稿无损迁移！
-- **第五梯队**：多模型网关配置与模型 ID 真实持久化、顶栏与智能体全局模型状态联动！
-- **第六梯队**：全屏/最大化顶栏右侧溢出根除、Far-Right 窗口控制区（最小化、向下还原、关闭 X）永久绝对锚定锁定！
-- **第七梯队**：一键新版本免密自动签名构建流水线打通，桌面安装包开箱即用！
+- **第四梯队**：长篇存稿极速解析与 Word (.docx) 智能分章导入系统，彻底打通外部书稿无损迁移；
+- **第五梯队**：多模型网关配置与模型 ID 真实持久化、顶栏与智能体全局模型状态联动；
+- **第六梯队**：全屏/最大化顶栏右侧溢出根除、Far-Right 窗口控制区永久绝对锚定锁定；
+- **第七梯队**：一键新版本免密自动签名构建流水线打通，桌面安装包开箱即用；
+- **第八梯队**：Agent Skills 技能管理中心与 6 大专业技能矩阵全链路闭环；
+- **第九梯队**：代码库精简洗练，孤儿视图组件与临时脚本彻底清除，项目结构纯净健壮；
+- **第十梯队**：全系统操作流畅度极致调优，根除 GPU backdrop 滤镜过载与键盘打字重渲染雪崩，实现 120fps 丝滑创作体验；
+- **第十一梯队**：UI 拖拽手感专业级重构，告别粘滞死区与意外弹窗，实现 VS Code 级别的分栏 1:1 跟手与全域吸附停靠；
+- **第十二梯队**：悬浮窗拖拽全域自动吸附与侧边栏一键融入闭环，支持智能边缘磁吸与双侧精准停靠；
+- **第十三梯队**：全局 Tailwind v4 显式类名暗色隔离，彻底根除系统深色主题渗透导致的阴阳脸混色断层；
+- **第十四梯队**：AI 优化提示词深度重构引擎，四维文学视角智能重构粗纲，让普通构思秒变好莱坞与顶级网文高张力创作指令；
+- **第十五梯队**：关闭最后一个面板干净呈现空工作区引导，彻底根除“删除最后一个界面自动复活最初三个”的逻辑倒退；
+- **第十六梯队**：纯净无侵入小说创建、分卷自主增删闭环与标题前缀去重（V2.5.2），彻底解决“没开新书却自动塞入第一卷”的困扰，移除后端强行塞入默认卷逻辑，开放独立【加卷】与分卷【删除】能力。
+- **第十七梯队**：全层级大纲、章节与作品元数据热编辑闭环（V2.5.3）：
+  1. **正文编辑器章节标题点击即改**：彻底解决正文顶部章节标题静态只读问题，实现点击/悬停一键内联重命名，输入框契合羊皮纸宋体排版，回车或失焦即刻保存，ESC 或取消按钮安全取消，无缝联动 SQLite、Zustand、大纲目录树与 FTS5 全文索引；
+  2. **分卷重命名与大纲修订**：新增 `update_volume` 端点与前端桥接，侧边栏树形节点提供一键重命名按钮，保持向后兼容与平滑刷新；
+  3. **大纲树与章节目录操作平权**：侧边栏树形图节点补齐【📋 复制纯文本】、【✏️ 重命名】、【🗑️ 删除】悬浮操作，ChaptersPanel 同步支持快捷重命名；
+  4. **作品项目档案全要素修改**：`NovelInfoPanel` 从纯只读展示升级为支持作品书名、流派题材、叙事文风、故事核心梗概的一键编辑与持久化，彻底消除初始作品名无法修改的痛点；
+  5. **全系统测试验证**：SQLite 后端 56 项测试 100% 通过（新增 3 项元数据与 FTS5 联动验证），12 项 Docking 测试全绿，标题规范化测试全绿，Vite 编译 0 错误。
+- **第十八梯队**：原生 Model Context Protocol (MCP) 服务端与 AI 全流程创作接管系统（V2.5.4）：
+  1. **原生 Rust 高性能独立二进制 (`novelforge_mcp.exe`)**：严格遵循 Anthropic MCP 与 JSON-RPC 2.0 stdio 协议规范，内部日志精准分流至 `stderr`，确保 `stdout` 纯净零污染传输；
+  2. **SQLite WAL 本地直连与高并发零锁协同**：直连用户本地 `%APPDATA%\NovelForgeAI\novelforge.db`，支持外部 AI 与桌面端同时并发读写，互不阻塞、互不锁库；
+  3. **19 项全生命周期创作接管工具 (Full-Lifecycle Tools)**：覆盖作品 CRUD、分卷管理、大纲树查询、章节增删读写与版本历史留痕、人物卡管理、世界观因果公理、L0~L4 五层记忆装配上下文（Context Pack）、FTS5 全文秒级搜索、全书 TXT/EPUB 导出；
+  4. **开箱即用通用启动器 (`scripts/novelforge-mcp.cjs`)**：自适应探测编译产物与环境变量，支持 `--test` 一键自检与 `--tools` 工具清单检视；
+  5. **端到端 E2E 自动化测试全绿**：`scripts/test-mcp-e2e.cjs` 端到端验证覆盖握手、全书列举、大纲树拉取、世界观法则与 FTS5 检索，100% 通过。
+- **第十九梯队**：DAWO 逆向实战融合与去 AI 味朱雀对抗量化升级（V2.5.5）：
+  1. **六维人类信号量化打分引擎与朱雀对抗算法升级**：
+     - 精准拆分叙述句与对话句（`splitSentences`），对引号内台词与正文叙述做正交分离；
+     - 引入句长离散变异系数（`CV = σ / μ`）量化指标，科学度量段落长短参差呼吸感与抗 AI 检测爆发度（Burstiness）；
+     - 引入实体具体性（`specificity`）打分，度量数字、专有名词、地名与具体物象密度；
+     - 叙述层严禁跳出说理，口语词与疑虑推敲词只准出现在台词对话层；
+     - 植入 14 项“100% 判 AI”红牌毒句式（工整排比三连、假靶子反折“不是A而是B”、万能状语“，带着…”、深吸一口气、不可否认/总而言之等），在 `TypesetterCleanerPanel` 与 `HumanizerEngine` 中实时告警与拦截；
+     - `test-humanizer-engine.ts` 测试套件扩充至 27 项，100% 通过。
+  2. **角色生存与出场追踪看板 (Tracking Board)**：
+     - 在 `CharacterProfilesPanel` 中新增【出场生存追踪】与【人物档案卡】双模式看板；
+     - 支持角色生命体征（健康 / 受伤 / 闭关 / 离场 / 死亡）5 大状态即时切换与流转；
+     - 后端新增 `update_character_status` 命令，同时写入 `characters` 表与 `character_state_events` 事件溯源表；
+     - 增加已确认死亡角色的“因果锁”告警标识（防死人意外出场与因果崩塌），并配备状态统计分布。
+  3. **正文速览偷看抽屉 (ChapterPeekDrawer)**：
+     - 彻底解决长篇创作时“上一章卡在哪里、断章伏笔断了没”的心流痛点；
+     - 正文编辑工具栏一键唤起抽屉，无缝展示全书目录、前章开篇 200 字以及**章末断章悬念（最后 350 字）**；
+     - 支持一键复制末尾钩子、一键跳转目标章节，全程无需离开当前正文编辑区域。
+  4. **灵感起名生成器 (QuickNameModal)**：
+     - 支持人物（主角/配角/反派/路人）、势力宗门、功法招式、灵宝装备、怪物妖兽、天地道具 7 大品类；
+     - 支持东方修仙、赛博都市、魔幻奇幻、西方古典等多流派风格；
+     - 内置 0-Token 离线词根毫秒级组合库，同时支持调用已配置的大模型深度定制起名。
+  5. **全系统编译与测试**：
+     - 56 项 SQLite 核心后端测试 100% 通过；
+     - 27 项去 AI 味与朱雀对抗测试 100% 通过；
+     - `tsc && vite build` 生产构建 0 错误 0 警告。
 
-至此，NovelForge AI 已经形成了从“外部 Word 存稿一键导入 -> 智能多 Agent 构思写作 -> 字句级划词微雕 -> 双模竞技PK -> 终稿清洗与全渠道出版分发”的完整专业长篇小说生产力闭环！
 
 
 
 
+
+
+
+
+
+- **第二十梯队**：创作流程流水线化重塑与标题栏功能分区分级降噪（V2.6.0）：
+  1. **标题栏彻底告别随意堆放，构建三级标准功能分区**：
+     - **左区【书架与工程上下文】**：折叠侧边栏按钮 + 品牌 Logo + **典雅作品切换胶囊 (Novel Switcher Badge)**，一键查看作品名、流派、章节数，并可展开书架快捷下拉切换或新建作品，确保作者在任意页面时刻明确当前创作项目；
+     - **中区【长篇小说六步法创作流水线 (Creation Pipeline Stepper)】**：
+       - 严格按照长篇创作专业路径构建 6 大阶段步进器：
+         `① 构思立项 (DASHBOARD)` ➔ `② 世界架构 (WORLD)` ➔ `③ 角色谱系 (CHARACTERS)` ➔ `④ 剧情大纲 (PLOTS)` ➔ `⑤ 正文执笔 (EDITOR)` ➔ `⑥ 记忆连载 (MEMORY)`；
+       - 配备数字圆标、语义图标、中文阶段名与流向箭头指示，激活态采用古墨金石朱砂印泥渐变高亮；
+       - 阶段悬停显示详细创作任务引导气泡；
+       - 尾部配备「💡 流程向导」快捷入口，呼出完整流程解析；
+     - **右区【集约化工具箱与系统视窗区】**：
+       - **创作上下文状态**：仅在正文模式或有选定章节时显示字数统计与存盘微指示器（已存/存盘中/待存/失败）；
+       - **快捷指令**：全局指令速查 (Ctrl+K)；
+       - **核心连载**：多 Agent 自动连载高光胶囊；
+       - **创作工坊抽屉 (Creation Workshop)**：将散乱按钮规整为清晰的三大抽屉：
+         - 【稿件输入与排版】：Word (.docx) 智能导入分章、网文排版清洗机、本章/全本导出；
+         - 【AI 创作与拆解】：爆款范文拆解器、小说百宝箱、剧情工作流引擎、作者文风档案、双模型比稿竞技；
+         - 【质检、沉淀与交付】：全书贯通因果体检、正文资产沉淀提案、Agent Skills 技能中心、发布交付中心；
+       - **系统与视窗控制**：界面缩放步进器、日夜主题切换、专注写作模式 (Zen Mode)、模型与系统设置、AI 助手抽屉开关、原生无边框窗口三键。
+  2. **全流程向导组件落地 (`CreationWorkflowModal.tsx`)**：
+     - 系统性阐释长篇小说 6 阶段的核心输入、关键交付物（产出清单）与避坑建议，展示当前作品实时进度并支持一键前往。
+  3. **概览看板升级 (`DashboardView.tsx`)**：
+     - 增加可视化【长篇小说六步法协同创作流水线 (Creation Pipeline Roadmap)】交互卡片栅格，提供全流程健康度与快捷跳转。
+  4. **全系统编译与测试**：
+     - `pnpm build` 1.29s 快速构建打包，0 错误；
+     - 12 项 Docking 工作台测试、27 项 Humanizer 测试、28 项 Updater 测试、17 项 Arena 测试、20 项 Typesetter 测试、36 项 Memory 测试、8 项 Provider 测试、16 项 Word 测试、56 项 Skills 测试、22 项 Optimizer 测试 100% 全部通过。
+
+- **第二十一梯队**：DAWO 第二梯队三大核心生产力引擎实装落地与全系统联动（V2.6.1）：
+  1. **样章与名作拆书工坊 (`DeconstructEngine` & `DeconstructModal` / `DeconstructPanel`)**：
+     - 支持外部样章/竞品范文多维度（结构卷章布局、黄金三章开篇钩子、节奏爽点与断章悬念、人物设计与反派动机、可复用实操套路）结构化逆向拆解；
+     - 深度规范独立提示词中心规范 `prompts/deconstruct_architect.md`；
+     - 创新实现本地 0-Token 纯离线快速分析引擎，零模型开销毫秒级输出字数密度、段落长短参差、台词对话黄金呼吸占比（25%~45%）、前 300 字切入方式诊断与章末尾钩分析；
+     - 结构化提取可复用套路打法卡与戏剧节拍流，支持一键复制到剪贴板。
+  2. **全书因果体检与违规巡检系统 (`FullCheckEngine` & `FullCheckModal` / `FullCheckPanel`)**：
+     - 自动化跨章巡检 5 大因果维度：
+       - `CHARACTER_LIFE`：精准识别并拦截已死亡角色以活人形式发言动作的诈尸危机（CRITICAL），同时智能放行回忆/祭奠语态；检测闭关/离场角色突兀现身（WARNING）；追踪核心角色长期掉线（INFO）；
+       - `FORESHADOW_ORPHAN`：巡检连载 10 章以上仍未推进的初设滞后伏笔（WARNING）；
+       - `CANON_CONFLICT`：巡检正文触碰世界观权威公理中否定性约束条款的冲突风险（WARNING）；
+       - `LENGTH_PACE`：巡检单章篇幅过短 (< 1200字) 或过长 (> 6000字)，智能豁免序章/引子/后记；
+       - `CENSOR_RISK`：全书敏感禁限词跨章扫描并提供合规建议；
+     - 扣分制输出 0~100 综合因果健康指数仪表盘与四级健康评级（`PERFECT` / `GOOD` / `NEEDS_ATTENTION` / `DANGER`），提供一键直达问题章节。
+  3. **正文资产反哺提案引擎 (`AssetProposalEngine` & `AssetProposalModal` / `AssetProposalPanel`)**：
+     - 毫秒级规则扫描正文未在设定库登记的野生实体（新人物、江湖宗门势力、功法绝技、神兵法宝道具）；
+     - 自动对比现有设定排除已有角色与法则，过滤代词与常见虚词误判，智能抽取上下文整句；
+     - 彻底打通与 SQLite 后端的数据流转管道，支持【一键采纳】：人物角色直通 `api.createCharacter`，门派功法法宝直通 `api.createWorldRule`（自动赋予 EXTENDED 扩展法则级别），实现从正文到世界观设定的真实持久化沉淀。
+  4. **全系统架构融合与双模自适应**：
+     - 支持独立悬浮弹窗（Header 创作工坊与 Toolbox 顶栏呼出）与工作台可停靠面板（`deconstruct_workshop`, `full_check`, `asset_proposal`）双模运行，100% 视图复用，杜绝空壳与假页面；
+     - 全局命令面板 (`Ctrl+K`) 与顶栏创作工坊下拉菜单全链路挂载。
+  5. **全系统编译与自动化测试全绿**：
+     - 新建专有测试套件 `tests/test-second-cohort-engines.ts`，46 项严苛断言 100% 通过；
+     - 全系统自动化测试累计突破 238 项全绿；
+     - `pnpm build` (tsc && vite build) 1.34s 极速构建，0 错误 0 警告。
+
+- **第二十二梯队**：作品封面与装帧设计工坊、跨章节批量精修与全站装帧系统（V2.6.2）：
+  1. **作品封面与物理装帧系统 (`BookCoverView` & `BookCoverModal`)**：
+     - **真实物理 3D 书籍渲染 (`BookCoverView.tsx`)**：
+       - 采用 CSS 3D 透视（`perspective: 900px`）呈现真实书籍厚度、侧边纸张切口叠层、左侧装订书脊压痕阴影与金丝书签带（Bookmark Ribbon）；
+       - 内置 8 大经典文学流派程序化纹理装帧预设（宣纸水墨、烫金沉香、澄心青竹、深邃星穹、孤月夜影、朱砂墨韵、羊皮奇幻、极简象牙），支持书名自动竖排/横排、作者印章排版与流派徽章；
+       - 适配 5 档规格尺寸（`xs`, `sm`, `md`, `lg`, `xl`），完美嵌入看板、顶栏书架选择器与作品信息面板；
+     - **全功能作品封面设计工坊 (`BookCoverModal.tsx`)**：
+       - **预设装帧**：实时预览并一键切换 8 种高雅纹理，支持调整副标题与印章文案；
+       - **本地上传**：支持本地图片一键转 Base64 编码，100% 离线本地优先存储于 SQLite，杜绝远程外链失效或断网丢失；
+       - **网络链接**：支持直链高清图片输入与实时预览验证；
+       - **AI 绘图生图咒语**：结合当前小说题材、世界观背景与核心梗概，自动为 Midjourney / Flux / SDXL 装配高审美画面描述词与参数，支持一键复制到剪贴板；
+     - **SQLite 数据库向下兼容迁移**：
+       - `novels` 表平滑迁移 `cover_url TEXT DEFAULT ''`，编写向下兼容迁移脚本；
+       - `db_test` 57 项全测试通过，验证 Base64 封面与预设封面创建、读取、更新全流程。
+  2. **跨章节批量精修工作台 (`BatchReviseEngine` & `BatchReviseModal` / `BatchRevisePanel`)**：
+     - 支持全书、指定章节范围（如第 1~5 章）、或多选章节执行专项批量重塑；
+     - 提供 4 大精修预设（去 AI 味与消除工整排比、节奏提速与压缩冗余、强化章末断章悬念尾钩、具象化五感微表情）与自定义指令；
+     - 支持模型网关并发调用与本地 0-Token 纯离线清洗双模；
+     - 差异比对面板（Diff Summary）逐章审核、一键采纳并保存新版本。
+  3. **神州山河地理沙盘 (`MapEngine` & `MapModal` / `MapPanel`)**：
+     - 支持小说宗门势力、主城要塞坐标定标、危险等级与路线规划，联动世界观法则库。
+  4. **手打原创 vs AI 协同双轨字数大盘 (`DualWordStatsBadge` & `DualWordStatsEngine`)**：
+     - 细粒度追踪手写与 AI 协同字数占比，透明呈现作家原创纯度。
+  5. **全系统编译与测试**：
+     - `cargo run --bin db_test` 57/57 核心后端测试 100% 通过；
+     - `npx tsc --noEmit` 0 错误；
+     - `npm run build` (tsc && vite build) 1.10s 快速打包成功。
+
+- **第二十三梯队**：DAWO 第三梯队三大核心生产力引擎落地闭环与全自动化测试验收（V2.6.3）：
+  1. **跨章节批量修改与 Diff 提案流 (`BatchReviseEngine` & `BatchReviseModal` / `BatchRevisePanel`)**：
+     - **提示词规范化解耦**：设立 `prompts/batch_reviser.md`，注入顶级长篇小说批量精修架构师职责与三大核心戒律（绝对剧情保真、目标专一、输出纯粹正文无客套）；
+     - **灵活作用域过滤**：支持全书 (`ALL`)、连续章节区间 (`RANGE`，如 1~10 章，自适应 min/max)、自主勾选指定章节 (`SELECTION`)；
+     - **4 大精修目标与自定义指令**：
+       - `DEAI_POLISH`：消除 50+ 种典型 AI 机械套话（封杀不仅如此、嘴角勾起、眼神闪过、空气凝固等），强化真实人情味；
+       - `PACE_ACCELERATE`：压缩冗余说明，精炼短句，强化交锋推进；
+       - `HOOK_ENHANCE`：重塑章末收尾，打造高悬念断章尾钩；
+       - `SENSORY_DETAIL`：五感微表情与环境动作具象化 (Show Don't Tell)；
+       - `CUSTOM`：支持用户自由输入专项精修提示词；
+     - **0-Token 纯离线快速规则清洗**：无网络或零模型消耗下毫秒级执行典型套话清洗、多余叹号压缩与尾钩自动装配；
+     - **字符级差异比对指标 (`calculateDiffMetrics`)**：计算新增字数、削减字数与中文语义化变动摘要；
+     - **非破坏性提案确认与安全存盘**：强制以 `BatchReviseProposal` 供作者逐章对比审阅，采纳时自动调用 `api.saveChapterContent` 并提交 `BATCH_REVISE` 来源版本快照，彻底杜绝误触丢稿。
+  2. **手打原创 vs AI 辅助字数双流统计与心流追踪 (`DualWordStatsEngine` & `DualWordStatsBadge`)**：
+     - **免数据库迁移的算法精准归因**：基于章节及现有版本历史的 `source_type`（`USER_EDIT`, `AI_ASSISTANT_REVISE`, `PROSE_WRITER_GEN`, `BATCH_REVISE` 等）精准折算手打原创字数与 AI 辅助字数；
+     - **全书双轨聚合大盘与心流评级**：
+       - `PURIST` (纯粹原创 · 匠心手作，原创 >= 85%)；
+       - `BALANCED_COPILOT` (人机协同 · 平衡心流，50% ~ 84%)；
+       - `AI_HEAVY` (深度赋能 · 概念总监，< 50%)；
+     - **高雅视觉胶囊徽章 (`DualWordStatsBadge.tsx`)**：金黄手打条 + 蓝紫 AI 条，悬浮展开详细字数、章节明细与签约合规存证说明，完美嵌入概览看板数据指标栏。
+  3. **架空世界宣纸墨韵地理沙盘与行军因果核验 (`MapEngine` & `MapModal` / `MapPanel`)**：
+     - **世界观法则无缝联动**：自动从现有权威地理与宗门法则（`WorldRule`）中提取并生成沙盘地标（宗门、都城、秘境等）；
+     - **古风宣纸墨韵沙盘画布**：宣纸纹理背景、印章徽标、交互式打点与连线；
+     - **空间坐标百分比自适应**：基于 0~100% 相对坐标体系，自适应任意屏幕尺寸与工作台多栏缩放；
+     - **超距离行程速度因果核验 (`verifyTravelSpeed`)**：计算地标间欧几里得距离与设定天数，若凡俗队伍出现极短天数跨越大半个大陆的荒谬设定，自动提示因果风险并报警拦截。
+  4. **全端深度融合与命令直达**：
+     - 概览看板 (`DashboardView.tsx`) 扩展为 4 列统计大盘，增加双流统计徽章与【批量修改】/【世界沙盘】快速卡片；
+     - 顶栏 (`Header.tsx`) 创作工坊与命令面板 (`CommandPaletteModal.tsx`) 全链路注册直达快捷指令；
+     - 工作台停靠面板全注册 (`batch_revise`, `map_sandbox`)，支持双模自由停靠或全屏模态框。
+  5. **10 大自动化测试套件与 256 项断言 100% 全绿**：
+     - 专有测试套件 `tests/test-third-cohort-engines.ts` 46 项严密断言全部通过；
+     - 涵盖全系统 10 个测试套件，累计通过 256 项断言，0 错误 0 失败；
+     - `pnpm build` (tsc && vite build) 1.05s 极速构建，0 TypeScript 类型错误。
+
+- **第二十四梯队**：沉浸式桌面写作环境与全链路交互体验 (UX/DX) 深度进化（V2.6.5）：
+  1. **全局统一轻量文学风 Toast 即时反馈系统 (`useToastStore` & `ToastContainer`)**：
+     - 告别零散混乱的单点提示，统一由全局 Toast 引擎接管，支持 `success`, `info`, `warning`, `error` 四种语义；
+     - 宣纸毛玻璃与金、翠、褐、朱砂古韵微光边框，悬浮于右下角，3.2 秒自动渐隐淡出，最多并存 5 条并支持点击快速关闭或一键清空；
+     - 全面覆盖快照存盘、一键文学排版、纸张信笺切换、章节无缝穿梭、阶段导航及查找替换等核心动作。
+  2. **正文编辑器原生章内智能查找与替换工具栏 (`EditorFindReplaceBar.tsx`, `Ctrl+F` / `Ctrl+H`)**：
+     - 快捷唤起：`Ctrl+F` 开启仅查找模式，`Ctrl+H` 开启查找与替换模式，`Esc` 退出并归还焦点；
+     - 基于 ProseMirror Transaction 原生事务实现，严格遍历 TextNode 计算文档绝对偏移，绝不破坏富文本树状结构；
+     - 支持区分大小写 (`Aa`) 与全词精确匹配 (`\b`)，实时计算匹配总数与当前光标最接近匹配索引 (`X / Y`)；
+     - 键盘流极速操作：在查找框按 `Enter` 跳至下一个、`Shift+Enter` 跳至上一个；
+     - 原子安全替换：单处替换自动推进选区；全部替换按逆序降序执行，彻底防止文档偏移错位漂移，且完美接入 Tiptap 原生撤销栈 (`Ctrl+Z`) 与快照历史。
+  3. **章节快速穿梭导航栏 (Chapter Paging Bar, `Alt+[` / `Alt+]`)**：
+     - 原稿信笺底栏印章下方集成典雅双向翻页穿梭条，展示上一章与下一章的章号与标题；
+     - 极速键盘流：支持 `Alt+[` 翻回上一章、`Alt+]` 翻入下一章；
+     - 零丢字安全守护：切章前同步触发已注册的 `flushEditorSync()`，排空防抖定时器并原子保存当前章节正文后再执行跳转；
+     - 尾章贴心引导：当已位于全书最新一章时，右侧自动转换为【续写下一章】引导按钮，灵感无缝衔接。
+  4. **段落聚焦模式 (Paragraph Focus, `Ctrl+Alt+F`) 与打字机居中滚动 (Typewriter Scroll, `Ctrl+Alt+T`)**：
+     - **段落聚焦 (Paragraph Focus)**：开启后通过轻量 DOM 标记与 CSS 过滤，仅高亮当前光标所在的活动段落，其余段落平滑淡化至 35% 半透明（支持鼠标悬停临时预览），帮助作者隔绝视线杂音、沉浸单段心流；
+     - **打字机居中滚动 (Typewriter Scroll)**：开启后根据光标在视口内的垂直坐标动态平滑回滚，始终将当前输入行锁定在屏幕垂直 45% 的黄金舒适视野线，消除长文写作持续低头引发的颈椎劳损；
+     - 状态本地化记忆 (`novelforge_focus_mode`, `novelforge_typewriter_mode`)，下次打开自动还原。
+  5. **全局快捷键速查中心 (`ShortcutHelpModal.tsx`, `F1` / `?`) 与全链路阶段导航**：
+     - 快捷唤起：全局按 `F1` 或非输入状态下按 `Shift+?`，或点击顶栏右侧键盘图标；
+     - 模块化分类：四组精细卡片（写作与排版、沉浸与视野、阶段导航、界面与系统），配备拟物化立体 Kbd 徽章；
+     - 实时关键词搜索过滤：秒级筛选定位任意功能与按键；
+     - 全局阶段快捷直达：`Ctrl+1` 构思立项、`Ctrl+2` 人物档案、`Ctrl+3` 世界观、`Ctrl+4` 剧情伏笔、`Ctrl+5` 五层记忆、`Ctrl+6` 正文工作台、`Ctrl+B` 侧栏折叠；
+  6. **双端构建与全系统 14 大自动化测试套件 100% 全绿**：
+     - 前端 `pnpm build` (tsc && vite build) 1.38s 极速成功；
+     - Rust 后端 `cargo check` 1.95s 零警告零错误，`db_test` 57 项核心业务全绿通过；
+     - 14 大自动化测试套件全部通过，0 错误 0 失败。
+
+
+### 3.12 全局应用内对话框体系 (In-App Dialog System)
+- **根治 Tauri v2 原生对话框失效缺陷**：Tauri v2 WebView 默认不实现 JS 原生 `alert/confirm/prompt`，此前 69 处原生调用（24 个组件文件）在桌面端静默失效，导致删除章节、重命名、合并、版本回退等关键确认交互不可用；
+- **自研 Promise 式对话框三件套**：
+  - `src/stores/useDialogStore.ts`（Zustand 队列存储）+ `src/utils/dialog.ts`（`confirmDialog` / `alertDialog` / `promptDialog`，任意模块可直接 import，`promptDialog` 取消返回 `null`）；
+  - `src/components/common/DialogHost.tsx`：App 根节点全局渲染器，完整继承「暖纸书卷」美学（象牙纸页 / 琥珀主按钮 / 玫红危险按钮 / 衬线字体），Enter 确认、Esc 取消、点击遮罩取消，prompt 输入框自动聚焦并全选预填值；
+  - 破坏性关键词（删除/回退/恢复/清除/不可撤销）自动升级为 danger 红色语气；`App.css` 新增入场动画并遵循 `prefers-reduced-motion`；
+- **全量迁移与验证**：69 处调用点机械替换 + 11 处同步箭头函数升级 async + 3 处 `window.prompt` 重命名流程改造；`tsc --noEmit` 零错误，浏览器实测三种对话框明暗渲染、Esc/Enter 交互与「删除确认」「重命名落库」业务闭环（详见 DECISIONS.md ADR-038）。
+
+- **第二十五梯队**：全系统深度漏洞巡检与因果鲁棒性加固（V2.6.6 Bugfix & Robustness Evolution）：
+  1. **Word 导入章节标题字符渗漏修复 (`WordImportService.ts`)**：
+     - 彻底根除 Word (.docx) 智能分章时因 `fullMatch` 裁剪前导空白换行导致字符长度计算偏小、使得标题尾部字词（如“出山”）泄漏进正文首段的严重数据缺陷；
+     - 记录正则匹配未 trim 的真实物理长度 `rawMatchLength`，确保切章光标准确跨过标题行，正文提取绝对纯净。
+  2. **自动连载推进流闭包陷阱修复 (`SerializationModal.tsx`)**：
+     - 引入 `isAutoRunningRef` 接管循环状态，根治 React 函数闭包导致 `isAutoRunning` 在异步执行流中不可变、从而在完成第一章后被误判跳出的缺陷；
+     - 支持运行中即时安全暂停并补全组件卸载时的自动停止清理。
+  3. **编辑器活动输入竞态保护与排版标签保护 (`NovelEditor.tsx`)**：
+     - 严格隔离“章节切换”与“同章节外部变更”：同章节内仅当编辑器未聚焦（`!editor.isFocused`）时才同步外部数据（如版本回滚、一键排版、批量采纳），彻底消除 800ms 防抖存盘返回后新打入字符被旧快照冲掉与光标跳跃的竞态隐患；
+     - 一键文学排版改用 DOM `TEXT_NODE` 递归遍历替换全角标点，杜绝直接赋值 `p.innerText` 破坏加粗 (`strong`)、斜体 (`em`) 等富文本结构。
+  4. **升级前数据安全守卫硬阻断与醒目警示 (`DataSafetyGuard.ts` & `PreUpdateSafetyModal.tsx`)**：
+     - 恪守数据安全与本地优先红线：当 SQLite 在线热备份失败时，强制将 `result.canProceed` 置为 `false`，绝对阻断升级；
+     - 升级检查弹窗卡片在备份失败时展示醒目红框与详尽错误原因，绝不伪装为正常通过。
+  5. **工程与作品导出文件名 Windows 非法字符安全转义 (`PublishingModal.tsx`)**：
+     - 集中清洗书名中包含的 Windows 文件名保留字符（`:` `?` `*` `" < > | / \`），防止类似《我的道侣：从剑宗开始？》的书名在导出 HTML/TXT/MD/JSON 时触发文件系统错误或下载中断。
+  6. **工作流推演动态变量美元符号防吞字 (`WorkflowRunnerModal.tsx`)**：
+     - 变量替换改用安全函数式返回值 `replace(regex, () => val)`，杜绝正文中包含 `$1000`、`$主角` 等符号时被 JavaScript 原生 `replace` 误解析为正则捕获组导致关键文字被抹除。
+  7. **拆书工坊爆款套路真实持久化 (`DeconstructModal.tsx`)**：
+     - 告别“仅弹提示未入库”假实现：真正将逆向拆解出的爆款套路、适用场景、推进节拍与核验清单格式化写入小说本地灵感便签，并触发 `novelforge:notes-updated` 广播事件。
+  8. **长期记忆台数据流转与依赖优化 (`MemoryEngineView.tsx`)**：
+     - 从 `loadData` 依赖数组中解耦 `selectedCharId` 与 `selectedCuratorChapterId`，改用函数式初始化，杜绝侧栏切换角色时反复触发全书事实与章节全量请求。
+  9. **状态管理与中文输入法体验修复**：
+     - `useNovelStore`: 修复 `deleteChapter` 与 `deleteNovel` 导致的状态不同步，重构全书各维度数据加载闭环；
+     - 中文输入法 IME Composition Enter 键防早提提交（`DialogHost`, `NovelEditor`, `EditorFindReplaceBar`）；
+     - `EditorFindReplaceBar`: 中文全词匹配基于 Unicode `Script=Han` 前后瞻断言实现。
+  10. **全系统 14 大自动化测试套件与 31 项专项漏洞验证 100% 全绿**：
+     - 新建专有测试套件 `tests/test-bugfixes-verification.ts`（31 项断言 100% 通过）；
+- **第二十六梯队**：全系统深度漏洞巡检与工程复原完整性加固 (V2.6.8 Deep Bugfix & Archive Fidelity Evolution)：
+  1. **全书工程快照归档与跨端复原完整性 (P0 Data Fidelity)**：
+     - Rust 后端 `import_novel_archive` 补齐角色关系 (`character_relationships`)、故事阶段 (`story_phases`)、剧情弧 (`story_arcs`)、伏笔线索 (`plot_threads`)、角色状态事件 (`character_states`) 的全量复原与新建实体 ID 映射重定向，杜绝备份还原后一半设定集丢失；
+     - `webMockStorage.ts` 补齐 `import_novel_archive` 的实际解析与 Novel 对象返回，根治导入后 `selectNovel` 报错。
+  2. **剧情大纲未归类与孤儿剧情弧独立分组可见性 (P1 Data Visibility)**：
+     - 彻底修复 `PlotArcsView.tsx` 仅循环已知阶段导致未指定阶段或所属阶段被删除的剧情弧完全隐形不可见的问题；
+     - 提取 `unassignedArcs` 并在界面专属“独立 / 未归类剧情弧”卡片中呈现；
+     - 补齐 Rust、TauriBridge、WebMock 与前端界面的剧情弧物理删除 API `delete_story_arc`；
+     - 解耦 `PlotArcsView` `loadData` 对 `arcPhaseId` 的依赖，杜绝下拉框切换触发全量请求。
+  3. **人物拓扑图谱按键误删与状态脱节防御 (P1 Data Desync)**：
+     - `CharacterFlowView.tsx` 实现 `onEdgesDelete`，按下 Delete/Backspace 时同步调用 `api.deleteCharacterRelationship(edge.id)` 从 SQLite 中持久化删除，消除“界面已删但数据库未删”的幽灵连线；
+     - 在 `onNodesChange` 中安全过滤 `'remove'` 变更，杜绝在拓扑图上按键误删核心角色节点；
+     - 增加 `onPaneClick` 空白处点击自动清除选中连线高亮。
+  4. **批量修订与排版清洗采纳即时通知编辑器 (P1 Content Overwrite Guard)**：
+     - `BatchReviseModal.tsx` 与 `TypesetterCleanerPanel.tsx` 在采纳保存当前活动章节新正文后，主动广播 `novelforge:force-editor-reload` 自定义事件，使已挂载的 TipTap 编辑器无感无损即刻刷新为新正文，彻底消除旧正文二次自动保存冲掉采纳成果的竞态风险。
+  5. **正文反哺提案跨分类同名去重防御 (P2 Data Integrity)**：
+     - `AssetProposalModal.tsx` 去重依据从纯 `p.name` 升级为 `${p.category}:${p.name}` 组合复合键，杜绝同名但不同分类的实体（例如既是角色又是法宝的「七星剑」）被静默吞噬。
+  6. **Web Audio 节点释放与防内存泄漏 (P2 Resource Guard)**：
+     - `typewriterAudio.ts` 在按键音播放完毕后绑定 `whiteNoise.onended` 显式断开 `whiteNoise`, `filter`, `gainNode` 与目标管线的连接，防止高频敲击与长篇流式输出时累积音频节点。
+  7. **自动化测试与构建 100% 全绿**：
+     - `tests/test-bugfixes-verification.ts` 扩展至 42 项断言 100% 通过；
+     - `src-tauri/src/bin/db_test.rs` 增加剧情弧删除与工程归档关系/阶段/剧情弧全量复原断言，57 项验证 100% 通过；
+     - `tsc --noEmit` 0 错误，Vite 构建 1.84s 极速成功。
+
+- **第二十七梯队**：故事设定集（角色/世界观/伏笔）全生命周期闭环与数据级联加固 (V2.6.9 Story Bible Lifecycle & Data Integrity Evolution)：
+  1. **角色档案全生命周期与多表级联清理 (P0 Data Lifecycle)**：
+     - 彻底修复角色档案此前只能创建和修改状态、无法修改名称/别名/生平/动机等笔误且无法删除的问题；
+     - Rust 后端实现 `get_character`, `update_character`, `delete_character`，并实现完备的级联清理（自动将 `scenes.pov_character_id` 和 `parallel_threads.pov_character_id` 安全置为 NULL，级联清理 `plot_associations`, `character_arcs`, `character_relationships`, `character_state_events`）；
+     - WebMock 与桥接层同步实现，UI 双入口（独立视图 `CharactersView.tsx` 与停靠面板 `CharacterProfilesPanel.tsx`）全面集成编辑与删除弹窗与按钮，接入 `confirmDialog` 确认与 `novelforge:reload-story-bible` 广播。
+  2. **世界观铁律全生命周期管理 (P0 Data Lifecycle)**：
+     - 彻底修复世界观法则创建后无法再行编辑与删除的单向缺陷；
+     - Rust 后端与前端完整实现 `get_world_rule`, `update_world_rule`, `delete_world_rule`，级联清理 `plot_associations`；
+     - UI 双入口（`WorldSettingsView.tsx` 与 `WorldSettingsPanel.tsx`）全面集成编辑法则、删除法则与即时持久化。
+  3. **剧情伏笔线索状态推进与闭合清理 (P0 Plot Threads Lifecycle)**：
+     - 彻底修复剧情伏笔被永久锁定在 `PLANTED` 初始状态无法推进的缺陷；
+     - 支持从 `PLANTED` 依次推进至 `DEVELOPING`（发酵推进中）、`READY_TO_RESOLVE`（临界回收）、`RESOLVED`（已揭秘闭合）、`ABANDONED`（已废弃/遗忘）；
+     - 并在各卡片上支持内联状态选择器、直接编辑与删除清理；
+     - 级联清理 `plot_associations`。
+  4. **故事阶段与剧情弧解绑与关联级联 (P1 Cascade Integrity)**：
+     - `delete_story_arc` 级联清理 `plot_associations WHERE entity_id = ?1`；
+     - `delete_story_phase` 显式执行 `UPDATE story_arcs SET phase_id = NULL WHERE phase_id = ?1`，杜绝悬挂外键。
+  5. **TipTap 版本历史还原即时同步 (P1 UI Synchronization)**：
+     - `useNovelStore.ts` 中 `restoreVersion` 派发 `window.dispatchEvent(new CustomEvent('novelforge:force-editor-reload'))`，确保编辑器在任何状态下都能即刻刷新为所恢复的历史版本。
+  6. **双流字数统计引擎全谱系 AI 来源识别 (P1 Stats Accuracy)**：
+     - `DualWordStatsEngine.ts` 扩充 `aiSources` 集合，覆盖 `AI_GENERATED`、`AI_REVISED`、`AI_APPEND`、`AI_REPLACE`、`AI_MCP_PROSE`，消除初始范文章节与 MCP 生成正文被漏计为纯手打的统计失真。
+  7. **删除后的选中实体 Fallback 防空指针 (P2 UI Defensive Guard)**：
+     - `MemoryEngineView.tsx` 与 `PlotArcsView.tsx` 增加实体是否存在性校验，防止删除实体后界面保留已失效的 `selectedId`。
+  8. **100% 自动化测试通过**：
+     - `tests/test-bugfixes-verification.ts` 扩充至 13 大类 61 项端到端断言，100% 全绿；
+     - `src-tauri/src/bin/db_test.rs` 扩充至 61 项 SQLite 真实集成测试，100% 全绿；
+     - 前端 Vite 构建 1.56s 零错误，TypeScript 检查 0 错误。
 

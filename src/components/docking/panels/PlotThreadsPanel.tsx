@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
+import { confirmDialog } from '@/utils/dialog';
 import type { PlotThread } from '@/types';
 import {
   Bookmark,
@@ -11,10 +12,11 @@ import {
   AlertCircle,
   X,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = {
-  PLANTED: { label: '已埋设', color: 'bg-amber-800/10 text-amber-800 border-amber-800/20', icon: Clock },
+  PLANTED: { label: '已埋设', color: 'bg-amber-800/10 text-primary border-amber-800/20', icon: Clock },
   DEVELOPING: { label: '发酵推进中', color: 'bg-blue-800/10 text-blue-800 border-blue-800/20', icon: Sparkles },
   READY_TO_RESOLVE: { label: '临界回收', color: 'bg-purple-800/10 text-purple-800 border-purple-800/20', icon: AlertCircle },
   RESOLVED: { label: '已揭秘闭合', color: 'bg-emerald-800/10 text-emerald-800 border-emerald-800/20', icon: CheckCircle2 },
@@ -46,6 +48,14 @@ export const PlotThreadsPanel: React.FC = () => {
 
   useEffect(() => {
     loadThreads();
+
+    const handleReload = () => {
+      loadThreads();
+    };
+    window.addEventListener('novelforge:reload-story-bible', handleReload);
+    return () => {
+      window.removeEventListener('novelforge:reload-story-bible', handleReload);
+    };
   }, [activeNovel?.id]);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -66,6 +76,35 @@ export const PlotThreadsPanel: React.FC = () => {
     setExpectedResolution('');
     setShowAddModal(false);
     loadThreads();
+    window.dispatchEvent(new CustomEvent('novelforge:reload-story-bible'));
+  };
+
+  const handleStatusChange = async (threadId: string, newStatus: string) => {
+    try {
+      await api.updatePlotThreadStatus(threadId, newStatus);
+      loadThreads();
+      window.dispatchEvent(new CustomEvent('novelforge:reload-story-bible'));
+    } catch (e) {
+      console.error('更新伏笔状态失败:', e);
+    }
+  };
+
+  const handleDeleteThread = async (t: PlotThread) => {
+    const ok = await confirmDialog({
+      title: '删除剧情伏笔',
+      message: `确定要删除伏笔线索“${t.title}”吗？此操作不可撤销。`,
+      confirmText: '彻底删除',
+      tone: 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      await api.deletePlotThread(t.id);
+      loadThreads();
+      window.dispatchEvent(new CustomEvent('novelforge:reload-story-bible'));
+    } catch (e) {
+      console.error('删除伏笔失败:', e);
+    }
   };
 
   const filtered = threads.filter((t) => {
@@ -78,45 +117,45 @@ export const PlotThreadsPanel: React.FC = () => {
 
   if (!activeNovel) {
     return (
-      <div className="flex-1 flex items-center justify-center text-xs text-[#786f65] p-6 text-center">
+      <div className="flex-1 flex items-center justify-center text-xs text-ink-2 p-6 text-center">
         请选择或创建小说项目以管理伏笔线索
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#f4efe6] text-[#2c2825] text-xs overflow-hidden select-none">
+    <div className="flex flex-col h-full w-full bg-canvas text-ink text-xs overflow-hidden select-none">
       {/* Top action bar */}
-      <div className="p-2 border-b border-[#ded5c4] bg-[#efe9dc] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <Bookmark className="w-3.5 h-3.5 text-amber-800" />
-          <span className="font-semibold text-xs">伏笔与悬念追踪 ({threads.length})</span>
+      <div className="p-2 border-b border-line bg-surface-2 flex items-center justify-between shrink-0 gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Bookmark className="w-3.5 h-3.5 text-primary shrink-0" />
+          <span className="font-semibold text-xs truncate">伏笔与悬念追踪 ({threads.length})</span>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-2 py-1 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium transition flex items-center gap-1 shadow-xs text-[11px]"
+          className="px-2 py-1 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium transition flex items-center gap-1 shadow-xs text-[11px] shrink-0 whitespace-nowrap"
         >
-          <Plus className="w-3 h-3" />
+          <Plus className="w-3 h-3 shrink-0" />
           埋设新伏笔
         </button>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="p-2 border-b border-[#ded5c4] bg-[#fdfbf7]/80 flex items-center gap-2">
+      <div className="p-2 border-b border-line bg-surface/80 flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-[#8e8476]" />
+          <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-ink-2" />
           <input
             type="text"
             placeholder="搜索伏笔暗线、谜题关键词..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded pl-7 pr-2 py-1 text-xs text-[#2b2621] placeholder-[#8e8476] focus:outline-none focus:border-amber-700"
+            className="w-full bg-surface border border-line rounded pl-7 pr-2 py-1 text-xs text-ink placeholder-[#8e8476] focus:outline-none focus:border-amber-700"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-[#fdfbf7] border border-[#d5cbb8] rounded px-2 py-1 text-xs text-[#2b2621] focus:outline-none focus:border-amber-700 shrink-0"
+          className="bg-surface border border-line rounded px-2 py-1 text-xs text-ink focus:outline-none focus:border-amber-700 shrink-0"
         >
           <option value="ALL">全部状态 ({threads.length})</option>
           <option value="PLANTED">已埋设</option>
@@ -129,8 +168,8 @@ export const PlotThreadsPanel: React.FC = () => {
       {/* Threads List */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
         {filtered.length === 0 ? (
-          <div className="py-12 text-center text-[#786f65]">
-            <Bookmark className="w-8 h-8 mx-auto mb-2 opacity-30 text-amber-800" />
+          <div className="py-12 text-center text-ink-2">
+            <Bookmark className="w-8 h-8 mx-auto mb-2 opacity-30 text-primary" />
             <p>暂无匹配的伏笔线索，点击右上角【埋设新伏笔】记录</p>
           </div>
         ) : (
@@ -142,16 +181,33 @@ export const PlotThreadsPanel: React.FC = () => {
             return (
               <div
                 key={thread.id}
-                className="bg-[#fdfbf7] border border-[#dcd3c1] hover:border-amber-800/40 rounded-lg p-3 transition shadow-xs"
+                className="bg-surface border border-line hover:border-amber-800/40 rounded-lg p-3 transition shadow-xs"
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-bold text-sm text-[#854d0e]">{thread.title}</span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1 ${statusConfig.color}`}
-                  >
-                    <StatusIcon className="w-2.5 h-2.5" />
-                    {statusConfig.label}
-                  </span>
+                  <span className="font-bold text-sm text-primary">{thread.title}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1">
+                      <StatusIcon className="w-3.5 h-3.5 text-ink-2" />
+                      <select
+                        value={thread.status}
+                        onChange={(e) => handleStatusChange(thread.id, e.target.value)}
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border cursor-pointer focus:outline-none ${statusConfig.color}`}
+                      >
+                        <option value="PLANTED">已埋设</option>
+                        <option value="DEVELOPING">发酵推进中</option>
+                        <option value="READY_TO_RESOLVE">临界回收</option>
+                        <option value="RESOLVED">已揭秘闭合</option>
+                        <option value="ABANDONED">已废弃/遗忘</option>
+                      </select>
+                    </span>
+                    <button
+                      onClick={() => handleDeleteThread(thread)}
+                      className="p-1 text-ink-2 hover:text-red-600 rounded hover:bg-red-50 transition"
+                      title="删除伏笔"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {thread.description && (
@@ -160,14 +216,14 @@ export const PlotThreadsPanel: React.FC = () => {
                   </p>
                 )}
 
-                <div className="flex flex-wrap items-center gap-3 text-[10px] text-[#786f65] pt-1.5 border-t border-[#eee6d8]">
+                <div className="flex flex-wrap items-center gap-3 text-[10px] text-ink-2 pt-1.5 border-t border-line">
                   {introChapter && (
                     <span>
                       <strong>埋设位置：</strong>第 {introChapter.chapter_number} 章《{introChapter.title}》
                     </span>
                   )}
                   {thread.expected_resolution && (
-                    <span className="text-[#854d0e]">
+                    <span className="text-primary">
                       <strong>预期回收：</strong>{thread.expected_resolution}
                     </span>
                   )}
@@ -181,12 +237,12 @@ export const PlotThreadsPanel: React.FC = () => {
       {/* Modal: Create Thread */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#fdfbf7] border border-[#d5cbb8] rounded-xl max-w-md w-full p-4 shadow-xl text-xs">
-            <div className="flex items-center justify-between pb-2 border-b border-[#ded5c4] mb-3">
-              <span className="font-bold text-sm text-[#2c2825]">埋设新剧情伏笔</span>
+          <div className="bg-surface border border-line rounded-xl max-w-md w-full p-4 shadow-xl text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-line mb-3">
+              <span className="font-bold text-sm text-ink">埋设新剧情伏笔</span>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1 rounded text-[#786f65] hover:text-[#2c2825]"
+                className="p-1 rounded text-ink-2 hover:text-ink"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -194,23 +250,23 @@ export const PlotThreadsPanel: React.FC = () => {
 
             <form onSubmit={handleCreate} className="space-y-3">
               <div>
-                <label className="block text-[11px] font-semibold text-[#554b3e] mb-1">伏笔线索名称 *</label>
+                <label className="block text-[11px] font-semibold text-ink-2 mb-1">伏笔线索名称 *</label>
                 <input
                   type="text"
                   required
                   placeholder="例如：怀中玉佩的半道裂痕、神秘黑衣人的断剑之诺"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded px-2.5 py-1.5 text-xs text-[#2b2621] focus:outline-none focus:border-amber-700"
+                  className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-[#554b3e] mb-1">埋设章节</label>
+                <label className="block text-[11px] font-semibold text-ink-2 mb-1">埋设章节</label>
                 <select
                   value={introducedChapterId}
                   onChange={(e) => setIntroducedChapterId(e.target.value)}
-                  className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded px-2.5 py-1.5 text-xs text-[#2b2621] focus:outline-none focus:border-amber-700"
+                  className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
                 >
                   <option value="">未指定 / 灵感前期预设</option>
                   {chapters.map((ch) => (
@@ -222,24 +278,24 @@ export const PlotThreadsPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-[#554b3e] mb-1">伏笔详情与暗线逻辑</label>
+                <label className="block text-[11px] font-semibold text-ink-2 mb-1">伏笔详情与暗线逻辑</label>
                 <textarea
                   rows={3}
                   placeholder="详细记录此处伏笔的表层意图与深层玄机..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded px-2.5 py-1.5 text-xs text-[#2b2621] focus:outline-none focus:border-amber-700"
+                  className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-[#554b3e] mb-1">预期揭秘/回收节点</label>
+                <label className="block text-[11px] font-semibold text-ink-2 mb-1">预期揭秘/回收节点</label>
                 <input
                   type="text"
                   placeholder="例如：第一卷高潮大决战前夕、主角突破元婴期之时"
                   value={expectedResolution}
                   onChange={(e) => setExpectedResolution(e.target.value)}
-                  className="w-full bg-[#fdfbf7] border border-[#d5cbb8] rounded px-2.5 py-1.5 text-xs text-[#2b2621] focus:outline-none focus:border-amber-700"
+                  className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
                 />
               </div>
 
@@ -247,7 +303,7 @@ export const PlotThreadsPanel: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-3 py-1.5 rounded border border-[#d5cbb8] text-[#554b3e] hover:bg-[#ede5d6]"
+                  className="px-3 py-1.5 rounded border border-line text-ink-2 hover:bg-surface-3"
                 >
                   取消
                 </button>

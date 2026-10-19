@@ -27,8 +27,8 @@ export const UpdateChangelogView: React.FC<Props> = ({
 }) => {
   if (!changelog) {
     return (
-      <div className="p-8 text-center text-[#786f65] font-serif bg-[#f7f2e7] rounded-xl border border-[#ded5c4]">
-        <FileText className="w-8 h-8 text-[#854d0e]/40 mx-auto mb-2" />
+      <div className="p-8 text-center text-ink-2 font-serif bg-surface rounded-xl border border-line">
+        <FileText className="w-8 h-8 text-primary/40 mx-auto mb-2" />
         <p className="text-xs">暂无更新日志内容，请点击“检查更新”获取最新说明</p>
       </div>
     );
@@ -37,17 +37,17 @@ export const UpdateChangelogView: React.FC<Props> = ({
   return (
     <div className="space-y-4 font-serif">
       {/* 顶部版本选择栏与元数据 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-[#ded5c4]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-line">
         <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-[#854d0e]" />
-          <span className="text-xs font-bold text-[#2b2621]">版本更新说明：</span>
+          <Layers className="w-4 h-4 text-primary" />
+          <span className="text-xs font-bold text-ink">版本更新说明：</span>
 
           {/* 历史版本快速切换 */}
           <select
             value={changelog.version}
             onChange={(e) => onSelectVersion(e.target.value)}
             disabled={isLoadingHistory}
-            className="text-xs font-mono font-semibold bg-[#efe9dc] text-[#854d0e] border border-[#ded5c4] rounded-lg px-2.5 py-1 focus:outline-hidden focus:border-[#854d0e] cursor-pointer"
+            className="text-xs font-mono font-semibold bg-surface-2 text-primary border border-line rounded-lg px-2.5 py-1 focus:outline-hidden focus:border-[#854d0e] cursor-pointer"
           >
             {historyList.map((item) => (
               <option key={item.version} value={item.version}>
@@ -57,9 +57,9 @@ export const UpdateChangelogView: React.FC<Props> = ({
           </select>
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] text-[#786f65]">
+        <div className="flex items-center gap-3 text-[11px] text-ink-2">
           <span className="flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5 text-[#854d0e]" />
+            <Calendar className="w-3.5 h-3.5 text-primary" />
             发布于 {changelog.date}
           </span>
 
@@ -68,7 +68,7 @@ export const UpdateChangelogView: React.FC<Props> = ({
               href={changelog.releaseUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-[#854d0e] hover:underline"
+              className="flex items-center gap-1 text-primary hover:underline"
               title="前往 GitHub Releases 查看官方完整构建与签名产物"
             >
               <span>完整发布说明</span>
@@ -80,8 +80,8 @@ export const UpdateChangelogView: React.FC<Props> = ({
 
       {/* 版本摘要 */}
       {changelog.summary && (
-        <div className="p-3 rounded-lg bg-[#efe9dc]/60 border border-[#ded5c4] text-xs text-[#3d362e] leading-relaxed">
-          <strong className="text-[#854d0e]">本版概览：</strong> {changelog.summary}
+        <div className="p-3 rounded-lg bg-surface-2/60 border border-line text-xs text-ink leading-relaxed">
+          <strong className="text-primary">本版概览：</strong> {changelog.summary}
         </div>
       )}
 
@@ -94,7 +94,7 @@ export const UpdateChangelogView: React.FC<Props> = ({
               <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
               新增功能 · Features ({changelog.features.length})
             </h4>
-            <ul className="space-y-1 pl-5 list-disc text-xs text-[#3d362e]">
+            <ul className="space-y-1 pl-5 list-disc text-xs text-ink">
               {changelog.features.map((feat, idx) => (
                 <li key={idx} className="leading-relaxed">
                   {feat}
@@ -107,11 +107,11 @@ export const UpdateChangelogView: React.FC<Props> = ({
         {/* 功能优化 */}
         {changelog.improvements.length > 0 && (
           <div className="space-y-1.5">
-            <h4 className="text-xs font-bold text-amber-800 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-amber-700" />
+            <h4 className="text-xs font-bold text-primary flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-primary" />
               功能优化 · Improvements ({changelog.improvements.length})
             </h4>
-            <ul className="space-y-1 pl-5 list-disc text-xs text-[#3d362e]">
+            <ul className="space-y-1 pl-5 list-disc text-xs text-ink">
               {changelog.improvements.map((item, idx) => (
                 <li key={idx} className="leading-relaxed">
                   {item}
@@ -128,7 +128,7 @@ export const UpdateChangelogView: React.FC<Props> = ({
               <Bug className="w-3.5 h-3.5 text-sky-700" />
               Bug 修复 · Fixes ({changelog.bugfixes.length})
             </h4>
-            <ul className="space-y-1 pl-5 list-disc text-xs text-[#3d362e]">
+            <ul className="space-y-1 pl-5 list-disc text-xs text-ink">
               {changelog.bugfixes.map((item, idx) => (
                 <li key={idx} className="leading-relaxed">
                   {item}
@@ -158,11 +158,11 @@ export const UpdateChangelogView: React.FC<Props> = ({
         {/* 已知问题 */}
         {changelog.knownIssues.length > 0 && (
           <div className="space-y-1.5">
-            <h4 className="text-xs font-bold text-[#685f54] flex items-center gap-1.5">
-              <HelpCircle className="w-3.5 h-3.5 text-[#685f54]" />
+            <h4 className="text-xs font-bold text-ink-2 flex items-center gap-1.5">
+              <HelpCircle className="w-3.5 h-3.5 text-ink-2" />
               已知问题 · Known Issues ({changelog.knownIssues.length})
             </h4>
-            <ul className="space-y-1 pl-5 list-disc text-xs text-[#685f54]">
+            <ul className="space-y-1 pl-5 list-disc text-xs text-ink-2">
               {changelog.knownIssues.map((item, idx) => (
                 <li key={idx} className="leading-relaxed">
                   {item}

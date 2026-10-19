@@ -9,6 +9,7 @@ import {
   DropTargetZone,
   DropDirection,
   LayoutNode,
+  TabGroupNode,
 } from '@/types/docking';
 import {
   BUILTIN_WORKSPACE_PRESETS,
@@ -27,6 +28,9 @@ import {
   validateAndSanitizeLayout,
   generateNodeId,
   allPanelsInTree,
+  findLeftmostTabGroup,
+  findRightmostTabGroup,
+  findFirstTabGroup,
 } from '@/utils/dockingTree';
 
 const STORAGE_LAYOUT_KEY = 'novelforge_docking_layout';
@@ -72,6 +76,10 @@ interface WorkspaceState {
     floatingId: string,
     targetTabGroupId?: string,
     direction?: DropDirection
+  ) => void;
+  dockFloatingToSidebar: (
+    floatingId: string,
+    side?: 'left' | 'right' | 'center'
   ) => void;
   updateFloatingPanel: (floatingId: string, updates: Partial<FloatingPanel>) => void;
   bringFloatingToFront: (floatingId: string) => void;
@@ -145,6 +153,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   saveWorkspace: (novelId?: string) => {
     try {
+      if (typeof localStorage === 'undefined') return;
       const { layout, currentNovelId } = get();
       const targetNovelId = novelId || currentNovelId;
       const layoutStorageKey = targetNovelId
@@ -304,9 +313,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     // 在树中移除
     const { newRoot } = removePanelFromTree(layout.root, instanceId);
     if (!newRoot) {
-      // 如果全部被关闭，保留一个空的默认编辑器
-      const fallbackRoot = cloneTree(FOCUS_WRITING_LAYOUT.root);
-      set({ layout: { ...layout, root: fallbackRoot, maximizedInstanceId: null } });
+      // 如果全部被关闭，保留一个纯净的空工作区容器，绝不擅自复活初始的三栏面板
+      const emptyRoot: TabGroupNode = {
+        type: 'tabs',
+        id: 'tab_empty_workspace',
+        panels: [],
+        activeInstanceId: '',
+      };
+      set({ layout: { ...layout, root: emptyRoot, maximizedInstanceId: null } });
     } else {
       set({
         layout: {
@@ -330,7 +344,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const { layout } = get();
     // 1. 如果在树中，先从树中移除
     const { newRoot } = removePanelFromTree(layout.root, panel.instanceId);
-    const updatedRoot = newRoot || cloneTree(FOCUS_WRITING_LAYOUT.root);
+    const updatedRoot: LayoutNode =
+      newRoot || {
+        type: 'tabs',
+        id: 'tab_empty_workspace',
+        panels: [],
+        activeInstanceId: '',
+      };
 
     // 2. 检查是否已经在悬浮窗中
     const existingIdx = layout.floatingPanels.findIndex((f) => f.panel.instanceId === panel.instanceId);
@@ -404,6 +424,54 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     get().saveWorkspace();
   },
 
+  dockFloatingToSidebar: (floatingId, side = 'left') => {
+    const { layout } = get();
+    const targetFloating = layout.floatingPanels.find((f) => f.id === floatingId);
+    if (!targetFloating) return;
+
+    const remainingFloating = layout.floatingPanels.filter((f) => f.id !== floatingId);
+    let nextRoot = layout.root;
+
+    if (side === 'left') {
+      const leftTab = findLeftmostTabGroup(nextRoot);
+      if (leftTab) {
+        // 如果最左侧包含章节目录，则优先作为侧边栏标签页合并；否则拆分出新的最左侧分屏
+        const hasChapters = leftTab.panels.some((p) => p.panelType === 'chapters');
+        if (hasChapters) {
+          nextRoot = addTabToGroup(nextRoot, leftTab.id, targetFloating.panel);
+        } else {
+          nextRoot = splitTabGroup(nextRoot, leftTab.id, targetFloating.panel, 'left');
+        }
+      }
+    } else if (side === 'right') {
+      const rightTab = findRightmostTabGroup(nextRoot);
+      if (rightTab) {
+        const hasRightTools = rightTab.panels.some(
+          (p) => p.panelType === 'ai_assistant' || p.panelType === 'editor_in_chief'
+        );
+        if (hasRightTools) {
+          nextRoot = addTabToGroup(nextRoot, rightTab.id, targetFloating.panel);
+        } else {
+          nextRoot = splitTabGroup(nextRoot, rightTab.id, targetFloating.panel, 'right');
+        }
+      }
+    } else {
+      const firstTab = findFirstTabGroup(nextRoot);
+      if (firstTab) {
+        nextRoot = addTabToGroup(nextRoot, firstTab.id, targetFloating.panel);
+      }
+    }
+
+    set({
+      layout: {
+        ...layout,
+        root: nextRoot,
+        floatingPanels: remainingFloating,
+      },
+    });
+    get().saveWorkspace();
+  },
+
   updateFloatingPanel: (floatingId, updates) => {
     const { layout } = get();
     const updated = layout.floatingPanels.map((f) => (f.id === floatingId ? { ...f, ...updates } : f));
@@ -435,12 +503,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ draggingState: null, dropTarget: null });
 
     if (!dropTarget) {
-      // 未落在有效区域，如果原来不是悬浮窗，可选择作为悬浮面板释放
-      if (!sourceFloatingId) {
-        const mouseX = draggingState.currentMousePos.x - draggingState.offset.x;
-        const mouseY = draggingState.currentMousePos.y - draggingState.offset.y;
-        get().floatPanel(panel, { x: Math.max(20, mouseX), y: Math.max(60, mouseY) });
-      }
+      // 未落在有效停靠区域时安全取消拖拽，保持标签页在原位，严禁意外转换为悬浮窗
       return;
     }
 
@@ -513,15 +576,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const nextRoot = addTabToGroup(layout.root, firstTab.id, newPanel);
       set({ layout: { ...layout, root: nextRoot } });
       get().saveWorkspace();
+    } else {
+      const nextRoot: TabGroupNode = {
+        type: 'tabs',
+        id: 'tab_empty_workspace',
+        panels: [newPanel],
+        activeInstanceId: newPanel.instanceId,
+      };
+      set({ layout: { ...layout, root: nextRoot } });
+      get().saveWorkspace();
     }
   },
 }));
-
-function findFirstTabGroup(root: LayoutNode): any {
-  if (root.type === 'tabs') return root;
-  for (const child of root.children) {
-    const found = findFirstTabGroup(child);
-    if (found) return found;
-  }
-  return null;
-}

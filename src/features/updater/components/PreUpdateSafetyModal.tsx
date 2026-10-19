@@ -25,25 +25,25 @@ export const PreUpdateSafetyModal: React.FC<Props> = ({
 }) => {
   return (
     <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-      <div className="w-full max-w-lg bg-[#fdfbf7] border border-[#ded5c4] rounded-2xl shadow-2xl overflow-hidden font-serif">
+      <div className="w-full max-w-lg bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden font-serif">
         {/* 头部 */}
-        <div className="p-4 bg-[#efe9dc] border-b border-[#ded5c4] flex items-center justify-between">
+        <div className="p-4 bg-surface-2 border-b border-line flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-amber-700 text-white flex items-center justify-center shadow-xs">
               <ShieldAlert className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[#2b2621]">
+              <h3 className="text-sm font-bold text-ink">
                 NovelForge AI — 升级前创作数据安全守卫
               </h3>
-              <p className="text-[11px] text-[#685f54]">
+              <p className="text-[11px] text-ink-2">
                 执行全面防丢失核验，杜绝正文遗失与任务损坏
               </p>
             </div>
           </div>
           <button
             onClick={onCancel}
-            className="p-1.5 rounded-lg text-[#685f54] hover:text-[#2b2621] hover:bg-[#e4dcce] transition cursor-pointer"
+            className="p-1.5 rounded-lg text-ink-2 hover:text-ink hover:bg-surface-3-hover transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -51,7 +51,7 @@ export const PreUpdateSafetyModal: React.FC<Props> = ({
 
         {/* 检查结果详情 */}
         <div className="p-6 space-y-4">
-          <div className="p-3 rounded-xl bg-[#efe9dc]/50 border border-[#ded5c4] text-xs text-[#4a4237] leading-relaxed">
+          <div className="p-3 rounded-xl bg-surface-2/50 border border-line text-xs text-ink-2 leading-relaxed">
             NovelForge AI 恪守本地优先与创作保护准则，在应用升级安装或重启前，必须确保当前小说正文已落盘、正在运行的 Agent 任务已安全挂起并已创建 SQLite 数据库灾备。
           </div>
 
@@ -77,8 +77,8 @@ export const PreUpdateSafetyModal: React.FC<Props> = ({
             </div>
 
             {/* 2. 多 Agent 任务状态 */}
-            <div className="p-3 rounded-xl border border-[#ded5c4] bg-[#f7f2e7] flex items-start gap-3 text-[#3d362e]">
-              <Cpu className="w-4 h-4 text-[#854d0e] shrink-0 mt-0.5" />
+            <div className="p-3 rounded-xl border border-line bg-surface flex items-start gap-3 text-ink">
+              <Cpu className="w-4 h-4 text-primary shrink-0 mt-0.5" />
               <div className="flex-1">
                 <div className="font-bold flex items-center justify-between">
                   <span>多 Agent 连载任务队列</span>
@@ -86,26 +86,44 @@ export const PreUpdateSafetyModal: React.FC<Props> = ({
                     {result.activeAgentJobs ? '已自动安全暂停' : '无进行中任务'}
                   </span>
                 </div>
-                <p className="text-[11px] text-[#786f65] mt-0.5">
+                <p className="text-[11px] text-ink-2 mt-0.5">
                   {result.activeJobDetails || '当前无正在生成长篇章节的后台任务，无需挂起。'}
                 </p>
               </div>
             </div>
 
             {/* 3. 数据库备份与完整性 */}
-            <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/60 flex items-start gap-3 text-emerald-950">
-              <Database className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+            <div className={`p-3 rounded-xl border flex items-start gap-3 ${
+              result.databaseIntegrityOk && result.backupCreated
+                ? 'border-emerald-200 bg-emerald-50/60 text-emerald-950'
+                : 'border-rose-200 bg-rose-50 text-rose-950'
+            }`}>
+              <Database className={`w-4 h-4 shrink-0 mt-0.5 ${
+                result.databaseIntegrityOk && result.backupCreated ? 'text-emerald-700' : 'text-rose-600'
+              }`} />
               <div className="flex-1">
                 <div className="font-bold flex items-center justify-between">
                   <span>SQLite 灾备与完整性诊断</span>
-                  <span>{result.databaseIntegrityOk ? '✅ 完整性 PASS' : '❌ 完整性异常'}</span>
+                  <span>
+                    {result.databaseIntegrityOk && result.backupCreated
+                      ? '✅ 灾备正常 PASS'
+                      : !result.databaseIntegrityOk
+                      ? '❌ 完整性异常'
+                      : '⚠️ 灾备备份失败'}
+                  </span>
                 </div>
-                <p className="text-[11px] text-emerald-800/90 mt-0.5">
+                <p className={`text-[11px] mt-0.5 ${
+                  result.databaseIntegrityOk && result.backupCreated ? 'text-emerald-800/90' : 'text-rose-800'
+                }`}>
                   {result.integrityReport || '数据库健康度正常。'}
                 </p>
-                {result.backupPath && (
+                {result.backupPath ? (
                   <p className="text-[10px] font-mono text-emerald-700 truncate mt-1">
                     安全热备份快照已生成：{result.backupPath}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-rose-700 font-medium mt-1">
+                    ⚠️ 数据库热备份快照生成失败，为保护本地创作数据，已阻断升级
                   </p>
                 )}
               </div>
@@ -121,11 +139,11 @@ export const PreUpdateSafetyModal: React.FC<Props> = ({
         </div>
 
         {/* 底部按钮栏 */}
-        <div className="p-4 bg-[#efe9dc] border-t border-[#ded5c4] flex items-center justify-end gap-3">
+        <div className="p-4 bg-surface-2 border-t border-line flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-xs font-serif font-medium text-[#5e5549] hover:bg-[#e4dcce] transition cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-serif font-medium text-ink-2 hover:bg-surface-3-hover transition cursor-pointer"
           >
             暂缓更新
           </button>

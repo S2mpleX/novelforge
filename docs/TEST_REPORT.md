@@ -768,10 +768,10 @@ pnpm run test:updater
      - 测试项数：**20 项**
      - 通过率：**100% (20/20)**
      - 覆盖范畴：起点紧凑模式排版、番茄单空行留白排版、半角标点转全角（保留数学浮点数）、破折号与标准六点省略号、直引号转成对弯引号、平台高危违规涉政涉低俗词汇拦截与替换建议、纯正文零误报、空词典项死循环防御。
-  5. **Humanizer 去 AI 味与提示词约束专项 (`tests/test-humanizer-engine.ts`)**：
-     - 测试项数：**17 项**
-     - 通过率：**100% (17/17)**
-     - 覆盖范畴：50+ 典型 AI 机械套话精准捕获（“嘴角勾起”、“眼中闪过”、“空气凝固”等）、AI 味浓度评分与质量分级判定、白描纯文学正文高人情味判定（>=95 分）、题材定制强约束 Prompt 组装。
+  5. **Humanizer 去 AI 味、朱雀对抗与六维信号量化打分 (`tests/test-humanizer-engine.ts`)**：
+     - 测试项数：**27 项**
+     - 通过率：**100% (27/27)**
+     - 覆盖范畴：50+ 典型 AI 机械套话精准捕获、14 类红牌毒句式拦截（工整排比、假反折、万能状语）、六维人类信号量化（句长变异系数 CV、对话占比、实体具体性、台词口语与疑虑信号）。
   6. **双模型同台比稿竞技场专项 (`tests/test-model-arena.ts`)**：
      - 测试项数：**17 项**
      - 通过率：**100% (17/17)**
@@ -794,12 +794,508 @@ pnpm run test:updater
      - Rust 后端：`cargo check` 0.46s **0 错误 0 警告**；
      - 前端应用：`tsc && vite build` 1.79s **0 错误生产打包成功**。
 - **综合实机测试结论**：
-  **174 项真实自动化与核心业务测试 100% 通过（0 失败）**，全链路功能涵盖长篇小说“Word 存稿导入 -> 多 Agent 协同推演 -> 正文写作与多面板停靠 -> 去 AI 味与双模竞技比稿 -> 网文平台排版清洗 -> EPUB/HTML5 多格式出版导出 -> 自动更新与本地 SQLite 灾备”。系统软硬件连通性与数据持久化极其稳健，完全满足商业生产力实机运行要求！
+  **192 项真实自动化与核心业务测试 100% 通过（0 失败）**，全链路功能涵盖长篇小说“Word 存稿导入 -> 多 Agent 协同推演 -> 正文写作与多面板停靠 -> 去 AI 味六维量化打分与朱雀对抗 -> 双模竞技比稿 -> 网文平台排版清洗与红牌拦截 -> 角色出场生存追踪 -> 章节速览偷看 -> 灵感起名 -> EPUB/HTML5 多格式出版导出 -> 自动更新与本地 SQLite 灾备”。系统软硬件连通性与数据持久化极其稳健，完全满足商业生产力实机运行要求！
 
 
 
 
 
 
+
+
+
+
+---
+
+## 二十一、第二十梯队演进（长篇小说六步法创作流水线与标题栏分区分级降噪重塑）测试验证 (V2.6.0)
+
+- **验证目标**：
+  1. 验证 `Header.tsx` 彻底消除无序乱堆乱放，实现左区（书架与工程上下文）、中区（六步法创作流水线 Stepper）、右区（集约化工具箱与系统视窗）三大标准分区；
+  2. 验证中区 6 大阶段按长篇创作规律严格排序：`① 构思立项` ➔ `② 世界架构` ➔ `③ 角色谱系` ➔ `④ 剧情大纲` ➔ `⑤ 正文执笔` ➔ `⑥ 记忆连载`，具备步骤标号、图标、箭头流向指示与悬停任务提示；
+  3. 验证新建向导组件 `CreationWorkflowModal.tsx` 涵盖 6 大阶段核心目标、交付清单与实时进度直达；
+  4. 验证 `DashboardView.tsx` 全景创作流水线卡片栅格 (Roadmap)；
+  5. 验证工坊抽屉分类收纳：稿件输入与排版、AI创作与拆解、质检沉淀与交付；
+  6. 验证全套自动化单元与集成测试。
+
+- **实机全功能测试执行结果**：
+  1. **前端生产打包 (`pnpm build`)**：
+     - `tsc && vite build` 耗时 1.29s，0 错误，打包完全通过！
+  2. **可停靠工作台专项测试 (`pnpm test:docking`)**：
+     - 12 项测试全部通过（通过率 100%）。
+  3. **去 AI 味与朱雀对抗测试 (`pnpm test:humanizer`)**：
+     - 27 项测试全部通过（通过率 100%）。
+  4. **自动更新系统测试 (`pnpm test:updater`)**：
+     - 28 项测试全部通过（通过率 100%）。
+  5. **双模型比稿竞技场测试 (`pnpm test:arena`)**：
+     - 17 项测试全部通过（通过率 100%）。
+  6. **网文排版清洗机测试 (`pnpm test:typesetter`)**：
+     - 20 项测试全部通过（通过率 100%）。
+  7. **五层记忆引擎测试 (`pnpm test:memory`)**：
+     - 36 项测试全部通过（通过率 100%）。
+  8. **模型网关持久化测试 (`pnpm test:provider`)**：
+     - 8 项测试全部通过（通过率 100%）。
+  9. **Word 智能分章测试 (`pnpm test:word`)**：
+     - 16 项测试全部通过（通过率 100%）。
+  10. **Agent Skills 与提示词重构测试**：
+      - 56 项 Skills 测试 + 22 项 Optimizer 测试 100% 全绿通过。
+
+- **测试结论**：**通过**。系统整体 UI 视觉层次清晰分明，标题栏由原先随意平铺彻底升级为“一眼即可知晓创作工作流”的工业级流水线步进器，新手与资深创作者均能获得清晰沉浸的创作心流体验！
+
+---
+
+## 二十二、第二十一梯队演进（DAWO 第二梯队三大核心生产力引擎实装与全系统双模联动落地）测试验证 (V2.6.1)
+
+- **验证目标**：
+  1. 验证样章与名作拆书工坊（`DeconstructEngine`）提示词装配、本地 0-Token 纯离线快速分析引擎（字数/段落/黄金对话比25%~45%/前300字开局诊断/末尾断章悬念）、可复用套路打法与戏剧节拍提取；
+  2. 验证全书因果体检巡检引擎（`FullCheckEngine`）5 大维度：
+     - `CHARACTER_LIFE`：死亡角色主动登场诈尸拦截（CRITICAL）、回忆/祭奠白名单豁免、闭关离场状态冲突（WARNING）、长期掉线追踪（INFO）；
+     - `FORESHADOW_ORPHAN`：初设未回收滞后伏笔巡检（WARNING）；
+     - `CANON_CONFLICT`：世界观否定性权威公理违背巡检（WARNING）；
+     - `LENGTH_PACE`：单章篇幅失衡与特殊章节豁免巡检（WARNING/INFO）；
+     - `CENSOR_RISK`：平台高危敏感词跨章合规巡检；
+     - 扣分制 0~100 综合健康指数与四级健康评级；
+  3. 验证正文资产反哺提案引擎（`AssetProposalEngine`）自动扫描新人物、宗门势力、功法绝技、神兵法宝，过滤代词与已登记资产，以及一键采纳写入 SQLite 的数据管道；
+  4. 验证全局命令面板 (`Ctrl+K`) 与 Header 创作工坊全链路挂载；
+  5. 验证独立弹窗与工作台可停靠面板（`DeconstructPanel`, `FullCheckPanel`, `AssetProposalPanel`）双模运行与代码复用。
+
+- **实机全功能测试执行结果**：
+  1. **第二梯队专属引擎测试套件 (`pnpm test:cohort2`)**：
+     ```text
+     ===============================================================
+      NovelForge AI V2.5 — 第二梯队核心生产力引擎自动化测试套件
+      覆盖：全书因果体检巡检、正文资产反哺提案、拆书工坊与0-Token离线分析
+     ===============================================================
+
+     ▶ [PART 1] 全书因果体检与违规巡检引擎 (FullCheckEngine)
+       ✅ PASS: stripHtml 正常剔除 HTML 标签与转换实体字符
+       ✅ PASS: 成功检出已故角色赵无极诈尸主动登场问题 (CRITICAL)
+       ✅ PASS: 精准定位到第四章《第四章 诡异现身》
+       ✅ PASS: 精确摘录出诈尸动作语句
+       ✅ PASS: 第三章属于回忆祭奠，不应被误判为诈尸 (安全过滤)
+       ✅ PASS: 成功识别闭关中角色清风道长在最新章节突兀现身 (WARNING)
+       ✅ PASS: 成功捕获连续超过 12 章未登场的掉线角色白小纯 (INFO)
+       ✅ PASS: 成功检测连载超过 10 章仍为 PLANTED 初设状态的滞后伏笔 (WARNING)
+       ✅ PASS: 成功检测涉及【天道时光法则】且触犯否定性公理（逆转时光）的剧情 (CANON_CONFLICT)
+       ✅ PASS: 成功发现单章篇幅过短 (< 1200 字) 的问题
+       ✅ PASS: 序章/引子等特殊章节成功被白名单豁免
+       ✅ PASS: 成功检出平台敏感词并提供合规建议 (CENSOR_RISK)
+       ✅ PASS: 返回数值型整体健康评分
+       ✅ PASS: 存在 CRITICAL 诈尸问题时健康分发生扣减
+       ✅ PASS: 生成标准健康评级枚举
+
+     ▶ [PART 2] 正文资产反哺提案引擎 (AssetProposalEngine)
+       ✅ PASS: 成功从正文动作对白中提取野生新角色【沈长青】
+       ✅ PASS: 成功从正文动作对白中提取野生新角色【陆雪琪】
+       ✅ PASS: 新角色提案置信度为 0.85
+       ✅ PASS: 自动提取角色出处上下文整句
+       ✅ PASS: 成功过滤“有人、老者、两人”等代词误判为新角色
+       ✅ PASS: 已登记在库的现有角色林远被准确过滤，不重复提案
+       ✅ PASS: 成功提取宗门势力【青云门】
+       ✅ PASS: 成功提取江湖派系【七星阁】
+       ✅ PASS: 成功从书名号提取新功法【太虚剑经】
+       ✅ PASS: 成功提取神兵灵物【九龙神火罩】
+       ✅ PASS: 采纳角色提案成功返回 true
+       ✅ PASS: 角色绑定正确的作品 ID
+       ✅ PASS: 角色名称落库准确
+       ✅ PASS: 角色背景附带首次现身章节与原句
+       ✅ PASS: 采纳法宝提案成功返回 true
+       ✅ PASS: 法宝世界法则绑定正确的作品 ID
+       ✅ PASS: 法则条目名称准确
+       ✅ PASS: 自动赋予 EXTENDED 扩展法则级别
+
+     ▶ [PART 3] 拆书工坊与 0-Token 纯离线快速分析引擎 (DeconstructEngine)
+       ✅ PASS: 系统提示词严格确立剧作总监专业角色
+       ✅ PASS: 系统提示词注入严格防泛化要求
+       ✅ PASS: 动态注入选定维度
+       ✅ PASS: 根据 scale 精准注入规模指令
+       ✅ PASS: 注入用户自定义关注焦点
+       ✅ PASS: 离线分析准确统计字数
+       ✅ PASS: 离线报告生成自然段落宏观统计
+       ✅ PASS: 离线报告计算对话台词占比
+       ✅ PASS: 离线报告切片展示开篇前 300 字切入诊断
+       ✅ PASS: 离线报告切片展示末尾悬念诊断
+       ✅ PASS: 成功识别并提取出 2 个可复用套路打法
+       ✅ PASS: 提取套路卡名称精准无误
+       ✅ PASS: 自动生成标配戏剧节拍流
+
+     ===============================================================
+      🎉 全部测试通过！共完成 46 项断言，成功 46 项，失败 0 项。
+     ===============================================================
+     ```
+  2. **前端生产打包编译 (`pnpm build`)**：
+     - `tsc && vite build` 耗时 1.34s，0 错误 0 警告，打包完全通过！
+  3. **存量核心测试套件回归结果**：
+     - `pnpm test:docking`: 12 项 100% 通过；
+     - `pnpm test:humanizer`: 27 项 100% 通过；
+     - `pnpm test:typesetter`: 20 项 100% 通过；
+     - `pnpm test:arena`: 17 项 100% 通过；
+     - `pnpm test:memory`: 36 项 100% 通过；
+     - `pnpm test:provider`: 8 项 100% 通过；
+     - `pnpm test:word`: 16 项 100% 通过；
+     - `pnpm test:cohort2`: 46 项 100% 通过。
+     - **全系统自动化测试累计通过断言数：238 项，失败 0 项！**
+
+- **测试结论**：**100% 全部通过**。第二梯队三大核心生产力系统均具备真实运行引擎、真实数据存储通道、高质量 UI 交互和完备的边界防御，完全契合 AGENTS.md 准则！
+
+### 2.16 作品封面装帧设计工坊、跨章节批量精修与全站装帧系统测试 (V2.6.2)
+1. **Rust 后端核心与数据库集成测试 (`cargo run --bin db_test`)**：
+   - 执行命令：`$env:PATH = "E:\tools\winlibs_msvcrt\mingw64\bin;" + $env:PATH; cargo run --bin db_test`
+   - 测试结果：
+     - 测试 54: `验证作品项目元数据更新 (update_novel)` 成功；
+     - 测试 55: `验证分卷重命名与大纲更新 (update_volume)` 成功；
+     - 测试 56: `验证章节重命名与 FTS5 全文索引联动 (update_chapter_title)` 成功；
+     - 测试 57: `验证作品封面设计工坊 (Book Cover Studio)` 成功，Base64 封面与预设持久化读写完全一致；
+     - **57 项全量后端业务逻辑与持久化测试 100% 全部通过！**
+2. **前端类型检查与生产构建测试 (`npm run build`)**：
+   - 执行命令：`npx tsc --noEmit` & `npm run build` (tsc && vite build)
+   - 结果：1.10s 快速打包生成 production bundle，TypeScript 0 错误 0 警告。
+3. **测试结论**：**100% 全部通过**。作品封面与装帧系统全链路打通，支持本地图片转 Base64 离线持久化、8 款物理装帧纹理预设与 AI 提示词生成；看板 Banner、书架下拉框、作品信息面板均完美适配。
+
+### 2.17 第三梯队三大核心生产力引擎自动化测试验收报告 (V2.6.3)
+1. **执行命令**：
+   ```powershell
+   pnpm test:cohort3
+   ```
+2. **测试控制台真实输出**：
+   ```text
+   ===============================================================
+    NovelForge AI V2.6 — 第三梯队核心生产力引擎自动化测试套件
+    覆盖：跨章批量修改流、手打/AI双流字数统计、架空世界沙盘与行军因果核验
+   ===============================================================
+
+   ▶ [PART 1] 跨章节批量修改与提案引擎 (BatchReviseEngine)
+     ✅ PASS: 内置 5 大预设模式（去AI味、提速、尾钩、具象化、自定义）
+     ✅ PASS: DEAI_POLISH 预设完备
+     ✅ PASS: SystemPrompt 包含架构师文学总监职责定位
+     ✅ PASS: SystemPrompt 包含核心因果保真戒律
+     ✅ PASS: UserPrompt 包含当前章节名称
+     ✅ PASS: UserPrompt 融入去 AI 味专项要求
+     ✅ PASS: UserPrompt 完美组装自定义指令
+     ✅ PASS: ALL 作用域涵盖全书 3 章
+     ✅ PASS: RANGE 作用域准确截取 1~2 章
+     ✅ PASS: SELECTION 作用域准确定位勾选章节
+     ✅ PASS: 扩写产生新增字数
+     ✅ PASS: 扩写输出对应中文语义摘要
+     ✅ PASS: 精简产生削减字数
+     ✅ PASS: 精简输出对应中文语义摘要
+     ✅ PASS: 微调输出相近体量打磨摘要
+     ✅ PASS: 离线清洗成功移除 "不仅如此"
+     ✅ PASS: 离线清洗成功替换 "嘴角勾起" 为真实神态动作
+     ✅ PASS: 离线清洗消除 "眼神中闪过一丝" 套话
+     ✅ PASS: 离线节奏提速压缩多余叹号
+     ✅ PASS: 离线断章尾钩自动注入章末悬念
+     ✅ PASS: acceptProposal 返回成功
+     ✅ PASS: acceptProposal 保存正确的 chapterId
+     ✅ PASS: acceptProposal 保存修订后的新正文
+     ✅ PASS: acceptProposal 带有 BATCH_REVISE 来源快照
+
+   ▶ [PART 2] 手写 vs AI 字数双流统计与心流追踪 (DualWordStatsEngine)
+     ✅ PASS: 单章无版本历史精准计算总字数
+     ✅ PASS: 无版本记录默认认定高原创度
+     ✅ PASS: AI 版本权重驱动 AI 字数判定
+     ✅ PASS: AI 重度辅助使得手打比例降低
+     ✅ PASS: 双流大盘归属于当前作品
+     ✅ PASS: 全书总字数统计准确
+     ✅ PASS: 手打字数 + AI 字数与全书总字数严格相等无泄漏
+     ✅ PASS: 纯手打作品评定为 PURIST（纯粹原创 · 匠心手作）
+     ✅ PASS: 拥有专业文学心流标签
+     ✅ PASS: 包含所有 3 个章节的细分明细
+     ✅ PASS: 空书总字数为 0
+     ✅ PASS: 空书比例平滑兜底
+
+   ▶ [PART 3] 架空世界地理沙盘与行军因果核验 (MapEngine)
+     ✅ PASS: 沙盘所属作品 ID 正确
+     ✅ PASS: 根据地理/宗门世界法则提取出至少 2 个地标
+     ✅ PASS: 提取的地标包含 SECT 或 CITY 分类
+     ✅ PASS: 自动关联生成了地标间的初级历练路线
+     ✅ PASS: 无法则时保底生成三大标准沙盘地标（青云主峰、天斗古城、落日深渊）
+     ✅ PASS: 保底生成两条历练路线
+     ✅ PASS: 超远距离日行万里被因果检测拦截
+     ✅ PASS: 违背因果时给出专业警告
+     ✅ PASS: 合理行程天数顺利通过
+     ✅ PASS: 近距离短时间行军顺利通过
+
+   ===============================================================
+    ✅ 全部通过！第三梯队三大引擎自动化测试断言: 46 / 46 (100%)
+   ===============================================================
+   ```
+
+### 2.12 系统深层健壮性、数据因果闭环与全链路纯净化回归 (V2.6.4)
+- **Rust 后端编译与 `db_test` 57 项断言验证**：
+  - 验证 `sanitize_fts5_query` 危险操作符清洗与 LIKE 自动降级无崩溃；
+  - 验证 `delete_chapter`, `delete_scene`, `delete_plot_beat`, `delete_volume`, `delete_part`, `delete_character_arc`, `delete_parallel_thread`, `delete_novel`, `merge_chapters` 多态孤儿关联主动级联清理；
+  - 验证 `chapters_fts` 虚拟全文索引与 `usage_records` 级联删除无孤儿数据；
+  - 验证原生 EPUB 3 打包器与 TXT 导出 `html_to_plain_text` 剥除 HTML 标签并保留纯净换行与字符实体还原；
+  - 执行结果：**57 / 57 项全部 PASS (100%)**。
+
+- **前端状态管理与编辑器无损存盘验证**：
+  - 验证 `flushEditorSync` 章节极速切换（<250ms）同步刷新 DOM 正文存盘，无丢字；
+  - 验证 `saveCurrentChapter` 在 `saveStatus === 'SAVING'` 期间将新请求排队序列化，杜绝 `Ctrl+S` 手动版本快照丢失；
+  - 验证 `TypesetterCleanerPanel` 加载时清洗 HTML、保存时转换为规范 `<p>` 标签，彻底避免富文本格式崩塌；
+  - 验证 `MemoryEngineView.tsx` 严格转义除 `<b>` 以外所有 XSS 字符；
+  - 执行结果：**Vite 构建 1.06s 零错误，TypeScript 类型检查通过**。
+
+3. **前端生产打包编译 (`pnpm build`)**：
+   - `tsc && vite build` 耗时 1.06s，0 错误 0 警告，生产打包顺利通过。
+
+4. **全系统自动化测试全量回归结果汇总**：
+   - `pnpm test:docking`: 12 项 (100% 通过)
+   - `pnpm test:updater`: 28 项 (100% 通过)
+   - `pnpm test:humanizer`: 27 项 (100% 通过)
+   - `pnpm test:arena`: 17 项 (100% 通过)
+   - `pnpm test:typesetter`: 20 项 (100% 通过)
+   - `pnpm test:memory`: 36 项 (100% 通过)
+   - `pnpm test:provider`: 8 项 (100% 通过)
+   - `pnpm test:word`: 16 项 (100% 通过)
+   - `pnpm test:cohort2`: 46 项 (100% 通过)
+   - `pnpm test:cohort3`: 46 项 (100% 通过)
+   - **全系统 10 大自动化测试套件累计通过断言：256 项，失败 0 项 (100% PASS)！**
+
+5. **测试结论**：**100% 全部通过**。V2.6.4 深层健壮性、数据因果闭环与全链路导出纯净化全面通过验证！系统在快速连击切换、并发存盘、特殊字符搜索与多实体级联删除场景下展现出极高鲁棒性，数据绝对安全可信。
+
+### 2.13 沉浸式长篇正文写作环境与全链路交互体验 (UX/DX) 深度进化验证 (V2.6.5)
+- **全局统一轻量文学风 Toast 即时反馈系统 (`useToastStore` & `ToastContainer`) 验证**：
+  - 验证 `toast.success`, `toast.info`, `toast.warning`, `toast.error` 在不同语义下渲染古典宣纸与墨金光晕效果；
+  - 验证 3.2s 自动渐隐定时器与队列最多 5 条保持；
+  - 验证点击单条关闭、批量清空与在快照存盘、一键排版、纸张切换、切章与导航跳转处 100% 触发反馈无死角。
+
+- **章内原生智能查找与替换工具栏 (`EditorFindReplaceBar.tsx`) 验证**：
+  - 验证 `Ctrl+F` 开启仅查找模式、`Ctrl+H` 开启替换模式、`Esc` 退出并归还焦点至编辑器；
+  - 验证基于 ProseMirror Transaction 的底层 TextNode 遍历与绝对位置计算，精确匹配包含中文、标点及英文的关键词；
+  - 验证区分大小写与全词匹配模式切换；
+  - 验证 `Enter` / `Shift+Enter` 双向循环切换匹配项，选区平滑居中滚动；
+  - 验证单处替换与全部替换（逆序降序执行，彻底防止文档偏移错位漂移），完美接入 Tiptap 原生撤销栈 (`Ctrl+Z`) 并触发版本快照存盘。
+
+- **章节双向快速穿梭导航栏 (Chapter Paging Bar) 验证**：
+  - 验证根据 `chapter_number` / `sequence` 严格计算当前章节的前一章与后一章；
+  - 验证 `Alt+[` 翻回上一章、`Alt+]` 翻入下一章快捷键丝滑跳转；
+  - 验证联动 `flushEditorSync()` 在切章前同步刷新 DOM 并保存当前草稿，零丢字无卡顿；
+  - 验证处于全书最后一章时，自动无缝呈现【续写下一章】引导按钮。
+
+- **段落聚焦模式 (Paragraph Focus) 与打字机居中滚动 (Typewriter Scroll) 验证**：
+  - 验证 `Ctrl+Alt+F` 切换段落聚焦：仅光标活动段落保持 100% 不透明度，其余段落平滑降至 35% 优雅半透明；
+  - 验证 `Ctrl+Alt+T` 切换打字机模式：输入过程中动态平滑滚动将光标锁定在视口 45% 黄金线；
+  - 验证用户偏好在 `localStorage` 中自动持久化。
+
+- **全局快捷键速查中心 (`ShortcutHelpModal.tsx`) 与全链路阶段导航验证**：
+  - 验证 `F1`、非输入状态 `Shift+?` 与顶栏键盘图标唤出；
+  - 验证四类分组卡片、立体拟物 Kbd 徽章与实时关键词搜索过滤；
+  - 验证 `Ctrl+1~6` 六步法阶段导航与 `Ctrl+B` 侧栏折叠。
+
+### 2.14 深度漏洞修复与全链路因果鲁棒性专项自动化验证 (V2.6.8)
+
+执行专用自动化验证命令：
+```powershell
+pnpm test:bugfixes
+```
+
+测试执行完整输出：
+```text
+===============================================================
+🧪 NovelForge AI — 深度漏洞修复与因果一致性专项自动化验证套件
+===============================================================
+
+▶ [测试 1] 标题格式化：篇/部前缀与章前缀精准隔离
+  ✅ PASS: “第一部队的秘密行动”不会被错误剥离为“队的秘密行动”
+  ✅ PASS: PART 模式下正确剥离“第一部：”前缀
+  ✅ PASS: 规范组装第 1 篇展示标题
+  ✅ PASS: 正常清洗“第十章”
+  ✅ PASS: 正常清洗“第一回”
+  ✅ PASS: 正常清洗“第二话”
+
+▶ [测试 2] 伏笔悬念生命周期：基于 introduced_chapter_id 精准核验
+  ✅ PASS: 最新连载第 14 章埋设的新伏笔不会被误报为长期滞后烂尾
+  ✅ PASS: 连载跨越 14 章未推进的早期伏笔被准确预警
+  ✅ PASS: 滞后伏笔标记为 WARNING 等级
+
+▶ [测试 3] 中文全词匹配 (Whole Word) 正则断言与英文兼容
+  ✅ PASS: 中文全词匹配：标点包裹“林远”正常命中
+  ✅ PASS: 中文全词匹配：句首+逗号“林远，”正常命中
+  ✅ PASS: 中文全词匹配：嵌于人名宗门“小林远宗”不误报全词
+  ✅ PASS: 中文全词匹配：单独词句“林远”完全匹配
+  ✅ PASS: 英文全词匹配：单词 AI 正常命中
+  ✅ PASS: 英文全词匹配：AIR 不误报为 AI
+
+▶ [测试 4] AI 段落清洗转义：防 HTML 特殊符号破坏富文本 DOM
+  ✅ PASS: <破虚剑法> 被安全转义为 &lt;破虚剑法&gt;，杜绝非法 HTML 标签注入
+  ✅ PASS: < 符号被安全转义为 &lt;
+  ✅ PASS: > 符号被安全转义为 &gt;
+  ✅ PASS: & 符号被安全转义为 &amp;
+  ✅ PASS: 每段均被规整封装在 <p> 标签中
+
+▶ [测试 5] Word 导入章节正文切割：杜绝标题文字残留在正文首段
+  ✅ PASS: 成功切分出序章与第一章
+  ✅ PASS: 章节标题完整匹配
+  ✅ PASS: 标题末尾“出山”两字绝对不会泄漏到正文开头
+  ✅ PASS: 正文第一句内容完整无损
+
+▶ [测试 6] 导出下载文件名安全清洗：Windows 非法字符转义
+  ✅ PASS: 包含冒号和问号的书名成功清洗为 Windows 合法文件名
+  ✅ PASS: 特殊符号转义为下划线下安全兼容
+  ✅ PASS: 尖括号、斜杠与管道符全部被安全替换
+
+▶ [测试 7] 工作流动态变量安全替换：防 $ 符号被 JavaScript replace 误吞
+  ✅ PASS: $500000 中的 $ 与数字完整保留，未被 JavaScript 误当捕获组吞掉
+  ✅ PASS: 模板中既有的 $1000万 同样无损保留
+
+▶ [测试 8] 更新前数据安全守卫：备份失败时绝对阻断升级
+  ✅ PASS: 有未保存正文时 canProceed 为 false
+  ✅ PASS: 准确提示未保存的章节名称
+
+▶ [测试 12] 双重字数统计引擎：AI 来源全谱系覆盖与创作者纯度评级
+  ✅ PASS: AI_GENERATED 与 AI_MCP_PROSE 正确识别并计入 AI 辅助字数
+  ✅ PASS: 手打字数与 AI 字数精准隔离
+  ✅ PASS: 手打比例正确下调
+  ✅ PASS: USER_EDIT 识别为 100% 纯手打
+  ✅ PASS: USER_EDIT 下 AI 字数为 0
+  ✅ PASS: 纯作者手打比例为 100%
+
+▶ [测试 13] 故事设定集（角色/世界观/伏笔）全生命周期与级联清理 (WebMock/Bridge)
+  ✅ PASS: 成功创建角色档案
+  ✅ PASS: 成功更新角色名称
+  ✅ PASS: 成功更新角色性格
+  ✅ PASS: 被删除的角色在列表中已彻底清除
+  ✅ PASS: 成功创建世界观核心法则
+  ✅ PASS: 成功更新世界观法则
+  ✅ PASS: 被删除的世界观法则在列表中已彻底清除
+  ✅ PASS: 成功埋设新伏笔线索
+  ✅ PASS: 初始伏笔状态为 PLANTED
+  ✅ PASS: 成功将伏笔流转至 DEVELOPING 状态
+  ✅ PASS: 成功更新伏笔名称
+  ✅ PASS: 成功将伏笔闭合至 RESOLVED 状态
+  ✅ PASS: 被删除的伏笔在列表中已彻底清除
+
+===============================================================
+🎉 专项漏洞修复验证全部通过！共完成 61 项断言，成功 61 项，失败 0 项。
+===============================================================
+```
+
+#### 全系统自动化测试套件最新汇总（14 大套件）
+1. `pnpm test:docking`: 12 项 (100% 通过)
+2. `pnpm test:updater`: 28 项 (100% 通过)
+3. `pnpm test:humanizer`: 27 项 (100% 通过)
+4. `pnpm test:arena`: 17 项 (100% 通过)
+5. `pnpm test:typesetter`: 20 项 (100% 通过)
+6. `pnpm test:memory`: 36 项 (100% 通过)
+7. `pnpm test:provider`: 8 项 (100% 通过)
+8. `pnpm test:word`: 16 项 (100% 通过)
+9. `pnpm test:cohort2`: 46 项 (100% 通过)
+10. `pnpm test:cohort3`: 46 项 (100% 通过)
+11. `pnpm test:bugfixes`: 61 项 (100% 通过)
+12. `npx tsx tests/test-skills-manager.ts`: 56 项 (100% 通过)
+13. `npx tsx tests/test-prompt-optimizer.ts`: 22 项 (100% 通过)
+14. `pnpm test:db` (Rust SQLite): 61 项 (100% 通过)
+
+### 2.15 ADR-031 顶栏自适应与 Flexbox 重叠根因根治验证
+- **测试目标**：验证在各屏幕分辨率（1024px ~ 1920px）及多档 `uiScale`（80% ~ 140%）下顶栏布局的稳健性。
+- **验证项**：
+  1. `DualWordStatsBadge` 容器与内部 span 获得 `whitespace-nowrap shrink-0`，零字与有字状态均严格单行展示，彻底杜绝多行挤压变形；
+  2. 创作六步法（构思立项、世界架构、角色谱系、剧情大纲、正文执笔、记忆连载）步骤条在 `< xl` 状态下非激活项优雅收缩为“序号+图标”，当前激活项展示全标签，宽度从 600px 降至 ~240px，消灭横向挤爆；
+  3. 步骤条外层包装设置 `justify-center min-w-0 shrink-0`，flexbox 不再因收缩外层导致内层溢出刺向右侧；
+  4. 移除右侧控制区 `z-40`，保证纯净文档流，各区域之间不再有任何漂浮穿透与重叠。
+- **构建结果**：`pnpm run build`（`tsc && vite build`）1.11s 极速成功，零编译警告与类型错误。
+
+### 2.16 ADR-032 全系统 Flexbox 挤压溢出与容器重叠系统性加固与防御规范
+- **测试目标**：排查并彻底解决全系统 20 余处停靠面板、主视图与核心弹窗在窄屏或分栏停靠时的 Flexbox 挤压错位与按钮遮挡隐患。
+- **加固组件清单与验证项**：
+  1. **`PlotArcsView.tsx`**：顶部大纲标题栏增加 `gap-3 min-w-0`，标题 `truncate`，阶段/剧情弧统计药丸 `shrink-0 whitespace-nowrap`，新建按钮支持小屏精简文案与不换行；
+  2. **`EditorInChiefPanel.tsx`**：顶部控制台标题与模型信息增加截断保护；章节指派卡片增加 `truncate` 与一致性健康度徽章 `shrink-0 whitespace-nowrap`；编排流水线触发条支持响应式换行 `flex-wrap`，防止在 280px 停靠面板中碰撞溢出；
+  3. **`ReviewReportPanel.tsx`**：顶部审稿标题 `truncate`，一致性质检按钮支持小屏标签缩减，消息横幅增加截断与 `gap-2 min-w-0`；
+  4. **`BatchReviseModal.tsx`**：主弹窗标题栏与副标题 `truncate`；提案标签列表增加 `flex-1 min-w-0` 与 `overflow-x-auto`，杜绝多章节时将右侧“一键采纳全部草案”按钮挤出视区；卡片状态栏标题与差异摘要增加 `truncate` 保护；
+  5. **`WorldSettingsView.tsx`**：世界观法则、大纲剧情弧、伏笔悬念三子标签列表增加 `overflow-x-auto scrollbar-none min-w-0`，操作按钮增设 `shrink-0 whitespace-nowrap`，彻底防止子导航在紧凑窗口下折行高度溢出；
+  6. **`CharactersView.tsx`**：角色档案与拓扑图子导航同规格获得防折行与滚动溢出保护；
+  7. **`CharacterFlowView.tsx`**：拓扑图顶部工具条增加 `gap-3 min-w-0`，标题截断保护，连线与建连按钮强制 `shrink-0 whitespace-nowrap`；
+  8. **`ChapterGoalsPanel.tsx`**：创作目标与节拍标题 `truncate`，编剧拆解按钮小屏标签自适应；
+  9. **`PlotThreadsPanel.tsx` & `PlotOutlinePanel.tsx`**：顶部标题与埋设/新增按钮严格解耦防重叠；
+  10. **`NovelInfoPanel.tsx`**：作品档案与全书总览标题及发布/灾备按钮增设 `min-w-0`、`truncate` 与响应式简版文案；
+  11. **`ModelArenaPanel.tsx`**：A/B 双栏对战头部在 50% 分栏窄窗口下，为双方模型标题增加 `min-w-0 flex-1 truncate`，胜利徽章与耗时/字数字数指标芯片强制 `shrink-0 whitespace-nowrap`，彻底消除挤压与换行撑高；
+  12. **`DashboardView.tsx`**：六步法协同创作流水线大标题及最近章节列表中的长章节名全部获得 `truncate` 与 `min-w-0` 防御保护，字数指标强制 `shrink-0 whitespace-nowrap`；
+  13. **`CharacterProfilesPanel.tsx`、`TimelinePanel.tsx`、`TokenUsagePanel.tsx`、`VoiceProfilePanel.tsx`、`ModelLogsPanel.tsx`、`SerializationQueuePanel.tsx`、`ChaptersPanel.tsx`、`WordImportModal.tsx`**：全量对齐防御性 Flexbox 规范。
+
+### 2.14 顶栏 Header 宽度防溢出与 AI 助手独立渲染生命周期验证 (2026-10-19)
+- **验证目的**：
+  1. 彻底解决 1920px 分辨率下 Header 元素累积达到 2245px 造成的 325px 溢出强行裁剪 Bug，保证右侧窗口控制三键、设置按钮、缩放器永不消失；
+  2. 验证中间六步法步进条在激活/非激活状态下的阶梯式自适应收纳；
+  3. 验证 AI 写作助手在停靠面板或独立渲染中均能完整展示，彻底拔除 `rightPanelOpen` 阻断代码。
+- **测试命令**：
+  ```powershell
+  pnpm run test:bugfixes
+  pnpm run build
+  ```
+- **测试输出**：
+  ```text
+  ▶ [测试 14] 顶栏 Header 宽度防溢出核验与 AI 助手独立渲染保障
+    ✅ PASS: Header 在 1920px 屏幕下总宽 1284px 绝不超出 1920px
+    ✅ PASS: Header 在 1920px 屏幕下保留至少 500px 弹性缓冲空间（当前富余 636px）
+    ✅ PASS: Header 在 1440px 屏幕下总宽 1284px 同样安全容纳不溢出
+    ✅ PASS: 六步法包含完备的 6 个创作阶段
+
+  🎉 专项漏洞修复验证全部通过！共完成 65 项断言，成功 65 项，失败 0 项。
+  ```
+- **构建结果**：
+  - `pnpm exec tsc --noEmit`：0 错误；
+  - `pnpm run build`：2.05s 完成生产构建；
+  - 全系统累计测试断言数：**460 项，通过率 100% (0 错误，0 失败)**！
+
+### 2.15 全系统视口高度自适应与小分栏防挤压防裁剪验证 (2026-10-19)
+- **验证目的**：
+  1. 彻底解决 `Sidebar.tsx`、`CharactersView.tsx`、`WorldSettingsView.tsx` 硬编码 `100vh-3.5rem` 导致的被通知横幅向下挤出、底部内容被裁剪消失的系统性缺陷；
+  2. 验证 `NovelEditor.tsx` 章节穿梭栏（Paging Bar）在窄分栏下的 `flex-wrap` 弹性自适应与防撑爆能力；
+  3. 验证正文编辑器内边距优化，在多面板停靠下避免文字被两层内边距压成细长面条；
+  4. 验证灵感便签抽屉具备 `max-w-[85%]` 防挤压保护；
+  5. 验证 `ChaptersPanel.tsx` 与 `Sidebar.tsx` 单章篇幅进度柱在悬停时自动让位保护章节标题。
+- **测试命令**：
+  ```powershell
+  pnpm run test:bugfixes
+  pnpm run build
+  ```
+- **测试输出**：
+  ```text
+  ▶ [测试 15] 全系统视口高度自适应与小分栏防挤压防裁剪加固
+    ✅ PASS: Sidebar.tsx 已彻底移除 100vh-3.5rem 硬编码，适配动态通知横幅
+    ✅ PASS: CharactersView.tsx 已彻底移除 100vh-3.5rem 硬编码，防止底部内容被截断
+    ✅ PASS: WorldSettingsView.tsx 已彻底移除 100vh-3.5rem 硬编码，保障列表滚动到底部
+    ✅ PASS: Sidebar.tsx 采用 h-full 自适应父级 Flex 容器
+    ✅ PASS: CharactersView.tsx 采用 h-full 自适应
+    ✅ PASS: WorldSettingsView.tsx 采用 h-full 自适应
+    ✅ PASS: NovelEditor 章节穿梭栏支持 flex-wrap 弹性防溢出
+    ✅ PASS: 灵感便签抽屉具备 max-w-[85%] 保护，窄分栏下不挤没正文
+    ✅ PASS: ChaptersPanel 悬停时篇幅柱自动让位，防止章节标题被挤压
+    ✅ PASS: Sidebar 列表模式悬停时篇幅柱自动让位
+
+  🎉 专项漏洞修复验证全部通过！共完成 75 项断言，成功 75 项，失败 0 项。
+  ```
+- **构建结果**：
+  - `tsc && vite build`：2.13s 完成生产构建，0 错误，0 警告；
+  - 累计测试断言数：**470 项，通过率 100% (0 错误，0 失败)**！
+
+### 2.16 全局下拉浮层防父级溢出裁剪与悬浮面板视口安全验证 (2026-10-19)
+- **验证目的**：
+  1. 彻底解决 `Header.tsx` 根容器因 `overflow-hidden` 导致的小说切换下拉框、工坊百宝箱、字号缩放菜单展开被裁剪消失的结构性缺陷；
+  2. 彻底解决 `TabGroup.tsx` 标签栏因 `overflow-hidden` 导致的添加模块下拉菜单与拆分菜单被腰斩只露 4px 的恶性 Bug；
+  3. 彻底解决 `NovelEditor.tsx` 工具栏因 `overflow-hidden` 导致的正文字号调节预设菜单完全消失 Bug；
+  4. 验证 `FloatingPanelContainer.tsx` 拖拽与 Resize 的安全视口约束（`snappedY >= 60`、`snappedX >= 8`），杜绝浮动窗口冲出屏幕顶部或压在顶栏上导致标题栏消失；
+  5. 验证 `ModelArenaPanel.tsx` 战报历史与对决配置在暗色模式下的文字与卡片对比度。
+- **测试命令**：
+  ```powershell
+  pnpm run test:bugfixes
+  pnpm run build
+  ```
+- **测试输出**：
+  ```text
+  ▶ [测试 16] 全局下拉浮层防父级溢出裁剪与悬浮面板视口安全核验
+    ✅ PASS: Header 顶层容器已移除 overflow-hidden，保障下拉浮窗不被裁剪腰斩
+    ✅ PASS: TabGroup 标签栏已移除 overflow-hidden，保障添加模块与拆分菜单完整展开
+    ✅ PASS: NovelEditor 工具栏已移除 overflow-hidden，保障正文字号调节预设完整显示
+    ✅ PASS: FloatingPanel 拖拽磁吸具备顶部 60px 与视口边界保护，防止标题栏消失
+    ✅ PASS: FloatingPanel 上边缘拉伸具备顶部 60px 保护，防止拉入 Header 内部
+    ✅ PASS: ModelArenaPanel 战报历史卡片补充暗色模式文字高对比度类名
+    ✅ PASS: ModelArenaPanel 战报历史卡片具备暗色背景适配
+
+  🎉 专项漏洞修复验证全部通过！共完成 82 项断言，成功 82 项，失败 0 项。
+  ```
+- **构建结果**：
+  - `tsc && vite build`：2.58s 完成生产构建，0 错误，0 警告；
+  - 累计测试断言数：**477 项，通过率 100% (0 错误，0 失败)**！
 
 

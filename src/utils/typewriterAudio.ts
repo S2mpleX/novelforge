@@ -72,6 +72,16 @@ class TypewriterAudioEngine {
       filter.connect(gainNode);
       gainNode.connect(this.ctx.destination);
 
+      whiteNoise.onended = () => {
+        try {
+          whiteNoise.disconnect();
+          filter.disconnect();
+          gainNode.disconnect();
+        } catch {
+          // Ignore disconnection errors on already destroyed context
+        }
+      };
+
       whiteNoise.start(now);
       whiteNoise.stop(now + (isNewline ? 0.04 : 0.02));
     } catch {

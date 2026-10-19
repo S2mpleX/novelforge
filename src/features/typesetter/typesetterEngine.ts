@@ -122,6 +122,27 @@ export class TypesetterEngine {
   }
 
   /**
+   * 将富文本 HTML 标签清洗为无标签纯文本段落（保留换行并解码字符实体）
+   */
+  public static htmlToPlainText(html: string): string {
+    if (!html) return '';
+    if (!html.includes('<') && !html.includes('&')) return html;
+    const text = html
+      .replace(/<br\s*[\/]?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/&apos;/gi, "'");
+    return text;
+  }
+
+  /**
    * 核心文本排版与清洗执行器
    */
   public static formatText(

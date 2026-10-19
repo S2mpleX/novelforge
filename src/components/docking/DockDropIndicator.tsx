@@ -14,10 +14,12 @@ interface Props {
   containerRect: DOMRect | null;
 }
 
-export const DockDropIndicator: React.FC<Props> = ({ tabGroupId, containerRect }) => {
-  const { draggingState, dropTarget, setDropTarget } = useWorkspaceStore();
+export const DockDropIndicator: React.FC<Props> = React.memo(({ tabGroupId, containerRect }) => {
+  const isDragging = useWorkspaceStore((s) => Boolean(s.draggingState));
+  const dropTarget = useWorkspaceStore((s) => s.dropTarget);
+  const setDropTarget = useWorkspaceStore((s) => s.setDropTarget);
 
-  if (!draggingState || !containerRect) return null;
+  if (!isDragging || !containerRect) return null;
 
   const handlePointerEnterZone = (direction: DropDirection) => {
     setDropTarget({
@@ -69,15 +71,66 @@ export const DockDropIndicator: React.FC<Props> = ({ tabGroupId, containerRect }
     }
   };
 
+  const handleOverlayPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!containerRect) return;
+
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+
+    const relX = (mouseX - containerRect.left) / containerRect.width;
+    const relY = (mouseY - containerRect.top) / containerRect.height;
+
+    // Outer 28% threshold for left/right/top/bottom docking zones
+    const distLeft = relX;
+    const distRight = 1 - relX;
+    const distTop = relY;
+    const distBottom = 1 - relY;
+
+    const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+
+    let direction: DropDirection = 'center';
+    if (minDist < 0.28) {
+      if (minDist === distLeft) direction = 'left';
+      else if (minDist === distRight) direction = 'right';
+      else if (minDist === distTop) direction = 'top';
+      else direction = 'bottom';
+    } else {
+      direction = 'center';
+    }
+
+    if (!dropTarget || dropTarget.targetTabGroupId !== tabGroupId || dropTarget.direction !== direction) {
+      setDropTarget({
+        targetTabGroupId: tabGroupId,
+        direction,
+        rect: {
+          x: containerRect.left,
+          y: containerRect.top,
+          width: containerRect.width,
+          height: containerRect.height,
+        },
+      });
+    }
+  };
+
+  const handleOverlayPointerLeave = () => {
+    if (dropTarget?.targetTabGroupId === tabGroupId) {
+      setDropTarget(null);
+    }
+  };
+
   return (
-    <div className="absolute inset-0 pointer-events-auto z-40 flex items-center justify-center bg-black/10 backdrop-blur-[0.5px]">
+    <div
+      onPointerMove={handleOverlayPointerMove}
+      onPointerLeave={handleOverlayPointerLeave}
+      className="absolute inset-0 pointer-events-auto z-40 flex items-center justify-center bg-black/10"
+    >
       {/* Visual Drop Preview Rectangle */}
       {currentDirection && (
         <div
           style={getPreviewStyle()}
           className="absolute bg-amber-700/25 border-2 border-amber-600 rounded-lg pointer-events-none transition-all duration-150 flex items-center justify-center shadow-lg"
         >
-          <span className="px-3 py-1.5 rounded-full bg-[#fdfbf7] text-[#854d0e] font-bold text-xs shadow-md border border-amber-600/40">
+          <span className="px-3 py-1.5 rounded-full bg-surface text-primary font-bold text-xs shadow-md border border-amber-600/40">
             {getDirectionText()}
           </span>
         </div>
@@ -91,7 +144,7 @@ export const DockDropIndicator: React.FC<Props> = ({ tabGroupId, containerRect }
           className={`w-12 h-12 rounded-lg flex items-center justify-center cursor-pointer transition shadow-md border ${
             currentDirection === 'center'
               ? 'bg-amber-800 text-white border-amber-900 scale-110'
-              : 'bg-[#fdfbf7] text-[#854d0e] border-[#d5cbb8] hover:bg-amber-800/20'
+              : 'bg-surface text-primary border-line hover:bg-amber-800/20'
           }`}
           title="拖入此处合并为标签页"
         >
@@ -104,7 +157,7 @@ export const DockDropIndicator: React.FC<Props> = ({ tabGroupId, containerRect }
           className={`absolute top-0 w-12 h-10 rounded-t-lg flex items-center justify-center cursor-pointer transition shadow-md border ${
             currentDirection === 'top'
               ? 'bg-amber-800 text-white border-amber-900 scale-110'
-              : 'bg-[#fdfbf7] text-[#854d0e] border-[#d5cbb8] hover:bg-amber-800/20'
+              : 'bg-surface text-primary border-line hover:bg-amber-800/20'
           }`}
           title="停靠在上方"
         >
@@ -117,7 +170,7 @@ export const DockDropIndicator: React.FC<Props> = ({ tabGroupId, containerRect }
           className={`absolute bottom-0 w-12 h-10 rounded-b-lg flex items-center justify-center cursor-pointer transition shadow-md border ${
             currentDirection === 'bottom'
               ? 'bg-amber-800 text-white border-amber-900 scale-110'
-              : 'bg-[#fdfbf7] text-[#854d0e] border-[#d5cbb8] hover:bg-amber-800/20'
+              : 'bg-surface text-primary border-line hover:bg-amber-800/20'
           }`}
           title="停靠在下方"
         >
@@ -130,7 +183,7 @@ export const DockDropIndicator: React.FC<Props> = ({ tabGroupId, containerRect }
           className={`absolute left-0 w-10 h-12 rounded-l-lg flex items-center justify-center cursor-pointer transition shadow-md border ${
             currentDirection === 'left'
               ? 'bg-amber-800 text-white border-amber-900 scale-110'
-              : 'bg-[#fdfbf7] text-[#854d0e] border-[#d5cbb8] hover:bg-amber-800/20'
+              : 'bg-surface text-primary border-line hover:bg-amber-800/20'
           }`}
           title="停靠在左侧"
         >
@@ -143,7 +196,7 @@ export const DockDropIndicator: React.FC<Props> = ({ tabGroupId, containerRect }
           className={`absolute right-0 w-10 h-12 rounded-r-lg flex items-center justify-center cursor-pointer transition shadow-md border ${
             currentDirection === 'right'
               ? 'bg-amber-800 text-white border-amber-900 scale-110'
-              : 'bg-[#fdfbf7] text-[#854d0e] border-[#d5cbb8] hover:bg-amber-800/20'
+              : 'bg-surface text-primary border-line hover:bg-amber-800/20'
           }`}
           title="停靠在右侧"
         >
@@ -152,4 +205,4 @@ export const DockDropIndicator: React.FC<Props> = ({ tabGroupId, containerRect }
       </div>
     </div>
   );
-};
+});

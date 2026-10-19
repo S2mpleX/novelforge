@@ -90,6 +90,37 @@ export function findTabGroupByPanel(root: LayoutNode, instanceId: string): TabGr
 }
 
 /**
+ * 递归查找最左侧的 TabGroup 节点（侧边栏主位）
+ */
+export function findLeftmostTabGroup(root: LayoutNode): TabGroupNode | null {
+  if (root.type === 'tabs') return root;
+  if (!root.children || root.children.length === 0) return null;
+  return findLeftmostTabGroup(root.children[0]);
+}
+
+/**
+ * 递归查找最右侧的 TabGroup 节点（右侧工具栏主位）
+ */
+export function findRightmostTabGroup(root: LayoutNode): TabGroupNode | null {
+  if (root.type === 'tabs') return root;
+  if (!root.children || root.children.length === 0) return null;
+  return findRightmostTabGroup(root.children[root.children.length - 1]);
+}
+
+/**
+ * 查找树中第一个可用的 TabGroup 节点
+ */
+export function findFirstTabGroup(root: LayoutNode): TabGroupNode | null {
+  if (root.type === 'tabs') return root;
+  if (!root.children) return null;
+  for (const child of root.children) {
+    const found = findFirstTabGroup(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
  * 获取树中所有的 PanelInstance 列表
  */
 export function allPanelsInTree(root: LayoutNode | null): PanelInstance[] {
@@ -393,11 +424,21 @@ export function validateAndSanitizeLayout(
     const n = node as any;
 
     if (n.type === 'tabs') {
-      if (!Array.isArray(n.panels) || n.panels.length === 0) return null;
+      if (!Array.isArray(n.panels)) return null;
       const validPanels: PanelInstance[] = n.panels.filter(
         (p: any) => p && typeof p === 'object' && typeof p.instanceId === 'string' && typeof p.panelType === 'string'
       );
-      if (validPanels.length === 0) return null;
+      if (validPanels.length === 0) {
+        if (n.id === 'tab_empty_workspace') {
+          return {
+            type: 'tabs',
+            id: 'tab_empty_workspace',
+            panels: [],
+            activeInstanceId: '',
+          };
+        }
+        return null;
+      }
       const activeId = validPanels.some((p) => p.instanceId === n.activeInstanceId)
         ? n.activeInstanceId
         : validPanels[0].instanceId;

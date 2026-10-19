@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS novels (
     language TEXT DEFAULT 'zh-CN',
     writing_style TEXT DEFAULT '通俗流畅、生动细腻',
     status TEXT DEFAULT 'ACTIVE',
+    cover_url TEXT DEFAULT '',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );

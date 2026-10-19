@@ -48,6 +48,13 @@ import { WorkflowPanel } from './panels/WorkflowPanel';
 import { VoiceProfilePanel } from './panels/VoiceProfilePanel';
 import { ModelArenaPanel } from './panels/ModelArenaPanel';
 import { TypesetterCleanerPanel } from './panels/TypesetterCleanerPanel';
+import { SkillsManagerPanel } from './panels/SkillsManagerPanel';
+import { DeconstructPanel } from './panels/DeconstructPanel';
+import { FullCheckPanel } from './panels/FullCheckPanel';
+import { AssetProposalPanel } from './panels/AssetProposalPanel';
+import { BatchRevisePanel } from './panels/BatchRevisePanel';
+import { MapPanel } from './panels/MapPanel';
+import { Sliders, FileSearch, HeartPulse } from 'lucide-react';
 
 export const PANEL_METADATA_MAP: Record<PanelType, PanelMeta> = {
   chapters: {
@@ -325,6 +332,72 @@ export const PANEL_METADATA_MAP: Record<PanelType, PanelMeta> = {
     category: 'ai',
     description: '起点/番茄/晋江全角排版、标点统一与敏感词预检',
   },
+  skills_manager: {
+    type: 'skills_manager',
+    title: 'Agent Skills 技能中心',
+    iconName: 'Sliders',
+    minWidth: 340,
+    minHeight: 300,
+    defaultSize: { width: 750, height: 620 },
+    allowMultiple: false,
+    category: 'ai',
+    description: '管理已挂载的文学精修规范、语言学实证去 AI 味白名单与文风滤镜',
+  },
+  deconstruct_workshop: {
+    type: 'deconstruct_workshop',
+    title: '拆书工坊',
+    iconName: 'FileSearch',
+    minWidth: 340,
+    minHeight: 300,
+    defaultSize: { width: 800, height: 620 },
+    allowMultiple: false,
+    category: 'ai',
+    description: '逆向拆解竞品与范文，提取卷章骨架、黄金三章开局、情绪爽点曲线与可复用打法',
+  },
+  full_check: {
+    type: 'full_check',
+    title: '全书因果体检巡检',
+    iconName: 'HeartPulse',
+    minWidth: 340,
+    minHeight: 300,
+    defaultSize: { width: 800, height: 620 },
+    allowMultiple: false,
+    category: 'core',
+    description: '跨章深度排查死人诈尸、伤病闭关登场、核心角色掉线、伏笔烂尾滞后与权威公理违背',
+  },
+  asset_proposal: {
+    type: 'asset_proposal',
+    title: '正文资产反哺提案',
+    iconName: 'Sparkles',
+    minWidth: 340,
+    minHeight: 300,
+    defaultSize: { width: 750, height: 620 },
+    allowMultiple: false,
+    category: 'core',
+    description: '扫描正文中随手写出的野生新人名、宗门势力与功法法宝，一键反哺写入世界观设定库',
+  },
+  batch_revise: {
+    type: 'batch_revise',
+    title: '跨章节批量重塑',
+    iconName: 'Layers',
+    minWidth: 360,
+    minHeight: 300,
+    defaultSize: { width: 850, height: 620 },
+    allowMultiple: false,
+    category: 'ai',
+    description: '跨章节批量执行语言学去AI味、节奏提速、章末悬念强化，安全生成Diff对比与逐章采纳',
+  },
+  map_sandbox: {
+    type: 'map_sandbox',
+    title: '神州山河地理沙盘',
+    iconName: 'Compass',
+    minWidth: 360,
+    minHeight: 300,
+    defaultSize: { width: 850, height: 620 },
+    allowMultiple: false,
+    category: 'plot',
+    description: '宗门城池坐标定标、历练行军路线规划与行程耗时因果校对',
+  },
 };
 
 export function getPanelIcon(panelType: PanelType) {
@@ -379,6 +452,18 @@ export function getPanelIcon(panelType: PanelType) {
       return Swords;
     case 'typesetter_cleaner':
       return Sparkles;
+    case 'skills_manager':
+      return Sliders;
+    case 'deconstruct_workshop':
+      return FileSearch;
+    case 'full_check':
+      return HeartPulse;
+    case 'asset_proposal':
+      return Sparkles;
+    case 'batch_revise':
+      return Layers;
+    case 'map_sandbox':
+      return Compass;
     default:
       return BookOpen;
   }
@@ -436,9 +521,21 @@ export function renderPanelComponent(panel: PanelInstance): React.ReactNode {
       return <ModelArenaPanel />;
     case 'typesetter_cleaner':
       return <TypesetterCleanerPanel />;
+    case 'skills_manager':
+      return <SkillsManagerPanel />;
+    case 'deconstruct_workshop':
+      return <DeconstructPanel />;
+    case 'full_check':
+      return <FullCheckPanel />;
+    case 'asset_proposal':
+      return <AssetProposalPanel />;
+    case 'batch_revise':
+      return <BatchRevisePanel />;
+    case 'map_sandbox':
+      return <MapPanel />;
     default:
       return (
-        <div className="flex-1 flex items-center justify-center text-xs text-[#786f65]">
+        <div className="flex-1 flex items-center justify-center text-xs text-ink-2">
           未知模块: {panel.panelType}
         </div>
       );

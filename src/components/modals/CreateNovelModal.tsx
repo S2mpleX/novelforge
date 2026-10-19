@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { X, BookPlus } from 'lucide-react';
 
+import { detectPresetByGenre } from '@/components/common/BookCoverView';
+import { alertDialog } from '@/utils/dialog';
+
 interface Props {
   onClose: () => void;
 }
@@ -35,31 +38,33 @@ export const CreateNovelModal: React.FC<Props> = ({ onClose }) => {
 
     setIsSubmitting(true);
     try {
+      const defaultCoverPreset = detectPresetByGenre(genre);
       await createNovel({
         title: title.trim(),
         description: description.trim(),
         genre_profile: genre,
         chapter_target_length: targetLength,
+        cover_url: defaultCoverPreset.id,
       });
       onClose();
     } catch (err) {
-      alert(`创建作品失败: ${err}`);
+      await alertDialog(`创建作品失败: ${err}`);
       setIsSubmitting(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-      <div className="w-full max-w-lg bg-[#fdfbf7] border border-[#ded5c4] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="w-full max-w-lg bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {/* Modal Header */}
-        <div className="p-4 border-b border-[#ded5c4] flex items-center justify-between bg-[#efe9dc]">
+        <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2">
-            <BookPlus className="w-5 h-5 text-[#854d0e]" />
-            <h2 className="text-sm font-serif font-bold text-[#2b2621]">立项开篇 · 创建新长篇作品</h2>
+            <BookPlus className="w-5 h-5 text-primary" />
+            <h2 className="text-sm font-serif font-bold text-ink">立项开篇 · 创建新长篇作品</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-[#685f54] hover:text-[#2b2621] hover:bg-[#e5ded0] transition"
+            className="p-1 rounded-lg text-ink-2 hover:text-ink hover:bg-surface-3-hover transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -68,8 +73,8 @@ export const CreateNovelModal: React.FC<Props> = ({ onClose }) => {
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="text-xs font-serif font-semibold text-[#2b2621] block mb-1.5">
-              作品名称 <span className="text-[#c2410c]">*</span>
+            <label className="text-xs font-serif font-semibold text-ink block mb-1.5">
+              作品名称 <span className="text-primary">*</span>
             </label>
             <input
               type="text"
@@ -77,19 +82,19 @@ export const CreateNovelModal: React.FC<Props> = ({ onClose }) => {
               placeholder="例如：万古剑神、深空序列、临高启明..."
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg px-3 py-2 text-xs text-[#2b2621] placeholder-[#a89f91] focus:outline-hidden focus:border-[#854d0e] focus:ring-1 focus:ring-[#854d0e]"
+              className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-xs text-ink placeholder-[#a89f91] focus:outline-hidden focus:border-[#854d0e] focus:ring-1 focus:ring-[#854d0e]"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-serif font-semibold text-[#2b2621] block mb-1.5">
+              <label className="text-xs font-serif font-semibold text-ink block mb-1.5">
                 核心题材 / 类型
               </label>
               <select
                 value={genre}
                 onChange={(e) => setGenre(e.target.value)}
-                className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg px-3 py-2 text-xs text-[#2b2621] focus:outline-hidden focus:border-[#854d0e] cursor-pointer"
+                className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-hidden focus:border-[#854d0e] cursor-pointer"
               >
                 {GENRE_OPTIONS.map((g) => (
                   <option key={g} value={g}>
@@ -100,7 +105,7 @@ export const CreateNovelModal: React.FC<Props> = ({ onClose }) => {
             </div>
 
             <div>
-              <label className="text-xs font-serif font-semibold text-[#2b2621] block mb-1.5">
+              <label className="text-xs font-serif font-semibold text-ink block mb-1.5">
                 单章目标字数
               </label>
               <input
@@ -110,19 +115,19 @@ export const CreateNovelModal: React.FC<Props> = ({ onClose }) => {
                 step={500}
                 value={targetLength}
                 onChange={(e) => setTargetLength(Number(e.target.value))}
-                className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg px-3 py-2 text-xs text-[#2b2621] focus:outline-hidden focus:border-[#854d0e]"
+                className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-hidden focus:border-[#854d0e]"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-serif font-semibold text-[#2b2621] block mb-1.5">
+            <label className="text-xs font-serif font-semibold text-ink block mb-1.5">
               文风基调
             </label>
             <select
               value={writingStyle}
               onChange={(e) => setWritingStyle(e.target.value)}
-              className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg px-3 py-2 text-xs text-[#2b2621] focus:outline-hidden focus:border-[#854d0e] cursor-pointer"
+              className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-hidden focus:border-[#854d0e] cursor-pointer"
             >
               {STYLE_OPTIONS.map((s) => (
                 <option key={s} value={s}>
@@ -133,7 +138,7 @@ export const CreateNovelModal: React.FC<Props> = ({ onClose }) => {
           </div>
 
           <div>
-            <label className="text-xs font-serif font-semibold text-[#2b2621] block mb-1.5">
+            <label className="text-xs font-serif font-semibold text-ink block mb-1.5">
               故事简介与核心梗概
             </label>
             <textarea
@@ -141,16 +146,16 @@ export const CreateNovelModal: React.FC<Props> = ({ onClose }) => {
               placeholder="一句话核心创意、主角身份与主线核心矛盾..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-[#f7f2e7] border border-[#ded5c4] rounded-lg p-2.5 text-xs text-[#2b2621] placeholder-[#a89f91] focus:outline-hidden focus:border-[#854d0e] resize-none"
+              className="w-full bg-surface border border-line rounded-lg p-2.5 text-xs text-ink placeholder-[#a89f91] focus:outline-hidden focus:border-[#854d0e] resize-none"
             />
           </div>
 
           {/* Buttons */}
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#ded5c4]">
+          <div className="pt-2 flex items-center justify-end gap-2 border-t border-line">
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-1.5 rounded-lg border border-[#ded5c4] text-xs font-serif text-[#685f54] hover:text-[#2b2621] hover:bg-[#efe9dc] transition"
+              className="px-3.5 py-1.5 rounded-lg border border-line text-xs font-serif text-ink-2 hover:text-ink hover:bg-surface-2 transition"
             >
               取消
             </button>

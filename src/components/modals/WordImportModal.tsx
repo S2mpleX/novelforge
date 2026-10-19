@@ -24,6 +24,7 @@ import {
   BookPlus,
 } from 'lucide-react';
 import { api } from '@/utils/tauriBridge';
+import { alertDialog } from '@/utils/dialog';
 
 interface WordImportModalProps {
   isOpen: boolean;
@@ -150,7 +151,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
     if (!parseResult) return;
     const selectedCount = parseResult.chapters.filter((c) => c.selected).length;
     if (selectedCount === 0) {
-      alert('请至少勾选一个要导入的章节！');
+      await alertDialog('请至少勾选一个要导入的章节！');
       return;
     }
 
@@ -189,11 +190,11 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
         onImportSuccess(res.novelId);
       }
 
-      alert(`🎉 恭喜！成功导入 ${res.importedCount} 个章节！`);
+      await alertDialog(`🎉 恭喜！成功导入 ${res.importedCount} 个章节！`);
       onClose();
     } catch (err: any) {
       console.error('导入失败:', err);
-      alert(`导入遇到错误: ${err.message || err}`);
+      await alertDialog(`导入遇到错误: ${err.message || err}`);
     } finally {
       setIsImporting(false);
     }
@@ -205,23 +206,23 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
       <div
-        className="w-full max-w-4xl max-h-[92vh] bg-[#fcfaf5] border border-[#ded5c4] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-[#2b2621] font-sans"
+        className="w-full max-w-4xl max-h-[92vh] bg-[#fcfaf5] border border-line rounded-2xl shadow-2xl flex flex-col overflow-hidden text-ink font-sans"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#ded5c4] bg-[#efe9dc]/80 select-none shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-900/20 text-white">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line bg-surface-2/80 select-none shrink-0 gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-900/20 text-white shrink-0">
               <FileText className="w-5 h-5" />
             </div>
-            <div>
-              <h2 className="text-base font-bold font-serif text-[#231f1a] flex items-center gap-2">
-                <span>Word 文档 (.docx) 智能解析与分章导入</span>
-                <span className="px-2 py-0.5 text-[10px] font-sans font-semibold bg-blue-100 text-blue-800 rounded-full border border-blue-200">
+            <div className="min-w-0">
+              <h2 className="text-base font-bold font-serif text-ink flex items-center gap-2 truncate">
+                <span className="truncate">Word 文档 (.docx) 智能解析与分章导入</span>
+                <span className="px-2 py-0.5 text-[10px] font-sans font-semibold bg-blue-100 text-blue-800 rounded-full border border-blue-200 shrink-0 whitespace-nowrap">
                   本地纯离线解析
                 </span>
               </h2>
-              <p className="text-xs text-[#786f65]">
+              <p className="text-xs text-ink-2 truncate">
                 支持长篇存稿极速解析、智能识别“第X章/卷/序章/尾声”、章节预览微调与一键批量建书入库
               </p>
             </div>
@@ -230,7 +231,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
           <button
             onClick={onClose}
             disabled={isImporting}
-            className="p-1.5 rounded-lg text-[#786f65] hover:text-[#231f1a] hover:bg-[#e2d8c7] transition disabled:opacity-40 cursor-pointer"
+            className="p-1.5 rounded-lg text-ink-2 hover:text-ink hover:bg-[#e2d8c7] transition disabled:opacity-40 cursor-pointer shrink-0"
             title="关闭"
           >
             <X className="w-5 h-5" />
@@ -245,7 +246,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-[#cfc3ad] hover:border-blue-600/70 bg-[#f7f2e7]/70 hover:bg-blue-50/30 rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 group"
+              className="border-2 border-dashed border-[#cfc3ad] hover:border-blue-600/70 bg-surface/70 hover:bg-blue-50/30 rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 group"
             >
               <input
                 ref={fileInputRef}
@@ -257,10 +258,10 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
               <div className="w-16 h-16 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform shadow-inner">
                 <Upload className="w-8 h-8" />
               </div>
-              <h3 className="text-base font-bold text-[#231f1a] font-serif mb-1">
+              <h3 className="text-base font-bold text-ink font-serif mb-1">
                 点击选择或将 Word 文档拖拽到此处
               </h3>
-              <p className="text-xs text-[#786f65] max-w-md leading-relaxed">
+              <p className="text-xs text-ink-2 max-w-md leading-relaxed">
                 支持标准 Microsoft Word (.docx) 文件。系统会在本地内存完成轻量解析，杜绝隐私与稿件泄露。
               </p>
               <div className="mt-4 flex items-center gap-3 text-[11px] text-[#8e8475]">
@@ -284,10 +285,10 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
           {isParsing && (
             <div className="p-12 flex flex-col items-center justify-center text-center">
               <RefreshCw className="w-10 h-10 text-blue-600 animate-spin mb-4" />
-              <h3 className="text-sm font-bold text-[#231f1a] font-serif mb-1">
+              <h3 className="text-sm font-bold text-ink font-serif mb-1">
                 正在深度解析 Word 文档与提取章节拓扑...
               </h3>
-              <p className="text-xs text-[#786f65]">正在提取文本流并执行中文段落排版规范化</p>
+              <p className="text-xs text-ink-2">正在提取文本流并执行中文段落排版规范化</p>
             </div>
           )}
 
@@ -303,16 +304,16 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
           {parseResult && !isParsing && (
             <div className="space-y-6 animate-in fade-in duration-150">
               {/* 文件信息卡片 */}
-              <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-[#efe9dc]/70 border border-[#ded5c4]">
+              <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-surface-2/70 border border-line">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                     <FileText className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-[#231f1a] truncate" title={parseResult.fileName}>
+                    <h4 className="text-sm font-bold text-ink truncate" title={parseResult.fileName}>
                       {parseResult.fileName}
                     </h4>
-                    <div className="flex items-center gap-3 text-xs text-[#786f65] mt-0.5 font-mono">
+                    <div className="flex items-center gap-3 text-xs text-ink-2 mt-0.5 font-mono">
                       <span>{(parseResult.fileSizeBytes / 1024).toFixed(1)} KB</span>
                       <span>•</span>
                       <span>总计 <strong>{parseResult.totalWordCount.toLocaleString()}</strong> 字</span>
@@ -328,18 +329,18 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                     setParseResult(null);
                     setParseError(null);
                   }}
-                  className="px-3 py-1.5 rounded-lg text-xs text-[#786f65] hover:text-[#231f1a] hover:bg-[#e4dcce] border border-[#d5cbb8] transition cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg text-xs text-ink-2 hover:text-ink hover:bg-surface-3-hover border border-line transition cursor-pointer"
                 >
                   更换其他文件
                 </button>
               </div>
 
               {/* 切分规则与模式控制 */}
-              <div className="p-4 rounded-xl bg-white border border-[#ded5c4] shadow-xs space-y-3">
+              <div className="p-4 rounded-xl bg-white border border-line shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Settings2 className="w-4 h-4 text-blue-700" />
-                    <span className="text-xs font-bold text-[#231f1a] font-serif">分章切分规则</span>
+                    <span className="text-xs font-bold text-ink font-serif">分章切分规则</span>
                   </div>
                   <span className="text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
                     {parseResult.detectedPatterns[0] || '智能识别'}
@@ -353,7 +354,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
                       splitMode === 'AUTO'
                         ? 'bg-blue-600 text-white shadow-xs font-bold'
-                        : 'bg-[#efe9dc] text-[#5e5549] hover:bg-[#e4dcce]'
+                        : 'bg-surface-2 text-ink-2 hover:bg-surface-3-hover'
                     }`}
                   >
                     <Sparkles className="w-3.5 h-3.5" />
@@ -366,7 +367,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
                       splitMode === 'SINGLE_CHAPTER'
                         ? 'bg-blue-600 text-white shadow-xs font-bold'
-                        : 'bg-[#efe9dc] text-[#5e5549] hover:bg-[#e4dcce]'
+                        : 'bg-surface-2 text-ink-2 hover:bg-surface-3-hover'
                     }`}
                   >
                     <BookOpen className="w-3.5 h-3.5" />
@@ -379,7 +380,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
                       splitMode === 'CUSTOM_REGEX'
                         ? 'bg-blue-600 text-white shadow-xs font-bold'
-                        : 'bg-[#efe9dc] text-[#5e5549] hover:bg-[#e4dcce]'
+                        : 'bg-surface-2 text-ink-2 hover:bg-surface-3-hover'
                     }`}
                   >
                     <Layers className="w-3.5 h-3.5" />
@@ -394,7 +395,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                       value={customRegex}
                       onChange={(e) => setCustomRegex(e.target.value)}
                       placeholder="输入自定义分章正则表达式，如：(?:^|\n)\s*(第.+?章\s*[^\n]+)"
-                      className="flex-1 px-3 py-1.5 text-xs font-mono bg-[#fdfbf7] border border-[#d5cbb8] rounded-lg focus:outline-hidden focus:border-blue-600"
+                      className="flex-1 px-3 py-1.5 text-xs font-mono bg-surface border border-line rounded-lg focus:outline-hidden focus:border-blue-600"
                     />
                     <button
                       type="button"
@@ -409,10 +410,10 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
 
               {/* 章节列表展示与微调 */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs text-[#786f65] px-1">
+                <div className="flex items-center justify-between text-xs text-ink-2 px-1">
                   <div className="flex items-center gap-2 font-medium">
                     <span>章节预览列表</span>
-                    <span className="font-mono text-[#231f1a] font-bold">
+                    <span className="font-mono text-ink font-bold">
                       （已选 {selectedCount} / 共 {totalCount} 章）
                     </span>
                   </div>
@@ -435,7 +436,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                   </div>
                 </div>
 
-                <div className="max-h-60 overflow-y-auto border border-[#ded5c4] rounded-xl bg-white divide-y divide-[#eee6d8] shadow-inner">
+                <div className="max-h-60 overflow-y-auto border border-line rounded-xl bg-white divide-y divide-[#eee6d8] shadow-inner">
                   {parseResult.chapters.map((ch, idx) => (
                     <div
                       key={ch.id}
@@ -464,18 +465,18 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                           type="text"
                           value={ch.title}
                           onChange={(e) => handleTitleChange(ch.id, e.target.value)}
-                          className="flex-1 text-xs font-semibold text-[#231f1a] bg-transparent border-b border-transparent hover:border-[#ded5c4] focus:border-blue-600 focus:bg-[#fdfbf7] px-1 py-0.5 rounded outline-hidden transition"
+                          className="flex-1 text-xs font-semibold text-ink bg-transparent border-b border-transparent hover:border-line focus:border-blue-600 focus:bg-surface px-1 py-0.5 rounded outline-hidden transition"
                           title="点击可直接编辑修改章节标题"
                         />
 
-                        <span className="text-[11px] font-mono text-[#786f65] shrink-0 bg-[#efe9dc] px-2 py-0.5 rounded-full">
+                        <span className="text-[11px] font-mono text-ink-2 shrink-0 bg-surface-2 px-2 py-0.5 rounded-full">
                           {ch.charCount.toLocaleString()} 字
                         </span>
 
                         <button
                           type="button"
                           onClick={() => setExpandedPreviewId(expandedPreviewId === ch.id ? null : ch.id)}
-                          className="p-1 text-[#786f65] hover:text-[#231f1a] hover:bg-[#efe9dc] rounded transition cursor-pointer"
+                          className="p-1 text-ink-2 hover:text-ink hover:bg-surface-2 rounded transition cursor-pointer"
                           title="查看正文首段摘要"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -484,7 +485,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
 
                       {/* 展开摘要预览 */}
                       {expandedPreviewId === ch.id && (
-                        <div className="mt-2 ml-11 p-2.5 rounded-lg bg-[#fdfbf7] border border-[#ded5c4] text-xs text-[#5e5549] font-serif leading-relaxed animate-in fade-in duration-100">
+                        <div className="mt-2 ml-11 p-2.5 rounded-lg bg-surface border border-line text-xs text-ink-2 font-serif leading-relaxed animate-in fade-in duration-100">
                           <p className="line-clamp-3">{ch.previewText || '（本章暂无正文内容）'}</p>
                         </div>
                       )}
@@ -494,8 +495,8 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
               </div>
 
               {/* 3. 导入目标设置 */}
-              <div className="p-4 rounded-xl bg-[#efe9dc]/50 border border-[#ded5c4] space-y-3">
-                <span className="text-xs font-bold text-[#231f1a] font-serif block">
+              <div className="p-4 rounded-xl bg-surface-2/50 border border-line space-y-3">
+                <span className="text-xs font-bold text-ink font-serif block">
                   选择导入目标位置
                 </span>
 
@@ -504,7 +505,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                     className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
                       destination === 'NEW_NOVEL'
                         ? 'bg-white border-blue-600 shadow-sm ring-1 ring-blue-600'
-                        : 'bg-white/60 border-[#ded5c4] hover:bg-white'
+                        : 'bg-white/60 border-line hover:bg-white'
                     }`}
                   >
                     <input
@@ -515,11 +516,11 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                       className="mt-1 text-blue-600"
                     />
                     <div>
-                      <div className="text-xs font-bold text-[#231f1a] flex items-center gap-1.5">
+                      <div className="text-xs font-bold text-ink flex items-center gap-1.5">
                         <BookPlus className="w-4 h-4 text-blue-600" />
                         <span>新建一部小说并完整导入</span>
                       </div>
-                      <p className="text-[11px] text-[#786f65] mt-1">
+                      <p className="text-[11px] text-ink-2 mt-1">
                         自动创建新书架构，所有章节直接归纳在新书目录树中。
                       </p>
                     </div>
@@ -531,7 +532,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                         ? 'opacity-40 cursor-not-allowed bg-stone-100'
                         : destination === 'APPEND_EXISTING_NOVEL'
                         ? 'bg-white border-blue-600 shadow-sm ring-1 ring-blue-600 cursor-pointer'
-                        : 'bg-white/60 border-[#ded5c4] hover:bg-white cursor-pointer'
+                        : 'bg-white/60 border-line hover:bg-white cursor-pointer'
                     }`}
                   >
                     <input
@@ -543,11 +544,11 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                       className="mt-1 text-blue-600"
                     />
                     <div>
-                      <div className="text-xs font-bold text-[#231f1a] flex items-center gap-1.5">
+                      <div className="text-xs font-bold text-ink flex items-center gap-1.5">
                         <FolderPlus className="w-4 h-4 text-emerald-600" />
                         <span>追加到当前作品《{activeNovel?.title || '未选择'}》</span>
                       </div>
-                      <p className="text-[11px] text-[#786f65] mt-1">
+                      <p className="text-[11px] text-ink-2 mt-1">
                         将勾选的章节批量追加到当前作品目录树的最后。
                       </p>
                     </div>
@@ -558,7 +559,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                 {destination === 'NEW_NOVEL' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                     <div>
-                      <label className="text-[11px] font-semibold text-[#5e5549] block mb-1">
+                      <label className="text-[11px] font-semibold text-ink-2 block mb-1">
                         新作品书名
                       </label>
                       <input
@@ -566,17 +567,17 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
                         value={newNovelTitle}
                         onChange={(e) => setNewNovelTitle(e.target.value)}
                         placeholder="请输入作品名称"
-                        className="w-full px-3 py-1.5 text-xs bg-white border border-[#ded5c4] rounded-lg focus:outline-hidden focus:border-blue-600"
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-line rounded-lg focus:outline-hidden focus:border-blue-600"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-semibold text-[#5e5549] block mb-1">
+                      <label className="text-[11px] font-semibold text-ink-2 block mb-1">
                         作品流派类型
                       </label>
                       <select
                         value={genreProfile}
                         onChange={(e) => setGenreProfile(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs bg-white border border-[#ded5c4] rounded-lg focus:outline-hidden focus:border-blue-600"
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-line rounded-lg focus:outline-hidden focus:border-blue-600"
                       >
                         <option value="玄幻修仙">玄幻修仙 (东方仙侠/升级流)</option>
                         <option value="都市现实">都市现实 (职场商战/日常异能)</option>
@@ -615,8 +616,8 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-[#ded5c4] bg-[#efe9dc]/50 flex items-center justify-between shrink-0">
-          <div className="text-xs text-[#786f65]">
+        <div className="px-6 py-3.5 border-t border-line bg-surface-2/50 flex items-center justify-between shrink-0">
+          <div className="text-xs text-ink-2">
             {parseResult ? (
               <span>已准备就绪，点击右侧按钮立即写入 SQLite 数据库</span>
             ) : (
@@ -629,7 +630,7 @@ export const WordImportModal: React.FC<WordImportModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isImporting}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-[#685f54] hover:bg-[#e4dcce] transition cursor-pointer disabled:opacity-40"
+              className="px-4 py-2 rounded-xl text-xs font-medium text-ink-2 hover:bg-surface-3-hover transition cursor-pointer disabled:opacity-40"
             >
               取消
             </button>

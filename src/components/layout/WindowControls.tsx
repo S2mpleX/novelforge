@@ -134,7 +134,7 @@ export const WindowControls: React.FC = () => {
 
   return (
     <div
-      className={`flex items-center ml-1.5 pl-1.5 border-l border-[#ded5c4] dark:border-stone-700/60 shrink-0 z-50 select-none ${
+      className={`flex items-center ml-1.5 pl-1.5 border-l border-line dark:border-stone-700/60 shrink-0 z-50 select-none ${
         isMaximized ? 'pr-3' : 'pr-2'
       }`}
       data-tauri-drag-region="false"
@@ -143,7 +143,7 @@ export const WindowControls: React.FC = () => {
       <button
         type="button"
         onClick={handleMinimize}
-        className="w-9 h-8 flex items-center justify-center rounded-md text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce] active:bg-[#d8cebe] dark:text-stone-300 dark:hover:text-stone-100 dark:hover:bg-stone-700/60 transition cursor-pointer shrink-0"
+        className="w-9 h-8 flex items-center justify-center rounded-md text-ink-2 hover:text-ink hover:bg-surface-3-hover active:bg-[#d8cebe] dark:text-stone-300 dark:hover:text-stone-100 dark:hover:bg-stone-700/60 transition cursor-pointer shrink-0"
         title={inTauri ? "最小化窗口" : "最小化 / 退出全屏"}
         aria-label="最小化窗口"
       >
@@ -154,7 +154,7 @@ export const WindowControls: React.FC = () => {
       <button
         type="button"
         onClick={handleToggleMaximize}
-        className="w-9 h-8 flex items-center justify-center rounded-md text-[#685f54] hover:text-[#231f1a] hover:bg-[#e4dcce] active:bg-[#d8cebe] dark:text-stone-300 dark:hover:text-stone-100 dark:hover:bg-stone-700/60 transition cursor-pointer shrink-0"
+        className="w-9 h-8 flex items-center justify-center rounded-md text-ink-2 hover:text-ink hover:bg-surface-3-hover active:bg-[#d8cebe] dark:text-stone-300 dark:hover:text-stone-100 dark:hover:bg-stone-700/60 transition cursor-pointer shrink-0"
         title={isMaximized ? '向下还原 (退出全屏)' : '窗口最大化'}
         aria-label={isMaximized ? '向下还原窗口' : '最大化窗口'}
       >
@@ -178,7 +178,7 @@ export const WindowControls: React.FC = () => {
       <button
         type="button"
         onClick={handleClose}
-        className="w-9 h-8 flex items-center justify-center rounded-md text-[#685f54] hover:text-white hover:bg-rose-600 active:bg-rose-700 dark:text-stone-300 dark:hover:text-white dark:hover:bg-rose-600 transition cursor-pointer group shrink-0"
+        className="w-9 h-8 flex items-center justify-center rounded-md text-ink-2 hover:text-white hover:bg-rose-600 active:bg-rose-700 dark:text-stone-300 dark:hover:text-white dark:hover:bg-rose-600 transition cursor-pointer group shrink-0"
         title="关闭 NovelForge AI"
         aria-label="关闭应用"
       >

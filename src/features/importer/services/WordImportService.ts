@@ -119,6 +119,7 @@ export class WordImportService {
       fullMatch: string;
       title: string;
       index: number;
+      rawMatchLength: number;
     }> = [];
 
     let match: RegExpExecArray | null;
@@ -132,6 +133,7 @@ export class WordImportService {
         fullMatch,
         title: chapterTitle || `第 ${matches.length + 1} 章`,
         index: match.index,
+        rawMatchLength: match[0].length,
       });
     }
 
@@ -175,7 +177,8 @@ export class WordImportService {
       const current = matches[i];
       const next = matches[i + 1];
 
-      const startIndex = current.index + current.fullMatch.length;
+      // 使用未 trim 的完整正则匹配字符长度，确保光标准确跨过章节标题行，杜绝尾部字词渗入正文
+      const startIndex = current.index + current.rawMatchLength;
       const endIndex = next ? next.index : text.length;
 
       const rawChapterText = text.slice(startIndex, endIndex).trim();

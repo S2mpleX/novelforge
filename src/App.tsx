@@ -9,15 +9,20 @@ import { MemoryEngineView } from '@/components/views/MemoryEngineView';
 import { DockingWorkspace } from '@/components/docking/DockingWorkspace';
 import { useUpdateStore } from '@/features/updater/stores/useUpdateStore';
 import { SettingsModal } from '@/components/modals/SettingsModal';
+import { ToastContainer } from '@/components/common/ToastContainer';
+import { DialogHost } from '@/components/common/DialogHost';
+import { ShortcutHelpModal } from '@/components/modals/ShortcutHelpModal';
+import { toast } from '@/stores/useToastStore';
 import { isTauri } from '@/utils/tauriBridge';
 import { Sparkles, ArrowRight, Info, X } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const { loadNovels, loadProviders, activeTab, zenMode, themeMode } = useNovelStore();
+  const { loadNovels, loadProviders, activeTab, setActiveTab, toggleSidebar, zenMode, themeMode } = useNovelStore();
   const { status, latestVersion, settings, loadSettings, checkForUpdates } = useUpdateStore();
   const [showWebNotice, setShowWebNotice] = useState(!isTauri());
   const [showUpdateBanner, setShowUpdateBanner] = useState(true);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showShortcutModal, setShowShortcutModal] = useState(false);
 
   useEffect(() => {
     loadNovels();
@@ -38,6 +43,70 @@ export const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Global keyboard shortcuts (F1, Ctrl+1~6, Ctrl+B)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Check if user is typing in standard text input or textarea
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable);
+
+      // F1 or Shift+? (when not typing) opens shortcuts guide
+      if (e.key === 'F1' || (!isInput && e.shiftKey && e.key === '?')) {
+        e.preventDefault();
+        setShowShortcutModal((prev) => !prev);
+        return;
+      }
+
+      // Ctrl + 1~6 for pipeline phase navigation
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        if (e.key === '1') {
+          e.preventDefault();
+          setActiveTab('DASHBOARD');
+          toast.info('阶段导航', '第 1 阶段：构思立项仪表盘');
+        } else if (e.key === '2') {
+          e.preventDefault();
+          setActiveTab('WORLD');
+          toast.info('阶段导航', '第 2 阶段：世界架构权威设定');
+        } else if (e.key === '3') {
+          e.preventDefault();
+          setActiveTab('CHARACTERS');
+          toast.info('阶段导航', '第 3 阶段：人物档案工坊');
+        } else if (e.key === '4') {
+          e.preventDefault();
+          setActiveTab('PLOTS');
+          toast.info('阶段导航', '第 4 阶段：剧情伏笔矩阵');
+        } else if (e.key === '5') {
+          e.preventDefault();
+          setActiveTab('EDITOR');
+          toast.info('阶段导航', '第 5 阶段：小说正文工作台');
+        } else if (e.key === '6') {
+          e.preventDefault();
+          setActiveTab('MEMORY');
+          toast.info('阶段导航', '第 6 阶段：五层长期记忆与连载');
+        } else if (!isInput && (e.key === 'b' || e.key === 'B')) {
+          e.preventDefault();
+          toggleSidebar();
+        }
+      }
+    };
+
+    const handleOpenShortcutsEvent = () => {
+      setShowShortcutModal(true);
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('novelforge:open-shortcuts', handleOpenShortcutsEvent);
+
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('novelforge:open-shortcuts', handleOpenShortcutsEvent);
+    };
+  }, [setActiveTab, toggleSidebar]);
+
   // Dynamically apply themeMode to document root
   useEffect(() => {
     if (themeMode === 'dark') {
@@ -50,19 +119,19 @@ export const App: React.FC = () => {
   }, [themeMode]);
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden bg-[#f4efe6] ambient-bg text-[#2b2621] font-sans">
+    <div className="flex flex-col h-full w-full overflow-hidden bg-canvas ambient-bg text-ink font-sans">
       {showWebNotice && (
-        <div className="bg-[#efe9dc] border-b border-[#ded5c4] px-4 py-1.5 text-xs text-[#854d0e] flex items-center justify-between font-serif shrink-0">
+        <div className="bg-surface-2 border-b border-line px-4 py-1.5 text-xs text-primary flex items-center justify-between font-serif shrink-0">
           <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-[#854d0e] shrink-0" />
+            <Info className="w-4 h-4 text-primary shrink-0" />
             <span>
               <strong>网页预览模式 (Web Preview)：</strong>
-              检测到您在浏览器 (localhost:1420) 中打开。已启用 Web LocalStorage 与网络探测兼容层；完整 SQLite 数据库与多 Agent 守护进程请在桌面窗口运行（终端执行 <code className="bg-[#f4efe6] px-1 py-0.5 rounded border border-[#ded5c4] font-mono text-[11px]">pnpm tauri dev</code>）。
+              检测到您在浏览器 (localhost:1420) 中打开。已启用 Web LocalStorage 与网络探测兼容层；完整 SQLite 数据库与多 Agent 守护进程请在桌面窗口运行（终端执行 <code className="bg-canvas px-1 py-0.5 rounded border border-line font-mono text-[11px]">pnpm tauri dev</code>）。
             </span>
           </div>
           <button
             onClick={() => setShowWebNotice(false)}
-            className="p-1 rounded-md text-[#786f65] hover:text-[#2b2621] hover:bg-[#e5ded0] transition ml-4"
+            className="p-1 rounded-md text-ink-2 hover:text-ink hover:bg-surface-3-hover transition ml-4"
             title="关闭提示"
           >
             <X className="w-3.5 h-3.5" />
@@ -110,12 +179,24 @@ export const App: React.FC = () => {
         </main>
       </div>
 
+      {/* 全局应用内对话框宿主（替代失效的原生 alert/confirm/prompt） */}
+      <DialogHost />
+
       {showUpdateModal && (
         <SettingsModal
           initialTab="UPDATER"
           onClose={() => setShowUpdateModal(false)}
         />
       )}
+
+      {/* Global Shortcut Help Center Modal */}
+      <ShortcutHelpModal
+        isOpen={showShortcutModal}
+        onClose={() => setShowShortcutModal(false)}
+      />
+
+      {/* Global Lightweight Literary Toast Container */}
+      <ToastContainer />
     </div>
   );
 };

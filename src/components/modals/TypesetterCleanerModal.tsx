@@ -19,7 +19,7 @@ export const TypesetterCleanerModal: React.FC<TypesetterCleanerModalProps> = ({
         {/* 弹窗头部 */}
         <div className="px-5 py-3 border-b border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/90 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center text-amber-700 dark:text-amber-400">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center text-primary dark:text-amber-400">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
