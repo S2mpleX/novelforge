@@ -23,7 +23,7 @@ use crate::models::{
     ModelArenaRun, SaveModelArenaRunInput, ArenaStreamChunkPayload, ExecuteArenaDuelInput, ArenaDuelResult, MergeArenaOutputsInput,
     OptimizeWritingPromptInput, OptimizeWritingPromptResult,
     UpdateNovelInput, UpdateVolumeInput,
-    UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput,
+    UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput, UpdateStoryPhaseInput,
 };
 use crate::providers::{
     ChatMessage, ChatCompletionRequest, ConnectionTestResult, OpenAIClient,
@@ -499,6 +499,14 @@ pub fn delete_story_phase(
     id: String,
 ) -> Result<(), String> {
     db.delete_story_phase(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_story_phase(
+    db: State<DbManager>,
+    input: UpdateStoryPhaseInput,
+) -> Result<StoryPhase, String> {
+    db.update_story_phase(input).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

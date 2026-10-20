@@ -13,12 +13,12 @@ export const EditorInChiefPanel: React.FC = () => {
   const { activeNovel, activeChapter, activeProvider } = useNovelStore();
   const [isRunningPipeline, setIsRunningPipeline] = useState(false);
   const [pipelineMessage, setPipelineMessage] = useState<string | null>(null);
-  const [chapterGoal, setChapterGoal] = useState('主角遭遇突发刺杀，被迫暴露隐藏战力，同时引出黑市秘境情报');
+  const [chapterGoal, setChapterGoal] = useState('主角遭遇突发危机打破现状，被迫展现隐藏实力，同时牵扯出更深层的阵营秘闻');
   const [feedbackScore, setFeedbackScore] = useState<number | null>(92);
   const [editorialNotes] = useState<string[]>([
     '节奏把控：当前处于卷首铺垫向中段冲突过渡，建议在第 3 幕拉高张力，留足章末悬念钩子。',
     '人物弧光：主角心境从“避战退让”转变为“以雷霆手段破局”，微表情描写需配合呼吸感。',
-    '世界观自洽：打斗涉及的天地灵气波动需严格符合《原初灵能三大不可逆定律》。',
+    '世界观自洽：关键场景涉及的超凡战力或核心设定，需严格符合底层核心公理定律。',
   ]);
 
   const handleRunCollaborativeWorkflow = async () => {

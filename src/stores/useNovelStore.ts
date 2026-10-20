@@ -61,6 +61,8 @@ interface NovelState {
   toggleRightPanel: () => void;
   toggleZenMode: () => void;
   setZenMode: (zenMode: boolean) => void;
+  enterZenMode: () => void;
+  exitZenMode: () => void;
   setThemeMode: (mode: ThemeMode) => void;
   toggleThemeMode: () => void;
   setUiScale: (scale: number) => void;
@@ -144,7 +146,7 @@ export const useNovelStore = create<NovelState>((set, get) => ({
   versions: [],
   sidebarCollapsed: false,
   rightPanelOpen: true,
-  zenMode: false,
+  zenMode: (typeof localStorage !== 'undefined' && localStorage.getItem('novelforge_zen_mode') === 'true') || false,
   themeMode: (typeof localStorage !== 'undefined' && (localStorage.getItem('novelforge_theme_mode') as ThemeMode)) || 'light',
   uiScale: (typeof localStorage !== 'undefined' && parseInt(localStorage.getItem('novelforge_ui_scale') || '100', 10)) || 100,
 
@@ -164,8 +166,32 @@ export const useNovelStore = create<NovelState>((set, get) => ({
   setActiveTab: (tab) => set({ activeTab: tab }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   toggleRightPanel: () => set((s) => ({ rightPanelOpen: !s.rightPanelOpen })),
-  toggleZenMode: () => set((s) => ({ zenMode: !s.zenMode })),
-  setZenMode: (zenMode) => set({ zenMode }),
+  enterZenMode: () => {
+    set({ zenMode: true, activeTab: 'EDITOR' });
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('novelforge_zen_mode', 'true');
+    }
+  },
+  exitZenMode: () => {
+    set({ zenMode: false });
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('novelforge_zen_mode', 'false');
+    }
+  },
+  toggleZenMode: () => {
+    if (get().zenMode) {
+      get().exitZenMode();
+    } else {
+      get().enterZenMode();
+    }
+  },
+  setZenMode: (zenMode) => {
+    if (zenMode) {
+      get().enterZenMode();
+    } else {
+      get().exitZenMode();
+    }
+  },
   setThemeMode: (mode) => {
     set({ themeMode: mode });
     if (typeof localStorage !== 'undefined') {

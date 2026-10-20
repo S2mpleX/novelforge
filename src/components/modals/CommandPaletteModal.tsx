@@ -229,7 +229,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
     {
       id: 'cmd-map-sandbox',
       icon: <Compass className="w-4 h-4 text-blue-700" />,
-      title: '打开神州山河地理沙盘路线图 (宗门城池坐标/历练行军路线规划)',
+      title: '打开世界地理与势力沙盘 (地标分布/势力疆域/行军探险路线)',
       category: '智能写作',
       action: () => {
         onClose();

@@ -262,6 +262,12 @@ export const api = {
     order_index?: number;
     goal?: string;
   }) => safeInvoke<StoryPhase>('create_story_phase', { input }),
+  updateStoryPhase: (input: {
+    id: string;
+    title: string;
+    order_index?: number;
+    goal?: string;
+  }) => safeInvoke<StoryPhase>('update_story_phase', { input }),
   deleteStoryPhase: (id: string) =>
     safeInvoke<void>('delete_story_phase', { id }),
 

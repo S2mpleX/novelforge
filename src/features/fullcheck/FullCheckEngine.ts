@@ -41,9 +41,9 @@ export class FullCheckEngine {
       const charName = char.name?.trim();
       if (!charName) return;
 
-      const isDead = char.status === '死亡';
-      const isRetreated = char.status === '闭关';
-      const isLeft = char.status === '离场';
+      const isDead = ['死亡', 'DECEASED', '阵亡', '陨落', '殉职', '消亡'].includes(char.status || '');
+      const isRetreated = ['闭关', 'SECLUDED', '休眠', '冷冻', '潜伏', '隔离', '失联', '潜修', '隐匿'].includes(char.status || '');
+      const isLeft = ['离场', 'ABSENT', '远行', '隐退', '脱队', '换图'].includes(char.status || '');
 
       // 统计角色出场章节
       const appearances: number[] = [];

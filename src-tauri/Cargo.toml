@@ -1,6 +1,6 @@
 [package]
 name = "novelforge-ai"
-version = "2.4.0"
+version = "2.4.1"
 description = "NovelForge AI - Professional Multi-Agent Long-form Novel Creation System"
 authors = ["NovelForge Team"]
 edition = "2024"
@@ -43,3 +43,15 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# ==============================================================================
+# 本地开发 (Debug) 瘦身与提速配置
+# ==============================================================================
+[profile.dev]
+# 自身代码保留行号信息（调试报错依然有清晰行号和堆栈，体积缩减过半）
+debug = 1
+
+# 对所有第三方依赖库（tokio/tauri/rusqlite 等）关闭调试符号，并开启轻度优化
+[profile.dev.package."*"]
+opt-level = 1
+debug = 0

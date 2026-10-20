@@ -534,9 +534,19 @@ export const NovelEditor: React.FC = () => {
         editor.commands.setContent(editorContent || '', { emitUpdate: false });
       }
     };
+    const handleToggleFocus = () => toggleFocusMode();
+    const handleToggleTypewriter = () => toggleTypewriterMode();
+
     window.addEventListener('novelforge:force-editor-reload', handleForceReload);
-    return () => window.removeEventListener('novelforge:force-editor-reload', handleForceReload);
-  }, [editor, editorContent]);
+    window.addEventListener('novelforge:toggle-focus', handleToggleFocus);
+    window.addEventListener('novelforge:toggle-typewriter', handleToggleTypewriter);
+
+    return () => {
+      window.removeEventListener('novelforge:force-editor-reload', handleForceReload);
+      window.removeEventListener('novelforge:toggle-focus', handleToggleFocus);
+      window.removeEventListener('novelforge:toggle-typewriter', handleToggleTypewriter);
+    };
+  }, [editor, editorContent, toggleFocusMode, toggleTypewriterMode]);
 
   // Sync scratch notes when active novel changes
   useEffect(() => {

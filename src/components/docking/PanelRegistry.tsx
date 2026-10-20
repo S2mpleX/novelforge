@@ -389,14 +389,14 @@ export const PANEL_METADATA_MAP: Record<PanelType, PanelMeta> = {
   },
   map_sandbox: {
     type: 'map_sandbox',
-    title: '神州山河地理沙盘',
+    title: '世界地理与势力沙盘',
     iconName: 'Compass',
     minWidth: 360,
     minHeight: 300,
     defaultSize: { width: 850, height: 620 },
     allowMultiple: false,
     category: 'plot',
-    description: '宗门城池坐标定标、历练行军路线规划与行程耗时因果校对',
+    description: '跨流派地标坐标定标、行军探索路线规划与行程耗时因果校对',
   },
 };
 

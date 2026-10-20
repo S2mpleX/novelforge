@@ -86,6 +86,7 @@ pub fn run() {
             // Story Phases & Arcs (Phase 2)
             commands::list_story_phases,
             commands::create_story_phase,
+            commands::update_story_phase,
             commands::delete_story_phase,
             commands::list_story_arcs,
             commands::create_story_arc,

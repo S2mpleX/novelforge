@@ -6,6 +6,16 @@ import { BatchReviseScope } from '../src/features/batchrevise/types';
 import { MapMarker } from '../src/features/map/types';
 import { api } from '../src/utils/tauriBridge';
 
+if (typeof (globalThis as any).localStorage === 'undefined') {
+  const store: Record<string, string> = {};
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => store[k] || null,
+    setItem: (k: string, v: string) => { store[k] = v; },
+    removeItem: (k: string) => { delete store[k]; },
+    clear: () => { Object.keys(store).forEach((k) => delete store[k]); },
+  };
+}
+
 console.log('===============================================================');
 console.log(' NovelForge AI V2.6 — 第三梯队核心生产力引擎自动化测试套件');
 console.log(' 覆盖：跨章批量修改流、手打/AI双流字数统计、架空世界沙盘与行军因果核验');
@@ -278,6 +288,32 @@ const nearMarker: MapMarker = {
 };
 const nearCheck = MapEngine.verifyTravelSpeed(startMarker, nearMarker, 0.5);
 assert(nearCheck.isReasonable === true, '近距离短时间行军顺利通过');
+
+// 3.3 跨流派自适应与“去神州化”测试 (Genre Adaptive & Non-Shenzhou)
+// 科幻流派
+const sciFiMap = MapEngine.generateMapFromRules('nov-scifi', [], '深空巡游者', { genre: '科幻', targetAudience: '大众' });
+assert(sciFiMap.title.includes('深空巡游者') && sciFiMap.title.includes('星图势力沙盘'), '科幻作品自动命名为星图势力沙盘，不再固定叫神州');
+assert(sciFiMap.bgTheme === 'COSMIC_DEEP', '科幻流派自动匹配 COSMIC_DEEP 深空星轨背景主题');
+assert(sciFiMap.markers.some((m) => m.name.includes('星港') || m.name.includes('空间站') || m.name.includes('带') || m.category === 'LANDMARK' || m.category === 'SECT'), '科幻沙盘自动生成星际枢纽或奇观要冲');
+
+// 废土流派
+const wastelandMap = MapEngine.generateMapFromRules('nov-waste', [], '末日废土记', { genre: '废土末世' });
+assert(wastelandMap.title.includes('末日废土记') && wastelandMap.title.includes('废土生存沙盘'), '废土作品自适应命名为废土生存沙盘');
+assert(wastelandMap.bgTheme === 'DESERT_BROWN', '废土流派自动匹配 DESERT_BROWN 废土沙盘主题');
+assert(wastelandMap.markers.some((m) => m.name.includes('避难所') || m.name.includes('集市') || m.name.includes('辐射')), '废土沙盘自动生成末世聚落');
+
+// 历史遗留旧硬编码“神州山河总略图”平滑升级测试
+const legacyMapJson = JSON.stringify({
+  id: 'map-legacy',
+  novelId: 'nov-upgrade',
+  title: '神州山河总略图',
+  markers: [],
+  routes: [],
+  updatedAt: 1000,
+});
+localStorage.setItem('novelforge_map_nov-upgrade', legacyMapJson);
+const upgradedMap = MapEngine.loadMapFromStorage('nov-upgrade', [], '银河帝国史诗', { genre: '科幻' });
+assert(upgradedMap.title.includes('银河帝国史诗') && upgradedMap.title.includes('星图势力沙盘'), '旧版神州山河总略图被自动平滑升级为书名定制沙盘');
 
 console.log('\n===============================================================');
 console.log(` ✅ 全部通过！第三梯队三大引擎自动化测试断言: ${passCount} / ${totalCount} (100%)`);

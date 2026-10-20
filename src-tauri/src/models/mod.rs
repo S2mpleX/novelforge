@@ -401,6 +401,14 @@ pub struct CreateStoryPhaseInput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateStoryPhaseInput {
+    pub id: String,
+    pub title: String,
+    pub order_index: Option<i64>,
+    pub goal: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoryArc {
     pub id: String,
     pub novel_id: String,

@@ -22,6 +22,25 @@ interface Props {
 
 export type CharacterLifeStatus = '健康' | '受伤' | '闭关' | '离场' | '死亡';
 
+export function getStatusDisplayName(status: CharacterLifeStatus, genre?: string): string {
+  const g = (genre || '').toLowerCase();
+  if (status === '闭关') {
+    if (g.includes('科幻') || g.includes('星际') || g.includes('赛博')) return '休眠/冷冻';
+    if (g.includes('末日') || g.includes('废土') || g.includes('丧尸')) return '隔离/失联';
+    if (g.includes('都市') || g.includes('谍战') || g.includes('刑侦')) return '潜伏/隐匿';
+    return '闭关/潜修';
+  }
+  if (status === '死亡') {
+    if (g.includes('科幻') || g.includes('星际')) return '阵亡/殉职';
+    return '死亡/陨落';
+  }
+  if (status === '离场') {
+    if (g.includes('科幻') || g.includes('星际')) return '航行/脱队';
+    return '离场/远行';
+  }
+  return status;
+}
+
 const STATUS_CONFIG: Record<
   CharacterLifeStatus,
   { label: CharacterLifeStatus; color: string; bg: string; border: string; desc: string }
@@ -38,28 +57,28 @@ const STATUS_CONFIG: Record<
     color: '#b45309',
     bg: '#fef3c7',
     border: '#fde68a',
-    desc: '带伤在身，战力折损，需要医治或调养',
+    desc: '带伤在身或机体受损，战力折损，需要救治或调养',
   },
   闭关: {
     label: '闭关',
     color: '#1d4ed8',
     bg: '#dbeafe',
     border: '#93c5fd',
-    desc: '闭门潜修或参悟功法，暂不插手外界纷争',
+    desc: '闭关潜修、冷冻休眠、暗线潜伏或隔离失联，暂不插手外界纷争',
   },
   离场: {
     label: '离场',
     color: '#475569',
     bg: '#f1f5f9',
     border: '#cbd5e1',
-    desc: '远行、换地图或暂退主线，防神隐遗忘',
+    desc: '远行、星际航行、换地图或暂退主线，防神隐遗忘',
   },
   死亡: {
     label: '死亡',
     color: '#991b1b',
     bg: '#fee2e2',
     border: '#fca5a5',
-    desc: '已确认陨落，作为剧情因果与复仇锚点（严防误复活）',
+    desc: '已确认陨落或阵亡，作为剧情因果与复仇锚点（严防误复活）',
   },
 };
 
@@ -215,11 +234,11 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
 
   const getNormalizedStatus = (rawStatus?: string): CharacterLifeStatus => {
     if (!rawStatus) return '健康';
-    if (['健康', 'HEALTHY', 'ACTIVE'].includes(rawStatus)) return '健康';
-    if (['受伤', 'INJURED'].includes(rawStatus)) return '受伤';
-    if (['闭关', 'SECLUDED'].includes(rawStatus)) return '闭关';
-    if (['离场', 'ABSENT'].includes(rawStatus)) return '离场';
-    if (['死亡', 'DECEASED'].includes(rawStatus)) return '死亡';
+    if (['健康', 'HEALTHY', 'ACTIVE', '正常', '全盛'].includes(rawStatus)) return '健康';
+    if (['受伤', 'INJURED', '受损', '重伤'].includes(rawStatus)) return '受伤';
+    if (['闭关', 'SECLUDED', '休眠', '冷冻', '潜伏', '隔离', '失联', '潜修', '隐匿'].includes(rawStatus)) return '闭关';
+    if (['离场', 'ABSENT', '远行', '隐退', '脱队', '换图'].includes(rawStatus)) return '离场';
+    if (['死亡', 'DECEASED', '阵亡', '陨落', '殉职', '消亡'].includes(rawStatus)) return '死亡';
     return '健康';
   };
 
@@ -322,7 +341,7 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                     : 'bg-white border-line text-ink-2 hover:border-amber-700'
                 }`}
               >
-                {st} ({counts[st]})
+                {st === '全部' ? '全部' : getStatusDisplayName(st, activeNovel?.genre_profile || (activeNovel as any)?.genre)} ({counts[st]})
               </button>
             ))}
           </div>
@@ -399,11 +418,11 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                         }}
                         className="text-[11px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer outline-none transition"
                       >
-                        <option value="健康">🟢 健康</option>
-                        <option value="受伤">🟠 受伤</option>
-                        <option value="闭关">🔵 闭关</option>
-                        <option value="离场">⚪ 离场</option>
-                        <option value="死亡">🔴 死亡</option>
+                        <option value="健康">🟢 {getStatusDisplayName('健康', activeNovel?.genre_profile)}</option>
+                        <option value="受伤">🟠 {getStatusDisplayName('受伤', activeNovel?.genre_profile)}</option>
+                        <option value="闭关">🔵 {getStatusDisplayName('闭关', activeNovel?.genre_profile)}</option>
+                        <option value="离场">⚪ {getStatusDisplayName('离场', activeNovel?.genre_profile)}</option>
+                        <option value="死亡">🔴 {getStatusDisplayName('死亡', activeNovel?.genre_profile)}</option>
                       </select>
                     </div>
 
@@ -570,11 +589,11 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                     onChange={(e) => setCharInitialStatus(e.target.value as CharacterLifeStatus)}
                     className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
                   >
-                    <option value="健康">🟢 健康 (全盛/正常)</option>
-                    <option value="受伤">🟠 受伤 (战损/虚弱)</option>
-                    <option value="闭关">🔵 闭关 (潜修/参悟)</option>
-                    <option value="离场">⚪ 离场 (远行/未入局)</option>
-                    <option value="死亡">🔴 死亡 (陨落/剧情锚点)</option>
+                    <option value="健康">🟢 {getStatusDisplayName('健康', activeNovel?.genre_profile)} (全盛/正常)</option>
+                    <option value="受伤">🟠 {getStatusDisplayName('受伤', activeNovel?.genre_profile)} (战损/虚弱)</option>
+                    <option value="闭关">🔵 {getStatusDisplayName('闭关', activeNovel?.genre_profile)} (隐匿/离线)</option>
+                    <option value="离场">⚪ {getStatusDisplayName('离场', activeNovel?.genre_profile)} (远行/未入局)</option>
+                    <option value="死亡">🔴 {getStatusDisplayName('死亡', activeNovel?.genre_profile)} (阵亡/剧情锚点)</option>
                   </select>
                 </div>
               </div>

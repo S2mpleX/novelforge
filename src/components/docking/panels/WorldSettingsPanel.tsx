@@ -15,6 +15,64 @@ import {
   Trash2,
 } from 'lucide-react';
 
+interface RuleTemplateItem {
+  genre: string;
+  title: string;
+  authority: 'CANON' | 'EXTENDED' | 'HYPOTHESIS';
+  content: string;
+}
+
+const GENRE_RULE_TEMPLATES: RuleTemplateItem[] = [
+  {
+    genre: '科幻',
+    title: '超空间曲率跃迁过载极限公理',
+    authority: 'CANON',
+    content: '任何常规物质飞船在执行超空间跃迁时，曲率引擎过载率严禁突破 145%；一旦被重力透镜或黑洞引力井捕获，逆向跃迁将直接导致舰体微观粒子坍缩消亡。',
+  },
+  {
+    genre: '科幻',
+    title: '纳米自毁与智械底层硬编码协议',
+    authority: 'EXTENDED',
+    content: '所有搭载自主作战逻辑的战斗型外骨骼与纳米无人机集群，均必须内置第三级硬编码物理熔断保险，严禁在无主控信标授权下进入自律杀戮模式。',
+  },
+  {
+    genre: '都市',
+    title: '金融证券双向做空熔断公理',
+    authority: 'CANON',
+    content: '单日大盘波动超过 10% 自动触发第一级无条件停牌熔断；任何离岸信托基金与杠杆拆借交易必须通过跨国加密清算所备案，杜绝幽灵账户操盘。',
+  },
+  {
+    genre: '都市',
+    title: '超凡觉醒者社会治安管理条例',
+    authority: 'EXTENDED',
+    content: '觉醒者禁止在非受控公共场合动用二级以上具象战技或精神干预；违规造成平民伤亡者直接剥夺公民权并由特别稽查处实施神经抑制。',
+  },
+  {
+    genre: '末日',
+    title: '地表黑雨生物基因衰变公理',
+    authority: 'CANON',
+    content: '地表降落的酸性黑雨含有高浓度变异辐射孢子；未穿戴密闭防化护甲暴露在黑雨中超过 180 秒，将触发不可逆机体溃烂与神经异化。',
+  },
+  {
+    genre: '末日',
+    title: '避难所高能净水与血清战略配给制',
+    authority: 'EXTENDED',
+    content: '深层地下净水与抗畸变血清为避难所全体生存者共有的不可再生资源；私自截留或向黑市走私者将被剥夺生存资格并放逐至辐射红区。',
+  },
+  {
+    genre: '玄幻',
+    title: '天地灵气守恒与神魂誓约公理',
+    authority: 'CANON',
+    content: '大千世界灵脉产出总量恒定；凡修士以本命神魂引动天道契约立下血誓者，背誓必遭九霄神雷心魔反噬，道基俱毁。',
+  },
+  {
+    genre: '玄幻',
+    title: '次级秘境与洞天福地空间承载律',
+    authority: 'EXTENDED',
+    content: '化神期以上大能严禁在凡品洞天福地内全力施展法天象地，否则世界晶壁失稳崩裂，空间乱流将彻底湮灭该秘境内所有生灵。',
+  },
+];
+
 export const WorldSettingsPanel: React.FC = () => {
   const { activeNovel } = useNovelStore();
   const [rules, setRules] = useState<WorldRule[]>([]);
@@ -240,6 +298,29 @@ export const WorldSettingsPanel: React.FC = () => {
                 <X className="w-4 h-4" />
               </button>
             </div>
+            {/* 快速注入流派模板胶囊 */}
+            <div className="p-2 rounded-lg bg-surface-2 border border-line space-y-1.5">
+              <span className="text-[10px] text-ink-2 font-medium flex items-center gap-1">
+                <Sparkles className="w-2.5 h-2.5 text-primary" />
+                流派公理推荐模板 (点击一键填入):
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {GENRE_RULE_TEMPLATES.map((tpl) => (
+                  <button
+                    key={tpl.title}
+                    type="button"
+                    onClick={() => {
+                      setRuleTitle(tpl.title);
+                      setRuleAuthority(tpl.authority);
+                      setRuleContent(tpl.content);
+                    }}
+                    className="px-2 py-0.5 rounded text-[10.5px] bg-surface hover:bg-surface-3 text-stone-700 dark:text-stone-300 border border-line hover:border-amber-700 transition cursor-pointer"
+                  >
+                    [{tpl.genre}] {tpl.title.slice(0, 8)}...
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <form onSubmit={handleSaveRule} className="space-y-3">
               <div>
@@ -247,7 +328,7 @@ export const WorldSettingsPanel: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="例如：原初灵能三大不可逆定律、大荒界域重力常数"
+                  placeholder="例如：超空间曲率跃迁极限定律、金融做空熔断公理、基因衰变律..."
                   value={ruleTitle}
                   onChange={(e) => setRuleTitle(e.target.value)}
                   className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"

@@ -2,7 +2,25 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const binaryPath = 'E:\\tools\\novelforge_target\\x86_64-pc-windows-gnu\\debug\\novelforge_mcp.exe';
+function findBinary() {
+  if (process.env.NOVELFORGE_MCP_BIN && fs.existsSync(process.env.NOVELFORGE_MCP_BIN)) {
+    return process.env.NOVELFORGE_MCP_BIN;
+  }
+  const candidatePaths = [
+    'E:\\tools\\novelforge_target\\x86_64-pc-windows-gnu\\release\\novelforge_mcp.exe',
+    'E:\\tools\\novelforge_target\\x86_64-pc-windows-gnu\\debug\\novelforge_mcp.exe',
+    path.join(__dirname, '..', 'src-tauri', 'target', 'release', 'novelforge_mcp.exe'),
+    path.join(__dirname, '..', 'src-tauri', 'target', 'debug', 'novelforge_mcp.exe'),
+    path.join(__dirname, 'novelforge_mcp.exe'),
+    'novelforge_mcp.exe'
+  ];
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return 'E:\\tools\\novelforge_target\\x86_64-pc-windows-gnu\\release\\novelforge_mcp.exe';
+}
+
+const binaryPath = findBinary();
 
 async function callTool(toolName, args = {}) {
   return new Promise((resolve, reject) => {

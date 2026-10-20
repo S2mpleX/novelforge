@@ -8,6 +8,7 @@ import { PanelWrapper } from './PanelWrapper';
 import { PANEL_METADATA_MAP } from './PanelRegistry';
 import { allPanelsInTree } from '@/utils/dockingTree';
 import { X } from 'lucide-react';
+import { ZenWritingWorkspace } from '@/components/zen/ZenWritingWorkspace';
 
 const DraggingGhostPill: React.FC = React.memo(() => {
   const draggingState = useWorkspaceStore((s) => s.draggingState);
@@ -71,10 +72,15 @@ export const DockingWorkspace: React.FC = () => {
       layout.floatingPanels.find((f) => f.panel.instanceId === layout.maximizedInstanceId)?.panel
     : null;
 
+  // 当开启沉浸写作 (Zen) 模式时，彻底收起多窗格树与次级工具栏，提供独占沉浸画布与极简案头浮岛
+  if (zenMode) {
+    return <ZenWritingWorkspace />;
+  }
+
   return (
     <div className="flex-1 flex flex-col w-full h-full overflow-hidden relative bg-canvas">
       {/* Workspace Sub-Toolbar */}
-      {!zenMode && <WorkspaceToolbar />}
+      <WorkspaceToolbar />
 
       {/* Main Layout Area */}
       <div className="flex-1 w-full h-full overflow-hidden relative">

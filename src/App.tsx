@@ -12,17 +12,40 @@ import { SettingsModal } from '@/components/modals/SettingsModal';
 import { ToastContainer } from '@/components/common/ToastContainer';
 import { DialogHost } from '@/components/common/DialogHost';
 import { ShortcutHelpModal } from '@/components/modals/ShortcutHelpModal';
+import { WritersDeskModal } from '@/components/desk/WritersDeskModal';
+import { WordImportModal } from '@/components/modals/WordImportModal';
+import { MapModal } from '@/components/modals/MapModal';
 import { toast } from '@/stores/useToastStore';
 import { isTauri } from '@/utils/tauriBridge';
 import { Sparkles, ArrowRight, Info, X } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const { loadNovels, loadProviders, activeTab, setActiveTab, toggleSidebar, zenMode, themeMode } = useNovelStore();
+  const {
+    loadNovels,
+    loadProviders,
+    activeTab,
+    setActiveTab,
+    toggleSidebar,
+    zenMode,
+    themeMode,
+    exitZenMode,
+    toggleZenMode,
+  } = useNovelStore();
   const { status, latestVersion, settings, loadSettings, checkForUpdates } = useUpdateStore();
   const [showWebNotice, setShowWebNotice] = useState(!isTauri());
   const [showUpdateBanner, setShowUpdateBanner] = useState(true);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showShortcutModal, setShowShortcutModal] = useState(false);
+  const [showWordImportModal, setShowWordImportModal] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [showDeskModal, setShowDeskModal] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem('novelforge_startup_show_desk');
+      return v === null ? true : v === 'true';
+    } catch {
+      return true;
+    }
+  });
 
   useEffect(() => {
     loadNovels();
@@ -58,6 +81,28 @@ export const App: React.FC = () => {
       if (e.key === 'F1' || (!isInput && e.shiftKey && e.key === '?')) {
         e.preventDefault();
         setShowShortcutModal((prev) => !prev);
+        return;
+      }
+
+      // F2 or Ctrl+D (when not typing) opens Writer's Desk
+      if (e.key === 'F2' || (!isInput && (e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D'))) {
+        e.preventDefault();
+        setShowDeskModal((prev) => !prev);
+        return;
+      }
+
+      // F11 or Ctrl+Alt+Z (when not typing) toggles Zen Mode
+      if (e.key === 'F11' || (!isInput && (e.ctrlKey || e.metaKey) && e.altKey && (e.key === 'z' || e.key === 'Z'))) {
+        e.preventDefault();
+        toggleZenMode();
+        return;
+      }
+
+      // Escape: If in Zen Mode, exit back to Studio Mode
+      if (e.key === 'Escape' && zenMode) {
+        e.preventDefault();
+        exitZenMode();
+        toast.info('模式切换', '已返回专业工坊模式 (Studio)');
         return;
       }
 
@@ -98,14 +143,20 @@ export const App: React.FC = () => {
       setShowShortcutModal(true);
     };
 
+    const handleOpenDeskEvent = () => {
+      setShowDeskModal(true);
+    };
+
     window.addEventListener('keydown', handleGlobalKeyDown);
     window.addEventListener('novelforge:open-shortcuts', handleOpenShortcutsEvent);
+    window.addEventListener('novelforge:open-desk', handleOpenDeskEvent);
 
     return () => {
       window.removeEventListener('keydown', handleGlobalKeyDown);
       window.removeEventListener('novelforge:open-shortcuts', handleOpenShortcutsEvent);
+      window.removeEventListener('novelforge:open-desk', handleOpenDeskEvent);
     };
-  }, [setActiveTab, toggleSidebar]);
+  }, [setActiveTab, toggleSidebar, zenMode, toggleZenMode, exitZenMode]);
 
   // Dynamically apply themeMode to document root
   useEffect(() => {
@@ -194,6 +245,24 @@ export const App: React.FC = () => {
         isOpen={showShortcutModal}
         onClose={() => setShowShortcutModal(false)}
       />
+
+      {/* 文人案头速览与新书启航中心 (Writer's Desk) */}
+      <WritersDeskModal
+        isOpen={showDeskModal}
+        onClose={() => setShowDeskModal(false)}
+        onOpenWordImport={() => setShowWordImportModal(true)}
+        onOpenMap={() => setShowMapModal(true)}
+      />
+
+      {/* 导入 Word 模态框 */}
+      {showWordImportModal && (
+        <WordImportModal isOpen={true} onClose={() => setShowWordImportModal(false)} />
+      )}
+
+      {/* 架空世界沙盘地图模态框 */}
+      {showMapModal && (
+        <MapModal isOpen={true} onClose={() => setShowMapModal(false)} />
+      )}
 
       {/* Global Lightweight Literary Toast Container */}
       <ToastContainer />

@@ -1979,6 +1979,19 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
       return;
     }
 
+    case 'update_story_phase': {
+      const phases = getStorage<any[]>('story_phases', []);
+      const target = phases.find((p) => p.id === args?.input?.id);
+      if (target) {
+        if (args?.input?.title) target.title = args.input.title;
+        if (args?.input?.goal !== undefined) target.goal = args.input.goal;
+        if (args?.input?.order_index !== undefined) target.order_index = args.input.order_index;
+        setStorage('story_phases', phases);
+        return target;
+      }
+      return null;
+    }
+
     case 'update_story_arc_status': {
       const arcs = getStorage<any[]>('story_arcs', []);
       const target = arcs.find((a) => a.id === args?.id);

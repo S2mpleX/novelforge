@@ -10,6 +10,11 @@ import {
   Check,
   Play,
   Clock,
+  FileText,
+  Library,
+  Flame,
+  ShieldCheck,
+  Layers,
 } from 'lucide-react';
 import {
   DECONSTRUCT_DIMENSIONS,
@@ -19,6 +24,7 @@ import {
   DeconstructDimensionKey,
   DeconstructScale,
   DeconstructReport,
+  ReusableSkillItem,
 } from '@/features/deconstruct/types';
 
 interface Props {
@@ -27,8 +33,51 @@ interface Props {
   embedded?: boolean;
 }
 
+function cleanHtmlToPlain(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<p[^>]*>/gi, '')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .trim();
+}
+
+const PRESET_SAMPLES = [
+  {
+    genre: '玄幻破局',
+    title: '《逆命修真》黄金三章开局',
+    text: `夜雨如注，打在青云宗外门的青石台阶上，发出噼啪的闷响。
+少年林远抹了把脸上的血水与泥沙，死死攥紧掌心里破碎的命牌。
+“三年之约，青云门退我婚事，废我灵脉，将我弃于荒山。”他冷冷抬起头，前方古殿雕梁画栋，正是七星阁与各方势力的演武台。
+就在这时，胸口前挂着的一枚布满铜锈的九龙古鼎，忽然发出一阵灼热微颤。
+一道苍老悠远的声音悄然从识海深处炸响：“小娃娃，天生至尊骨被夺又如何？老夫这里有一部《太虚混沌经》，敢修否？”`,
+  },
+  {
+    genre: '硬核科幻',
+    title: '《深空余波》跃迁拦截开篇',
+    text: `警报红光将驾驶舱撕裂成暗红的血狱。
+“舰长，第七曲率引擎过载率 142%，引力坍缩井即将闭合！”领航员的手指在全息矩阵上拉出急促的残影。
+陈巡没有回答，他的目光凝视着全息主视界——三艘泛亚同盟的重巡洋舰正呈品字形封死跃迁走廊。
+“他们不是来缉捕的，他们是来灭口的。”陈巡按下了主控台上的纳米自毁协议红色护盖，“启动脉冲光刃，调频至超空泡震荡模式，冲过去！”`,
+  },
+  {
+    genre: '谍战悬疑',
+    title: '《雨夜暗线》潜伏搜查开篇',
+    text: `雨水顺着黑色礼帽的帽檐淌下来，落在破损皮鞋的尖端。
+陆长生站在弄堂深处，看了一眼怀表：凌晨两点四十五分。
+三楼窗口的煤油灯晃了三下，随后熄灭。那是约定的紧急脱离暗号——线人已经暴露。
+他深吸一口冰冷的湿气，右手摸进大衣内侧，握紧了那把柯尔特手枪。楼道里传来了军靴踏过水洼的沉闷踩踏声，特务处的人比预想中提前了整整十分钟。`,
+  },
+];
+
 export const DeconstructModal: React.FC<Props> = ({ isOpen, onClose, embedded = false }) => {
-  const { activeProvider, activeModel, activeNovel } = useNovelStore();
+  const { activeProvider, activeModel, activeNovel, chapters, activeChapter, editorContent } = useNovelStore();
   const [sourceTitle, setSourceTitle] = useState<string>('');
   const [sourceText, setSourceText] = useState<string>('');
   const [selectedDims, setSelectedDims] = useState<DeconstructDimensionKey[]>([
@@ -46,7 +95,7 @@ export const DeconstructModal: React.FC<Props> = ({ isOpen, onClose, embedded = 
   const [copied, setCopied] = useState<boolean>(false);
   const [adoptedFeedback, setAdoptedFeedback] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  if (!isOpen && !embedded) return null;
 
   const toggleDim = (key: DeconstructDimensionKey) => {
     if (selectedDims.includes(key)) {
@@ -56,6 +105,66 @@ export const DeconstructModal: React.FC<Props> = ({ isOpen, onClose, embedded = 
     } else {
       setSelectedDims([...selectedDims, key]);
     }
+  };
+
+  // 载入当前正文
+  const handleLoadCurrentChapter = () => {
+    if (!activeChapter) {
+      setAdoptedFeedback('当前未打开任何章节！');
+      setTimeout(() => setAdoptedFeedback(null), 2500);
+      return;
+    }
+    const rawContent = editorContent || activeChapter.content || '';
+    const cleanText = cleanHtmlToPlain(rawContent);
+    if (!cleanText) {
+      setAdoptedFeedback('当前章节暂无正文内容！');
+      setTimeout(() => setAdoptedFeedback(null), 2500);
+      return;
+    }
+    setSourceTitle(`《${activeNovel?.title || '本草'}》· ${activeChapter.title}`);
+    setSourceText(cleanText);
+    setScale('detailed');
+    setAdoptedFeedback(`已成功载入当前章节《${activeChapter.title}》（${cleanText.length}字）！`);
+    setTimeout(() => setAdoptedFeedback(null), 2500);
+  };
+
+  // 载入前三章（黄金三章开篇自检）
+  const handleLoadFirstThreeChapters = () => {
+    if (!chapters || chapters.length === 0) {
+      setAdoptedFeedback('当前作品暂无已建章节！');
+      setTimeout(() => setAdoptedFeedback(null), 2500);
+      return;
+    }
+    const sorted = [...chapters].sort(
+      (a, b) => (a.chapter_number || a.sequence || 0) - (b.chapter_number || b.sequence || 0)
+    );
+    const firstThree = sorted.slice(0, 3);
+    const combined = firstThree
+      .map((ch, idx) => {
+        const text = ch.id === activeChapter?.id && editorContent ? editorContent : ch.content || '';
+        return `【第 ${idx + 1} 章：${ch.title}】\n${cleanHtmlToPlain(text)}`;
+      })
+      .join('\n\n' + '='.repeat(30) + '\n\n');
+
+    setSourceTitle(`《${activeNovel?.title || '本书'}》开篇黄金三章`);
+    setSourceText(combined);
+    setScale('detailed');
+    if (!selectedDims.includes('golden')) {
+      setSelectedDims([...selectedDims, 'golden']);
+    }
+    setAdoptedFeedback(`已载入开篇前 ${firstThree.length} 章正文（共 ${combined.length} 字），切换为黄金三章精拆！`);
+    setTimeout(() => setAdoptedFeedback(null), 3000);
+  };
+
+  // 载入内置样章
+  const handleLoadPresetSample = (idx: number) => {
+    const s = PRESET_SAMPLES[idx];
+    if (!s) return;
+    setSourceTitle(s.title);
+    setSourceText(s.text);
+    setScale('detailed');
+    setAdoptedFeedback(`已载入【${s.genre}】试炼样章！`);
+    setTimeout(() => setAdoptedFeedback(null), 2500);
   };
 
   const handleStartDeconstruct = async () => {
@@ -137,7 +246,43 @@ export const DeconstructModal: React.FC<Props> = ({ isOpen, onClose, embedded = 
     setTimeout(() => setAdoptedFeedback(null), 3000);
   };
 
-  if (!isOpen && !embedded) return null;
+  // 存为世界观设定库法则
+  const handleSaveSkillAsRule = async (skill: ReusableSkillItem) => {
+    if (!activeNovel) return;
+    try {
+      await api.createWorldRule({
+        novel_id: activeNovel.id,
+        title: `剧作定律：${skill.name}`,
+        rule_content: `【适用场景】${skill.scene || '通用剧作'}\n【推进节拍】\n${
+          skill.steps ? skill.steps.join('\n') : ''
+        }\n【自检核验】${skill.checklist ? skill.checklist.join('；') : ''}`,
+        authority_level: 'EXTENDED',
+      });
+      window.dispatchEvent(new CustomEvent('novelforge:reload-story-bible'));
+      setAdoptedFeedback(`已将【${skill.name}】存为世界观扩展法则！`);
+      setTimeout(() => setAdoptedFeedback(null), 3000);
+    } catch (e) {
+      console.error('存为法则失败:', e);
+    }
+  };
+
+  // 存为大纲阶段
+  const handleSaveSkillAsPhase = async (skill: ReusableSkillItem) => {
+    if (!activeNovel) return;
+    try {
+      const existingPhases = await api.listStoryPhases(activeNovel.id);
+      await api.createStoryPhase({
+        novel_id: activeNovel.id,
+        title: skill.name,
+        goal: `【实操步骤】${skill.steps?.join(' -> ') || ''} | 【核验清单】${skill.checklist?.join('；') || ''}`,
+        order_index: (existingPhases.length || 0) + 1,
+      });
+      setAdoptedFeedback(`已将【${skill.name}】作为故事阶段加入大纲！`);
+      setTimeout(() => setAdoptedFeedback(null), 3000);
+    } catch (e) {
+      console.error('存为大纲阶段失败:', e);
+    }
+  };
 
   const innerContent = (
     <div className={`w-full ${embedded ? 'h-full rounded-none border-0' : 'max-w-5xl h-[90vh] rounded-2xl border border-line dark:border-[#2e2a27] shadow-2xl animate-in fade-in zoom-in-95 duration-200'} bg-surface dark:bg-[#1a1714] flex flex-col overflow-hidden`}>
@@ -173,25 +318,65 @@ export const DeconstructModal: React.FC<Props> = ({ isOpen, onClose, embedded = 
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-0 divide-y lg:divide-y-0 lg:divide-x divide-[#ded5c4] dark:divide-[#2e2a27]">
           {/* 左栏：输入与拆解维度配置 (5列) */}
           <div className="lg:col-span-5 flex flex-col h-full p-4 overflow-y-auto space-y-3.5 bg-[#faf5ec]/50 dark:bg-[#181513]/40">
-            {/* 范文标题 */}
+            {/* 范文标题与快速载入工具栏 */}
             <div>
-              <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">
-                范文 / 竞品书名或章节名
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
+                  范文 / 竞品书名或自检章节
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleLoadCurrentChapter}
+                    className="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 dark:bg-amber-950/40 text-primary dark:text-amber-300 border border-amber-300 dark:border-amber-800 hover:bg-amber-100 flex items-center gap-1 cursor-pointer"
+                    title="一键载入当前正在编辑的章节正文进行自检"
+                  >
+                    <FileText className="w-2.5 h-2.5" />
+                    <span>载入本章</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLoadFirstThreeChapters}
+                    className="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 dark:bg-amber-950/40 text-primary dark:text-amber-300 border border-amber-300 dark:border-amber-800 hover:bg-amber-100 flex items-center gap-1 cursor-pointer"
+                    title="一键提取本书开篇前三章，执行黄金三章开局深度自检"
+                  >
+                    <Library className="w-2.5 h-2.5" />
+                    <span>黄金三章自检</span>
+                  </button>
+                </div>
+              </div>
               <input
                 type="text"
                 value={sourceTitle}
                 onChange={(e) => setSourceTitle(e.target.value)}
-                placeholder="例如：《诡秘之主》第一卷开篇三章 / 某爆款开头"
+                placeholder="例如：《诡秘之主》第一卷开篇三章 / 本书开局自检"
                 className="w-full px-3 py-1.5 text-xs rounded-lg border border-line dark:border-[#38332e] bg-white dark:bg-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-600"
               />
+
+              {/* 经典样章试炼胶囊 */}
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="text-[10px] text-stone-400 shrink-0 flex items-center gap-0.5">
+                  <Flame className="w-2.5 h-2.5 text-amber-600" />
+                  样章试炼:
+                </span>
+                {PRESET_SAMPLES.map((s, idx) => (
+                  <button
+                    key={s.genre}
+                    type="button"
+                    onClick={() => handleLoadPresetSample(idx)}
+                    className="px-1.5 py-0.5 rounded text-[10px] bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 text-stone-600 dark:text-stone-300 transition cursor-pointer"
+                  >
+                    {s.genre}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* 范文正文粘贴 */}
             <div className="flex-1 flex flex-col min-h-[160px]">
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
-                  待拆解范文文本 (支持粘贴数千至数万字)
+                  待拆解正文文本 (支持粘贴数千至数万字)
                 </label>
                 <span className="text-[11px] text-stone-400 font-mono">
                   {sourceText.length} 字
@@ -200,7 +385,7 @@ export const DeconstructModal: React.FC<Props> = ({ isOpen, onClose, embedded = 
               <textarea
                 value={sourceText}
                 onChange={(e) => setSourceText(e.target.value)}
-                placeholder="请在此直接粘贴需要逆向拆解分析的竞品正文、单卷或大纲……"
+                placeholder="请在此直接粘贴需要逆向拆解分析的竞品正文、或点击上方【载入本章/黄金三章自检】……"
                 className="flex-1 w-full p-3 text-xs font-serif leading-relaxed rounded-xl border border-line dark:border-[#38332e] bg-white dark:bg-stone-900 resize-none focus:outline-none focus:ring-1 focus:ring-amber-600"
               />
             </div>
@@ -369,11 +554,70 @@ export const DeconstructModal: React.FC<Props> = ({ isOpen, onClose, embedded = 
             )}
 
             {/* 报告内容区 */}
-            <div className="flex-1 overflow-y-auto mt-3 p-3.5 rounded-xl border border-line/60 dark:border-[#38332e]/60 bg-surface dark:bg-[#151311] select-text">
+            <div className="flex-1 overflow-y-auto mt-3 p-3.5 rounded-xl border border-line/60 dark:border-[#38332e]/60 bg-surface dark:bg-[#151311] select-text space-y-4">
               {streamMarkdown || report ? (
-                <div className="text-xs sm:text-sm font-serif leading-relaxed whitespace-pre-wrap text-stone-800 dark:text-stone-200">
-                  {streamMarkdown || report?.markdownContent}
-                </div>
+                <>
+                  <div className="text-xs sm:text-sm font-serif leading-relaxed whitespace-pre-wrap text-stone-800 dark:text-stone-200">
+                    {streamMarkdown || report?.markdownContent}
+                  </div>
+
+                  {/* 结构化提取出的套路卡片 */}
+                  {report?.reusableSkills && report.reusableSkills.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-line dark:border-[#2e2a27] space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-primary dark:text-amber-400 flex items-center gap-1.5 font-sans">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          提炼出的结构化爆款实操套路 ({report.reusableSkills.length})
+                        </span>
+                        <span className="text-[10px] text-stone-400 font-sans">
+                          点击可一键反哺至当前小说世界法则或大纲
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 font-sans">
+                        {report.reusableSkills.map((skill, sIdx) => (
+                          <div
+                            key={sIdx}
+                            className="p-2.5 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/20 text-xs"
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="font-bold text-amber-900 dark:text-amber-300">
+                                #{sIdx + 1} {skill.name}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveSkillAsRule(skill)}
+                                  className="px-1.5 py-0.5 rounded text-[10px] bg-white dark:bg-stone-900 border border-amber-300 dark:border-amber-800 text-primary dark:text-amber-300 hover:bg-amber-100 flex items-center gap-0.5 cursor-pointer"
+                                  title="存入世界观设定法则"
+                                >
+                                  <ShieldCheck className="w-2.5 h-2.5" />
+                                  <span>存为法则</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveSkillAsPhase(skill)}
+                                  className="px-1.5 py-0.5 rounded text-[10px] bg-white dark:bg-stone-900 border border-amber-300 dark:border-amber-800 text-primary dark:text-amber-300 hover:bg-amber-100 flex items-center gap-0.5 cursor-pointer"
+                                  title="作为阶段节点加入大纲"
+                                >
+                                  <Layers className="w-2.5 h-2.5" />
+                                  <span>存为大纲</span>
+                                </button>
+                              </div>
+                            </div>
+                            {skill.steps && skill.steps.length > 0 && (
+                              <div className="text-[11px] text-stone-600 dark:text-stone-300 space-y-0.5">
+                                {skill.steps.map((st, i) => (
+                                  <div key={i}>{st}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-stone-400 space-y-2">
                   <FileSearch className="w-10 h-10 opacity-30" />

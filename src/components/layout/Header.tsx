@@ -40,7 +40,9 @@ import {
   Plus,
   Layers,
   Keyboard,
+  LayoutGrid,
 } from 'lucide-react';
+import { toast } from '@/stores/useToastStore';
 
 const SettingsModal = React.lazy(() => import('@/components/modals/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const SerializationModal = React.lazy(() => import('@/components/modals/SerializationModal').then(m => ({ default: m.SerializationModal })));
@@ -152,6 +154,8 @@ export const Header: React.FC = () => {
     activeModel,
     zenMode,
     toggleZenMode,
+    enterZenMode,
+    exitZenMode,
     themeMode,
     toggleThemeMode,
     uiScale,
@@ -330,8 +334,8 @@ export const Header: React.FC = () => {
           </div>
 
           {/* Active Novel Badge & Quick Shelf Switcher */}
-          {activeNovel && (
-            <div ref={novelMenuRef} className="relative flex items-center ml-1 sm:ml-2">
+          {activeNovel ? (
+            <div ref={novelMenuRef} className="relative flex items-center ml-1 sm:ml-2 gap-1.5">
               <button
                 type="button"
                 onClick={() => setShowNovelMenu(!showNovelMenu)}
@@ -360,6 +364,17 @@ export const Header: React.FC = () => {
                     showNovelMenu ? 'rotate-180 text-primary dark:text-amber-400' : ''
                   }`}
                 />
+              </button>
+
+              {/* Open Writer's Desk Button */}
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('novelforge:open-desk'))}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-800/10 hover:bg-amber-800/15 dark:bg-amber-400/10 dark:hover:bg-amber-400/20 text-primary dark:text-amber-300 border border-amber-800/20 dark:border-amber-400/30 text-xs font-semibold font-serif transition cursor-pointer shadow-2xs hover:scale-105"
+                title="打开文人案头速览与新书启程中心 (快捷键: F2 或 Ctrl+D)"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-primary dark:text-amber-400" />
+                <span>案头</span>
               </button>
 
               {/* Shelf Quick Switcher Dropdown */}
@@ -431,13 +446,66 @@ export const Header: React.FC = () => {
                 </div>
               )}
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('novelforge:open-desk'))}
+              className="ml-1 sm:ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-700 to-amber-800 text-white text-xs font-bold font-serif shadow-sm animate-pulse cursor-pointer hover:from-amber-600 hover:to-amber-700"
+              title="案头尚无小说，点击开启新书 3 步向导"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>开启新长篇 (3步向导)</span>
+            </button>
           )}
         </div>
 
         {/* ============================================================ */}
-        {/* ZONE 2 (CENTER): Sequential Creation Pipeline Stepper        */}
+        {/* ZONE 2 (CENTER): Mode Switcher Capsule & Creation Pipeline   */}
         {/* ============================================================ */}
-        <div className="flex items-center justify-center mx-1 lg:mx-2 min-w-0 shrink">
+        <div className="flex items-center justify-center mx-1 lg:mx-2 min-w-0 shrink gap-1.5 sm:gap-2">
+          {/* Dual Mode Switcher Capsule (方案 2: 纯粹写作 Zen 模式 vs 专业工坊 Studio 模式一键切换) */}
+          <div className="flex items-center bg-surface-3 dark:bg-[#201d1a] p-0.5 rounded-xl border border-line dark:border-[#352f2a] shadow-inner shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (!zenMode) {
+                  enterZenMode();
+                  toast.info('沉浸写作模式已开启', '已收拢所有多余窗格，专心执笔正文 (按 Esc 随时切回工坊)');
+                }
+              }}
+              className={`px-2 lg:px-2.5 py-1 rounded-lg text-xs font-serif font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                zenMode
+                  ? 'bg-gradient-to-r from-amber-700 via-amber-800 to-amber-900 text-amber-50 shadow-sm border border-amber-950/30'
+                  : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#f3eee7] hover:bg-surface-3-hover/70'
+              }`}
+              title="切换至沉浸写作模式 (Zen)：零干扰、无杂念，主正文居中独占，专为快速码字打磨打造 (快捷键: F11 / Ctrl+Alt+Z)"
+            >
+              <Feather className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span className="whitespace-nowrap">沉浸写作</span>
+              {zenMode && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse hidden sm:inline-block" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (zenMode) {
+                  exitZenMode();
+                  toast.info('专业工坊模式已激活', '已恢复完整 Docking 多窗格排布、权威大纲与多 Agent 控制台');
+                }
+              }}
+              className={`px-2 lg:px-2.5 py-1 rounded-lg text-xs font-serif font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                !zenMode
+                  ? 'bg-gradient-to-r from-[#5c4033] to-[#422e24] dark:from-[#2e2620] dark:to-[#383028] text-amber-100 shadow-sm border border-amber-900/30'
+                  : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#f3eee7] hover:bg-surface-3-hover/70'
+              }`}
+              title="切换至专业工坊模式 (Studio)：全功能工作台、多窗格 Docking、权威世界观、多 Agent 主编、因果巡检与思维沙盘"
+            >
+              <LayoutGrid className="w-3.5 h-3.5 text-amber-200/80 shrink-0" />
+              <span className="whitespace-nowrap">专业工坊</span>
+            </button>
+          </div>
+
           <div className="flex items-center bg-surface-3 dark:bg-[#201d1a] p-0.5 lg:p-1 rounded-xl border border-line dark:border-[#352f2a] shadow-inner shrink-0">
             {CREATION_PIPELINE.map((item, idx) => {
               const Icon = item.icon;
@@ -719,7 +787,7 @@ export const Header: React.FC = () => {
                       className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
                     >
                       <Compass className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400 shrink-0" />
-                      <span className="flex-1 truncate">神州山河地理沙盘</span>
+                      <span className="flex-1 truncate">世界地理与势力沙盘</span>
                     </button>
                   </div>
 

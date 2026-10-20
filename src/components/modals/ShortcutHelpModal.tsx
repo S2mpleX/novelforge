@@ -94,15 +94,15 @@ const SHORTCUTS_DATA: ShortcutItem[] = [
     category: 'immersion',
   },
   {
-    keys: ['F11'],
-    action: '全屏专注写作',
-    description: '隐藏所有系统窗口杂质，纯净沉浸于信笺纸张之上',
+    keys: ['F11', '/', 'Ctrl+Alt+Z'],
+    action: '沉浸写作 (Zen) / 专业工坊切换',
+    description: '一键在零打扰独占写作与全功能多窗格工坊之间平滑穿梭',
     category: 'immersion',
   },
   {
     keys: ['Esc'],
-    action: '退出全屏 / 关闭弹窗',
-    description: '退出全屏模式或关闭当前的快捷工具栏与模态窗口',
+    action: '退出沉浸写作 / 关闭浮层',
+    description: '从沉浸写作快速返回专业工坊模式，或关闭当前弹窗与目录抽屉',
     category: 'immersion',
   },
 

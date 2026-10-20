@@ -15,7 +15,12 @@ import {
   History,
   Check,
   Loader2,
+  Copy,
+  Sparkles,
+  FileText,
 } from 'lucide-react';
+import { toast } from '@/stores/useToastStore';
+import { confirmDialog } from '@/utils/dialog';
 
 interface WorkflowRunnerModalProps {
   isOpen: boolean;
@@ -163,6 +168,59 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
       setStatusMessage(`执行失败: ${e.message || e}`);
     } finally {
       setIsExecutingStep(false);
+    }
+  };
+
+  const handleAppendToChapter = async (text: string) => {
+    if (!activeChapter || !text.trim()) return;
+    try {
+      const paragraphs = text
+        .split('\n')
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .map((p) => `<p>${p}</p>`)
+        .join('');
+      const newContent = `${activeChapter.content || ''}${paragraphs}`;
+      await api.saveChapterContent(activeChapter.id, newContent, true, 'WORKFLOW_APPEND');
+      window.dispatchEvent(new CustomEvent('novelforge:force-editor-reload'));
+      toast.success('已追加至正文', `已将成果追加到《${activeChapter.title}》末尾`);
+    } catch (e: any) {
+      toast.error('追加失败', e?.message || '保存正文出错');
+    }
+  };
+
+  const handleReplaceChapter = async (text: string) => {
+    if (!activeChapter || !text.trim()) return;
+    const ok = await confirmDialog({
+      title: '采纳为当前章节正文',
+      message: `确定要将工作流产出成果覆盖《${activeChapter.title}》吗？系统将自动为你生成历史版本备份。`,
+      confirmText: '确定采纳',
+      cancelText: '取消',
+    });
+    if (!ok) return;
+
+    try {
+      const paragraphs = text
+        .split('\n')
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .map((p) => `<p>${p}</p>`)
+        .join('');
+      await api.saveChapterContent(activeChapter.id, paragraphs, true, 'WORKFLOW_REPLACE');
+      window.dispatchEvent(new CustomEvent('novelforge:force-editor-reload'));
+      toast.success('已采纳为正文', `已将工作流成果覆盖至《${activeChapter.title}》`);
+    } catch (e: any) {
+      toast.error('采纳失败', e?.message || '保存正文出错');
+    }
+  };
+
+  const handleCopyStepOutput = async (text: string) => {
+    if (!text.trim()) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.info('已复制到剪贴板', text.slice(0, 30) + '...');
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -443,6 +501,44 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
                             disabled={!isCurrent && !isCompleted}
                             className="w-full text-xs p-3 rounded-xl bg-background/80 border border-border/80 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-sans leading-relaxed custom-scrollbar disabled:opacity-50"
                           />
+
+                          {/* 成果消费快捷动作栏 */}
+                          {(step.edited_output || step.raw_output) && (
+                            <div className="flex items-center justify-between pt-2 border-t border-border/40 mt-2 text-xs">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyStepOutput(step.edited_output || step.raw_output || '')}
+                                className="px-2.5 py-1 rounded-lg border border-border/60 hover:bg-muted/60 text-muted-foreground hover:text-foreground flex items-center gap-1 transition cursor-pointer"
+                                title="复制本步产出成果"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>复制成果</span>
+                              </button>
+
+                              {activeChapter && (
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAppendToChapter(step.edited_output || step.raw_output || '')}
+                                    className="px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 flex items-center gap-1 transition cursor-pointer font-medium"
+                                    title={`追加到当前章节《${activeChapter.title}》末尾`}
+                                  >
+                                    <Sparkles className="w-3 h-3" />
+                                    <span>追加至本章末尾</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReplaceChapter(step.edited_output || step.raw_output || '')}
+                                    className="px-2.5 py-1 rounded-lg bg-amber-800/10 hover:bg-amber-800/20 text-amber-800 dark:text-amber-400 border border-amber-800/30 flex items-center gap-1 transition cursor-pointer font-medium"
+                                    title={`采纳并覆盖为《${activeChapter.title}》正文`}
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    <span>采纳为正文</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

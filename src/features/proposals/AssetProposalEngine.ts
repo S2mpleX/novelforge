@@ -88,10 +88,10 @@ export class AssetProposalEngine {
       }
     }
 
-    // 2. 扫描未登记的门派/势力 (FACTION)
-    // 匹配如：玄天宗、青云门、七星阁、黑煞帮、天机殿、林氏商会
-    const factionPattern = /(?:^|[，。！？、“”「」\s与和及或是由在自入去向往临如]|只见|正是|便是|乃是|就是)([\u4e00-\u9fa5]{2,5}(?:宗|门|阁|帮|教|殿|盟|山庄|商会|神庭|圣地|王府|古派))/g;
-    const invalidFactionWords = new Set(['宗门', '开门', '进门', '各门', '各大宗', '空门', '关门', '掌门']);
+    // 2. 扫描未登记的势力/阵营/组织 (FACTION)
+    // 跨修真仙侠（宗门/山庄/圣地）、科幻星际（舰队/军团/同盟/帝国/重工）、都市商战（集团/财阀/商会）、末日废土（避难所/互助会/公会）
+    const factionPattern = /(?:^|[，。！？、“”「」\s与和及或是由在自入去向往临如]|只见|正是|便是|乃是|就是)((?![与和及或是由在自入去向往临如])[\u4e00-\u9fa5]{2,4}(?:宗|门|阁|帮|教|殿|盟|山庄|商会|神庭|圣地|王府|古派|集团|同盟|军团|帝国|联邦|财阀|基地|公会|协会|战队|舰队|研究所|重工|避难所|互助会|教会|骑士团))/g;
+    const invalidFactionWords = new Set(['宗门', '开门', '进门', '各门', '各大宗', '空门', '关门', '掌门', '同盟国', '避难所']);
 
     while ((match = factionPattern.exec(text)) !== null) {
       const candidate = match[1];
@@ -104,13 +104,14 @@ export class AssetProposalEngine {
       ) {
         seenNames.add(candidate);
         const context = sentences.find((s) => s.includes(candidate)) || match[0];
+        const isSciFiUrban = /(?:集团|军团|同盟|联邦|财阀|基地|公会|协会|战队|舰队|研究所|重工|避难所)/.test(candidate);
 
         proposals.push({
           id: `prop-fac-${candidate}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           category: 'FACTION',
-          categoryLabel: '门派势力',
+          categoryLabel: isSciFiUrban ? '阵营组织' : '门派势力',
           name: candidate,
-          summary: `正文中提及的江湖宗门或势力阵营`,
+          summary: isSciFiUrban ? `正文中提及的阵营体系、企业组织或武装公会` : `正文中提及的江湖宗门、世家古派或势力阵营`,
           contextSentence: context.slice(0, 100),
           sourceChapterId: chapterId,
           sourceChapterTitle: chapterTitle,
@@ -125,10 +126,10 @@ export class AssetProposalEngine {
       }
     }
 
-    // 3. 扫描未登记的功法秘术 (TECHNIQUE)
-    // 匹配如：《太虚剑经》、紫阳真经、八荒游龙步、大荒囚天指
-    const techniquePattern = /(?:《([\u4e00-\u9fa5]{2,8})》|(?:^|[，。！？、“”「」\s修习|参悟|运转|施展|捏动|催动|修炼|习得])([\u4e00-\u9fa5]{2,5}(?:诀|经|掌|拳|剑法|心法|神功|秘术|身法|步法)))/g;
-    const invalidTechniqueWords = new Set(['办法', '做法', '想法', '一拳', '一掌', '口诀']);
+    // 3. 扫描未登记的招式/异能/功法秘术 (TECHNIQUE)
+    // 涵盖修真功法（剑诀/心法/身法）、科幻异能（超频/纳米协议/战术指令）、西幻魔法（禁咒/魔导/法阵）
+    const techniquePattern = /(?:《([\u4e00-\u9fa5]{2,8})》|(?:^|[，。！？、“”「」\s修习|参悟|运转|施展|捏动|催动|修炼|习得|发动|启动|激活|释放|调用])([\u4e00-\u9fa5]{2,4}(?:诀|经|掌|拳|剑法|心法|神功|秘术|身法|步法|战术|异能|超频|协议|指令|序列|法阵|魔导|禁咒|格斗术|枪斗术|狙击术|矩阵|阵列)))/g;
+    const invalidTechniqueWords = new Set(['办法', '做法', '想法', '一拳', '一掌', '口诀', '这个拳']);
 
     while ((match = techniquePattern.exec(text)) !== null) {
       const candidate = match[1] || match[2];
@@ -141,13 +142,14 @@ export class AssetProposalEngine {
       ) {
         seenNames.add(candidate);
         const context = sentences.find((s) => s.includes(candidate)) || match[0];
+        const isSciFiModern = /(?:战术|异能|超频|协议|指令|序列|法阵|魔导|禁咒|格斗术|枪斗术|狙击术|矩阵|阵列)/.test(candidate);
 
         proposals.push({
           id: `prop-tech-${candidate}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           category: 'TECHNIQUE',
-          categoryLabel: '功法绝技',
+          categoryLabel: isSciFiModern ? '异能战技' : '功法绝技',
           name: candidate,
-          summary: `正文战斗或修炼中出现的新战技秘法`,
+          summary: isSciFiModern ? `正文战斗或操作中出现的新异能系统、指令或战术技法` : `正文战斗或修炼中出现的新战技秘法或门派真传`,
           contextSentence: context.slice(0, 100),
           sourceChapterId: chapterId,
           sourceChapterTitle: chapterTitle,
@@ -162,9 +164,9 @@ export class AssetProposalEngine {
       }
     }
 
-    // 4. 扫描未登记的法宝灵物 (ARTIFACT)
-    // 匹配如：九龙神火罩、乾坤戒、七星龙渊剑、焚天炉
-    const artifactPattern = /(?:^|[，。！？、“”「」\s的了着是个件口柄尊面枚副根条]|祭出|拿出|催动|手持|手握|头顶|佩戴|传闻中的)([\u4e00-\u9fa5]{2,5}(?:神剑|飞剑|宝剑|战刃|古鼎|神鼎|宝鉴|灵镜|宝塔|古钟|宝印|玉佩|储物戒|乾坤戒|飞舟|神火罩|宝珠|阵图|灵珠|法印|金丹|拂尘|古剑|长枪|神弓))/g;
+    // 4. 扫描未登记的装备/器物/法宝道具 (ARTIFACT)
+    // 涵盖仙侠法宝（神剑/宝印/乾坤戒/神火罩）、科幻装备（机甲/外骨骼/脉冲枪/芯片/光刃）、末日求生物资（血清/药剂/战甲）
+    const artifactPattern = /(?:^|[，。！？、“”「」\s的了着是个件口柄尊面枚副根条]|祭出|拿出|催动|手持|手握|头顶|佩戴|传闻中的|装备|搭载|装配|激活|拔出)([\u4e00-\u9fa5]{2,4}(?:神剑|飞剑|宝剑|古剑|战刃|古鼎|神鼎|宝鉴|灵镜|宝塔|古钟|宝印|法印|玉佩|储物戒|乾坤戒|飞舟|神火罩|宝珠|灵珠|阵图|金丹|拂尘|长枪|神弓|机甲|战甲|外骨骼|光刃|脉冲枪|高斯枪|芯片|终端|护盾|核心|药剂|血清|魔杖|圣杯|军刀|战舰|光剑|手环|战术目镜))/g;
 
     while ((match = artifactPattern.exec(text)) !== null) {
       const candidate = match[1];
@@ -176,13 +178,14 @@ export class AssetProposalEngine {
       ) {
         seenNames.add(candidate);
         const context = sentences.find((s) => s.includes(candidate)) || match[0];
+        const isSciFiModern = /(?:机甲|战甲|外骨骼|光刃|脉冲枪|高斯枪|芯片|终端|护盾|核心|药剂|血清|战舰|光剑|手环|战术目镜)/.test(candidate);
 
         proposals.push({
           id: `prop-art-${candidate}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           category: 'ARTIFACT',
-          categoryLabel: '法宝灵物',
+          categoryLabel: isSciFiModern ? '装备器物' : '法宝灵物',
           name: candidate,
-          summary: `正文中登场的重要装备道具或神兵`,
+          summary: isSciFiModern ? `正文中登场的重要高科装备、武器装置或功能器物` : `正文中登场的重要神兵法宝、灵宝法器或特殊装备`,
           contextSentence: context.slice(0, 100),
           sourceChapterId: chapterId,
           sourceChapterTitle: chapterTitle,

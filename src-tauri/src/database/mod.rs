@@ -24,7 +24,7 @@ use crate::models::{
     WorkflowRunDetails, ExecuteToolboxActionInput, ExecuteToolboxActionResult,
     VoiceProfile, SaveVoiceProfileInput, ModelArenaRun, SaveModelArenaRunInput,
     UpdateNovelInput, UpdateVolumeInput,
-    UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput,
+    UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput, UpdateStoryPhaseInput,
 };
 
 #[derive(Clone)]
@@ -1623,6 +1623,39 @@ impl DbManager {
         let _ = conn.execute("UPDATE story_arcs SET phase_id = NULL WHERE phase_id = ?1", params![id]);
         conn.execute("DELETE FROM story_phases WHERE id = ?1", params![id])?;
         Ok(())
+    }
+
+    pub fn update_story_phase(&self, input: UpdateStoryPhaseInput) -> Result<StoryPhase> {
+        let conn = self.conn.lock();
+        let goal = input.goal.unwrap_or_default();
+        if let Some(idx) = input.order_index {
+            conn.execute(
+                "UPDATE story_phases SET title = ?1, goal = ?2, order_index = ?3 WHERE id = ?4",
+                params![&input.title, &goal, idx, &input.id],
+            )?;
+        } else {
+            conn.execute(
+                "UPDATE story_phases SET title = ?1, goal = ?2 WHERE id = ?3",
+                params![&input.title, &goal, &input.id],
+            )?;
+        }
+
+        let phase = conn.query_row(
+            "SELECT id, novel_id, title, order_index, goal, status, created_at FROM story_phases WHERE id = ?1",
+            params![&input.id],
+            |row| {
+                Ok(StoryPhase {
+                    id: row.get(0)?,
+                    novel_id: row.get(1)?,
+                    title: row.get(2)?,
+                    order_index: row.get(3)?,
+                    goal: row.get(4)?,
+                    status: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            },
+        )?;
+        Ok(phase)
     }
 
     // --- STORY ARCS ---
