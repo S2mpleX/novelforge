@@ -43,6 +43,7 @@ import {
   LayoutGrid,
 } from 'lucide-react';
 import { toast } from '@/stores/useToastStore';
+import { APP_CURRENT_VERSION } from '@/features/updater/services/UpdateService';
 
 const SettingsModal = React.lazy(() => import('@/components/modals/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const SerializationModal = React.lazy(() => import('@/components/modals/SerializationModal').then(m => ({ default: m.SerializationModal })));
@@ -328,7 +329,7 @@ export const Header: React.FC = () => {
                 NovelForge
               </span>
               <span className="hidden xl:inline-block px-1.5 py-0.2 text-[9px] font-semibold bg-amber-800/10 dark:bg-amber-400/10 text-primary dark:text-amber-300 rounded-full border border-amber-800/20">
-                v2.5
+                v{APP_CURRENT_VERSION}
               </span>
             </div>
           </div>

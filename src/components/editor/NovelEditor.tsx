@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { APP_CURRENT_VERSION } from '@/features/updater/services/UpdateService';
 import type { Chapter } from '@/types';
 import {
   Bold,
@@ -773,7 +774,7 @@ export const NovelEditor: React.FC = () => {
 
           <div>
             <h2 className="text-2xl font-bold text-ink tracking-tight font-serif">
-              NovelForge AI <span className="text-primary text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-800/10 border border-amber-800/20 align-middle">V2.0</span>
+              NovelForge AI <span className="text-primary text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-800/10 border border-amber-800/20 align-middle">v{APP_CURRENT_VERSION}</span>
             </h2>
             <p className="text-sm text-ink-2 mt-2 max-w-lg mx-auto leading-relaxed">
               本地优先 · 多模型接入 · 多 Agent 协作 · 长期记忆驱动的专业长篇创作生产系统
