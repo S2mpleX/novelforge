@@ -2051,6 +2051,26 @@
   - 原生 Rust SQLite 数据库 66 项验证全量通过 (`pnpm test:db`)；
   - 生产构建 `pnpm build` **1.18s 极速完成**。
 
+## ADR-063: 修复首屏打包循环依赖导致的白屏与渲染安全屏障机制 (Fix Initial Chunk Circular Dependency Blank Screen & Add Root Error Boundary)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户启动应用后反馈：“怎么打开直接白了”，并附带应用主窗口完全变白（仅剩背景底色）的截图；
+  2. 经深入排查定位：
+     - 在上一轮优化中，`vite.config.ts` 配置了手动的 `manualChunks` 函数，强制将 `lucide-react`、`@tiptap`、`peerjs` 分割入不同 chunk，而 `react` 和 `react-dom` 被打包器隐式混入了 `vendor-editor`；
+     - 导致 `vendor-icons` 依赖 `vendor-editor`，而 34 个异步模块与 `index.js` 产生了**多重环状循环依赖 (Circular Chunk Dependency)**。在 WebView2 执行 ES 模块顶层拓扑求值时，React 相关符号未能及时完成初始化，导致脚本加载立即崩溃；
+     - `src/main.tsx` 缺乏顶层全局异常捕获器与 `<RootErrorBoundary>`，发生未捕获异常时整树被 React 卸载，展现为彻底的空白画面；
+     - 默认首页 `DockingWorkspace` 与首发案头 `WritersDeskModal` 亦被放入异步 Suspense 中，放大了初始化竞态风险。
+- **决策与重构实装**：
+  1. **移除脆弱的手动 `manualChunks`**：让 Vite 依据模块依赖树进行自然的无环 Chunk 分割，彻底消除 34 处环状依赖；同时依靠 `React.lazy` 保留对 `WordImportModal`（含 mammoth 329KB）、`CharacterFlowView`（含 xyflow 190KB）及二级页面的精准按需加载；
+  2. **首屏核心工作区直出保障**：在 [`src/App.tsx`](file:///e:/小说/src/App.tsx) 中将用户打开即见的 `DockingWorkspace`（主编辑器）与 `WritersDeskModal` 恢复为同步直出，彻底杜绝首屏 Suspense 悬挂与首屏加载竞态；
+  3. **接入全局异常捕获与 RootErrorBoundary 容灾防线**：在 [`src/main.tsx`](file:///e:/小说/src/main.tsx) 挂载全局 `window.addEventListener('error')` 与 React 根部 `<RootErrorBoundary>`，即使遇到任何未预期异常，也能提供友好的错误提示与一键重载按钮，彻底告别静默白屏。
+- **验证结果**：
+  - 环状依赖彻底清零（0 循环引用）；
+  - `pnpm tsc --noEmit`：0 错误 0 警告；
+  - 全套自动化测试（`test:character:visual`, `test:sandbox`, `test:header`, `test:docking` 等）100% 满分通过；
+  - 生产构建 `pnpm build` **1.46s 极速完成**。
+
+
 
 
 

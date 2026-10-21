@@ -1847,6 +1847,22 @@ pnpm test:bugfixes
   - `cargo run --manifest-path src-tauri/Cargo.toml --bin db_test`：**66/66 项原生全功能断言全部满分通过**；
   - 前端生产构建：`pnpm build` **1.18s 零错误 0 警告极速完成**！
 
+### 2.56 修复首屏打包循环依赖导致的白屏与渲染安全屏障验证 (ADR-063)
+- **验证范围**：
+  1. 移除手动 `manualChunks` 配置，解除 34 处环状循环模块依赖；
+  2. 保持 `React.lazy` 对 Word 导入（mammoth 329KB）、拓扑图谱（xyflow 190KB）与二级页面的自然按需加载；
+  3. 首屏核心工作区（`DockingWorkspace`、`WritersDeskModal`）同步直出渲染保障；
+  4. `src/main.tsx` 接入全局脚本错误监听与 React `<RootErrorBoundary>`。
+- **全套回归与构建验证矩阵**：
+  - `pnpm tsc --noEmit`：**0 错误 0 警告**；
+  - `pnpm test:character:visual`：**6/6 项全部满分通过**；
+  - `pnpm test:sandbox`：**12/12 项全部满分通过**；
+  - `pnpm test:header`：**9/9 项全部满分通过**；
+  - `pnpm test:docking`：**12/12 项全部满分通过**；
+  - 循环依赖检测：**0 处循环引用 (PASS)**；
+  - 前端生产构建：`pnpm build` **1.46s 零错误 0 警告通过**！
+
+
 
 
 

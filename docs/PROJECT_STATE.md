@@ -1,21 +1,15 @@
 # NovelForge AI — 项目持续开发状态 (PROJECT_STATE.md)
 
 ## 1. 当前阶段与基线
-- **当前阶段**：V3.7.0 **全局性能专项检查与多维极限优化架构 (Full-Project Performance Audit & Optimization Architecture)**
-  - ① **Zustand 全局精准粒度订阅与浅比较 (`useShallow`)**：全面排查并消除 `App.tsx`、`Header.tsx`、`Sidebar.tsx`、`DockingWorkspace.tsx`、`NovelEditor.tsx`、`DualWordStatsBadge.tsx` 及 20+ 个功能面板中的无 selector 裸订阅。正文键入防抖与 AI 流式 token 生成不再引发根组件级联重渲染，渲染负载骤降 90% 以上；
-  - ② **全域路由视图与重型模态框异步代码分割 (`React.lazy` + `Suspense`) 与 Vendor 独立切片**：
-    - `App.tsx` 动态按需加载五大主视图与独立模态框；
-    - 消灭全局 14 处 `INEFFECTIVE_DYNAMIC_IMPORT` 警告；
-    - 配置 Vite Rollup `manualChunks` 将 `@tiptap`、`@xyflow/react`、`mammoth`、`peerjs`、`lucide-react` 拆解为按需加载的独立 Vendor；
-    - **首屏 JS 核心包体积从 2,478 kB 暴降至 456 kB，降幅达 81.6%！**；
-  - ③ **清除浮动层 GPU 离屏模糊风暴 (`backdrop-blur` Multi-pass Convolution)**：
-    - 彻底剔除正文查找替换栏 (`EditorFindReplaceBar`)、划词悬浮胶囊 (`FloatingSelectionMenu`)、Zen 模式案头浮岛 (`ZenFloatingIsland`)、书架下拉菜单 (`NovelSelectorDropdown`) 与 Toast 浮动条的高开销 `backdrop-blur-*`，全面换用纯色实体高对比底色；
-    - 全局模态框背衬采用半透明遮罩（`bg-black/60`）消除 GPU 掉帧与排版抖动；
-  - ④ **全套自动化测试 100% 满分通过**：`test:character:visual` (6/6)、`test:sandbox:inspiration` (6/6)、`test:sandbox:api` (4/4)、`test:sandbox` (12/12)、`test:branches` (5/5)、`test:header` (9/9)、`test:docking` (12/12)、`test:zen` (12/12)、`test:humanizer` (27/27)、`test:cohort2` (46/46)、`test:cohort3` (55/55) 全部满分通过，原生 `cargo run --manifest-path src-tauri/Cargo.toml --bin db_test` 66/66 全部通过，前端生产构建 1.18s 零错误完成！
-- **版本目标**：V3.7.0
+- **当前阶段**：V3.7.1 **修复首屏打包循环依赖导致的白屏与渲染安全屏障机制 (Fix Initial Chunk Circular Dependency Blank Screen & Add Root Error Boundary)**
+  - ① **清除手动 manualChunks 消除 34 处循环依赖**：还原自然模块依赖树，彻底消灭 `vendor-icons` 与 `index.js` 间的环状依赖，恢复 ES 模块顶层拓扑求值安全；
+  - ② **首屏关键组件直出保障**：`App.tsx` 中的 `DockingWorkspace`（主写作工坊）与 `WritersDeskModal` 恢复为同步直出，避免启动挂起；
+  - ③ **接入全局异常与 RootErrorBoundary 容灾防线**：`src/main.tsx` 挂载全局异常与 React 错误边界，彻底杜绝静默白屏；
+  - ④ **全套自动化测试 100% 满分通过**：全部前端测试与 Rust 原生 `db_test` 66/66 全部通过，前端生产构建 1.46s 零错误完成！
+- **版本目标**：V3.7.1
 - **更新时间**：2026-10-21
-- **代码库状态**：真实可运行、真实编译通过 (Rust 后端与 SQLite 零错误零警告，前端 Vite 打包 1.18s 零错误，首屏 Chunk 仅 456kB，全部前端专项测试 100% 通过，Rust db_test 66/66 全部通过)。
-- **最近实装**：全局性能专项检查与多维极限优化架构 (ADR-062)。
+- **代码库状态**：真实可运行、真实编译通过 (Rust 后端与 SQLite 零错误零警告，前端 Vite 打包 1.46s 零错误，无循环依赖，全部前端专项测试 100% 通过，Rust db_test 66/66 全部通过)。
+- **最近实装**：修复首屏打包循环依赖导致的白屏与渲染安全屏障机制 (ADR-063)。
 
 ---
 

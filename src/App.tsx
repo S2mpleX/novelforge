@@ -10,16 +10,17 @@ import { toast } from '@/stores/useToastStore';
 import { isTauri } from '@/utils/tauriBridge';
 import { Sparkles, ArrowRight, Info, X } from 'lucide-react';
 
+import { DockingWorkspace } from '@/components/docking/DockingWorkspace';
+import { WritersDeskModal } from '@/components/desk/WritersDeskModal';
+
 // Lazy-loaded Views and Heavy Modals for Code Splitting & Instant Startup
 const DashboardView = lazy(() => import('@/components/views/DashboardView').then(m => ({ default: m.DashboardView })));
 const CharactersView = lazy(() => import('@/components/views/CharactersView').then(m => ({ default: m.CharactersView })));
 const WorldSettingsView = lazy(() => import('@/components/views/WorldSettingsView').then(m => ({ default: m.WorldSettingsView })));
 const MemoryEngineView = lazy(() => import('@/components/views/MemoryEngineView').then(m => ({ default: m.MemoryEngineView })));
-const DockingWorkspace = lazy(() => import('@/components/docking/DockingWorkspace').then(m => ({ default: m.DockingWorkspace })));
 
 const SettingsModal = lazy(() => import('@/components/modals/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const ShortcutHelpModal = lazy(() => import('@/components/modals/ShortcutHelpModal').then(m => ({ default: m.ShortcutHelpModal })));
-const WritersDeskModal = lazy(() => import('@/components/desk/WritersDeskModal').then(m => ({ default: m.WritersDeskModal })));
 const WordImportModal = lazy(() => import('@/components/modals/WordImportModal').then(m => ({ default: m.WordImportModal })));
 const MapModal = lazy(() => import('@/components/modals/MapModal').then(m => ({ default: m.MapModal })));
 
@@ -237,6 +238,7 @@ export const App: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {activeTab !== 'EDITOR' && !zenMode && <Sidebar />}
         <main className="flex-1 flex overflow-hidden">
+          {activeTab === 'EDITOR' && <DockingWorkspace />}
           <Suspense
             fallback={
               <div className="flex-1 flex items-center justify-center p-8 text-ink-2 font-serif text-sm">
@@ -247,7 +249,6 @@ export const App: React.FC = () => {
               </div>
             }
           >
-            {activeTab === 'EDITOR' && <DockingWorkspace />}
             {activeTab === 'DASHBOARD' && <DashboardView />}
             {activeTab === 'CHARACTERS' && <CharactersView />}
             {activeTab === 'WORLD' && <WorldSettingsView />}
@@ -259,6 +260,14 @@ export const App: React.FC = () => {
 
       {/* 全局应用内对话框宿主（替代失效的原生 alert/confirm/prompt） */}
       <DialogHost />
+
+      {/* 文人案头速览与新书启航中心 (Writer's Desk) */}
+      <WritersDeskModal
+        isOpen={showDeskModal}
+        onClose={() => setShowDeskModal(false)}
+        onOpenWordImport={() => setShowWordImportModal(true)}
+        onOpenMap={() => setShowMapModal(true)}
+      />
 
       <Suspense fallback={null}>
         {showUpdateModal && (
@@ -272,14 +281,6 @@ export const App: React.FC = () => {
         <ShortcutHelpModal
           isOpen={showShortcutModal}
           onClose={() => setShowShortcutModal(false)}
-        />
-
-        {/* 文人案头速览与新书启航中心 (Writer's Desk) */}
-        <WritersDeskModal
-          isOpen={showDeskModal}
-          onClose={() => setShowDeskModal(false)}
-          onOpenWordImport={() => setShowWordImportModal(true)}
-          onOpenMap={() => setShowMapModal(true)}
         />
 
         {/* 导入 Word 模态框 */}
