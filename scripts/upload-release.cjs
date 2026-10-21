@@ -92,13 +92,25 @@ async function main() {
 
     const releaseNotes = `## NovelForge AI v${version} 正式发布
 
-### 核心亮点
+### 📥 快速下载与安装指南（普通创作者必看）
+> 💡 **无需安装 Node.js、Python 或 Rust 等任何开发环境，开箱即用！**
+
+| 版本类型 | 下载文件名 | 推荐场景 |
+| :--- | :--- | :--- |
+| **标准安装包（首选）** | \`NovelForge.AI_${version}_x64-setup.exe\` | 拥有标准安装向导、桌面快捷方式，支持后续应用内一键自动升级 |
+| **绿色便携版（免安装）** | \`NovelForge-AI-v${version}-Windows-Portable.zip\` | 解压后直接双击 \`NovelForge AI.exe\` 即可运行，完全独立自包含 |
+
+> ⚠️ **重要提醒**：请**切勿下载页面底部的 \`Source code (zip)\`**！那是未编译的开发源代码（解压后是一堆代码脚本），只有软件开发者二次开发才需要。
+
+---
+
+### ✨ 核心功能亮点
 - **沉浸写作 Zen 模式 vs 专业工坊 Studio 模式**：顶栏一键秒级双态流转，独占宣纸居中打字画布与案头极简磨砂浮岛，按键 F11 / Ctrl+Alt+Z 随时切换。
 - **作家案头灵感工作台 (WritersDeskModal)** 与 **拆书复盘引擎 (DeconstructModal)** 体验全面跃升。
 - **世界观地图交互引擎 (MapModal)** 标注能力与拓扑渲染增强。
 - **故事大纲剧情弧面板 (PlotOutlinePanel)** 与 **资产提案系统 (AssetProposalEngine)** 联动优化。
 
-请通过应用内自动更新或下载随附安装包升级。`;
+请通过应用内自动更新或下载上方运行包升级。`;
 
     if (!fs.existsSync(latestJsonPath) && sigContent) {
         const latestMeta = {
@@ -137,6 +149,17 @@ async function main() {
         { name: sigFile, ghName: ghSigName, type: 'text/plain' },
         { name: exeFile, ghName: ghExeName, type: 'application/octet-stream' }
     ];
+
+    const portableZipName = `NovelForge-AI-v${version}-Windows-Portable.zip`;
+    const portableZipPath = path.join(desktopDir, portableZipName);
+    if (fs.existsSync(portableZipPath)) {
+        requiredFiles.push({
+            name: portableZipName,
+            ghName: portableZipName,
+            type: 'application/zip'
+        });
+        console.log(`📦 发现绿色免安装便携包: ${portableZipName}`);
+    }
 
     const headers = {
         'Authorization': `token ${token}`,

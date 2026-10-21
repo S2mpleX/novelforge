@@ -229,6 +229,29 @@ if ($exeName) {
         $latestMeta | ConvertTo-Json -Depth 5 | Set-Content -Path $latestJsonPath -Encoding UTF8
         Write-Host "     ✅ 已就绪更新清单 latest.json" -ForegroundColor Green
     }
+
+    # 自动打包绿色免安装便携版 (Portable ZIP)
+    $rawBin = 'E:\tools\novelforge_target\x86_64-pc-windows-gnu\release\novelforge-ai.exe'
+    if (Test-Path $rawBin) {
+        $portableTemp = Join-Path $env:TEMP ("nf_portable_v" + $newVersion)
+        if (Test-Path $portableTemp) { Remove-Item -Recurse -Force $portableTemp }
+        $portableFolder = Join-Path $portableTemp ("NovelForge-AI-v" + $newVersion)
+        New-Item -ItemType Directory -Force -Path $portableFolder | Out-Null
+        Copy-Item $rawBin "$portableFolder\NovelForge AI.exe"
+        $readmeDoc = @"
+NovelForge AI v$newVersion 绿色免安装版
+=============================================
+1. 本程序已内置所有运行环境、前端组件与 SQLite 本地数据库，完全独立自包含；
+2. 无需安装 Node.js、Python、Rust 等任何开发环境；
+3. 直接双击运行【NovelForge AI.exe】即可开启长篇小说创作；
+4. 创作数据全量持久化于本地 SQLite 数据库中，安全可控，离线可用。
+"@
+        [System.IO.File]::WriteAllText("$portableFolder\使用说明.txt", $readmeDoc, [System.Text.Encoding]::UTF8)
+        $portableZip = Join-Path $destDir ("NovelForge-AI-v" + $newVersion + "-Windows-Portable.zip")
+        Compress-Archive -Path $portableFolder -DestinationPath $portableZip -Force
+        Remove-Item -Recurse -Force $portableTemp
+        Write-Host "     ✅ 已就绪绿色免安装便携包: $portableZip" -ForegroundColor Green
+    }
     $sizeMB = [math]::Round($exeName.Length / 1MB, 2)
     Write-Host ''
     Write-Host '╔══════════════════════════════════════════════════╗' -ForegroundColor Green
