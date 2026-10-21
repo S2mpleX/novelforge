@@ -24,6 +24,8 @@ use crate::models::{
     OptimizeWritingPromptInput, OptimizeWritingPromptResult,
     UpdateNovelInput, UpdateVolumeInput,
     UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput, UpdateStoryPhaseInput,
+    ChapterProposal, CreateChapterProposalInput, AcceptChapterProposalInput,
+    RollbackChapterVersionInput, RollbackResult, EvaluationReport, EvaluateChapterInput,
 };
 use crate::providers::{
     ChatMessage, ChatCompletionRequest, ConnectionTestResult, OpenAIClient,
@@ -111,6 +113,46 @@ pub fn update_chapter_title(
     title: String,
 ) -> Result<Chapter, String> {
     db.update_chapter_title(&chapter_id, &title).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_chapter_proposal(
+    db: State<DbManager>,
+    input: CreateChapterProposalInput,
+) -> Result<ChapterProposal, String> {
+    db.create_chapter_proposal(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_chapter_proposals(
+    db: State<DbManager>,
+    chapter_id: String,
+) -> Result<Vec<ChapterProposal>, String> {
+    db.list_chapter_proposals(&chapter_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn accept_chapter_proposal(
+    db: State<DbManager>,
+    input: AcceptChapterProposalInput,
+) -> Result<Chapter, String> {
+    db.accept_chapter_proposal(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn rollback_chapter_version(
+    db: State<DbManager>,
+    input: RollbackChapterVersionInput,
+) -> Result<RollbackResult, String> {
+    db.rollback_chapter_version(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn evaluate_chapter(
+    db: State<DbManager>,
+    input: EvaluateChapterInput,
+) -> Result<EvaluationReport, String> {
+    db.evaluate_chapter(input).map_err(|e| e.to_string())
 }
 
 // --- STORY BIBLE (CHARACTERS, WORLD RULES, PLOT THREADS) ---

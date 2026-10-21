@@ -151,6 +151,13 @@ assert(diffMetricsCompress.summary.includes('精炼压缩文字'), '精简输出
 const diffMetricsSubtle = BatchReviseEngine.calculateDiffMetrics(baseText, '太玄剑门耸立于苍茫云海之巅。');
 assert(diffMetricsSubtle.summary.includes('保持相近体量'), '微调输出相近体量打磨摘要');
 
+// 1.4.1 离线降级时的明确提示测试
+const diffOfflineZero = BatchReviseEngine.calculateDiffMetrics(baseText, baseText, true);
+assert(diffOfflineZero.summary.includes('【离线规则降级】未命中套话正则'), '离线零变化明确标记离线规则降级未命中套话');
+
+const diffOfflineChanged = BatchReviseEngine.calculateDiffMetrics(baseText, '太玄剑门立于云海。', true);
+assert(diffOfflineChanged.summary.includes('【离线规则降级】局部关键词正则替换'), '离线有变动明确标记为离线关键词正则替换');
+
 // 1.5 0-Token 纯离线快速规则清洗 (offlineFastRevise)
 const offlineCleaned = BatchReviseEngine.offlineFastRevise(mockChapters[0].content, 'DEAI_POLISH');
 assert(!offlineCleaned.includes('不仅如此'), '离线清洗成功移除 "不仅如此"');

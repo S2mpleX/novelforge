@@ -119,7 +119,11 @@ ${this.stripHtml(content).slice(0, 30000)}
   /**
    * 计算字符级差异指标与简述
    */
-  static calculateDiffMetrics(originalText: string, revisedText: string): {
+  static calculateDiffMetrics(
+    originalText: string,
+    revisedText: string,
+    isOfflineFallback = false
+  ): {
     addedChars: number;
     removedChars: number;
     summary: string;
@@ -127,17 +131,26 @@ ${this.stripHtml(content).slice(0, 30000)}
     const origClean = this.stripHtml(originalText);
     const revClean = this.stripHtml(revisedText);
 
+    const isIdentical = origClean === revClean;
     const diffLen = revClean.length - origClean.length;
     const addedChars = Math.max(0, diffLen);
     const removedChars = Math.max(0, -diffLen);
 
     let summary = '';
-    if (diffLen > 100) {
-      summary = `扩充细节描写，净增 ${diffLen} 字`;
-    } else if (diffLen < -100) {
-      summary = `精炼压缩文字，净削减 ${Math.abs(diffLen)} 字`;
+    if (isOfflineFallback) {
+      if (isIdentical) {
+        summary = '【离线规则降级】未命中套话正则，正文无变化 (字数变化 +0)';
+      } else {
+        summary = `【离线规则降级】局部关键词正则替换 (字数变化 ${diffLen >= 0 ? '+' : ''}${diffLen}，未调用大模型)`;
+      }
     } else {
-      summary = `保持相近体量，局部遣词精微打磨 (字数变化 ${diffLen >= 0 ? '+' : ''}${diffLen})`;
+      if (diffLen > 100) {
+        summary = `扩充细节描写，净增 ${diffLen} 字`;
+      } else if (diffLen < -100) {
+        summary = `精炼压缩文字，净削减 ${Math.abs(diffLen)} 字`;
+      } else {
+        summary = `保持相近体量，局部遣词精微打磨 (字数变化 ${diffLen >= 0 ? '+' : ''}${diffLen})`;
+      }
     }
 
     return { addedChars, removedChars, summary };

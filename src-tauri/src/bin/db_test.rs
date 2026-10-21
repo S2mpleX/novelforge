@@ -8,6 +8,7 @@ use novelforge_ai_lib::models::{
     RenumberHierarchyInput, CreateWorkflowRunInput, AdvanceWorkflowStepInput, ExecuteToolboxActionInput,
     SaveVoiceProfileInput, SaveModelArenaRunInput, UpdateNovelInput, UpdateVolumeInput,
     UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput, CreatePlotThreadInput,
+    CreateChapterProposalInput, AcceptChapterProposalInput, RollbackChapterVersionInput, EvaluateChapterInput,
 };
 
 fn main() {
@@ -1018,11 +1019,100 @@ fn main() {
     assert_eq!(arc2_found.phase_id, None, "当阶段被删除时，情节弧的 phase_id 必须被安全解绑置为 NULL");
     println!("61. 验证故事大纲阶段与情节弧级联解绑 (delete_story_arc & delete_story_phase): 阶段解绑与关联清理验证通过");
 
+    // 62. 验证候选修订提案 (create_chapter_proposal & list_chapter_proposals & accept_chapter_proposal)
+    let pre_accept_chapter = db.get_chapter(&ch1.id).expect("获取章节");
+    let original_content = pre_accept_chapter.content.clone().unwrap_or_default();
+    
+    let proposal = db.create_chapter_proposal(CreateChapterProposalInput {
+        novel_id: novel.id.clone(),
+        chapter_id: ch1.id.clone(),
+        content: "外部 Agent 提交的候选高张力修订草稿正文。".to_string(),
+        proposal_summary: Some("重塑对话呼吸感".to_string()),
+        reasoning_trace: Some("COT: 识别出原段落缺少五感细节，补充了冷风与金属敲击".to_string()),
+    }).expect("创建修订提案失败");
+
+    // 验证正文未被破坏性覆盖
+    let unchanged_chapter = db.get_chapter(&ch1.id).expect("获取章节");
+    assert_eq!(unchanged_chapter.content.unwrap_or_default(), original_content, "在未明确采纳前，活动正文绝对不得被篡改");
+    
+    let proposals_list = db.list_chapter_proposals(&ch1.id).expect("获取提案列表失败");
+    assert!(proposals_list.iter().any(|p| p.version_id == proposal.version_id), "提案必须存在于提案列表中");
+
+    let accepted_ch = db.accept_chapter_proposal(AcceptChapterProposalInput {
+        novel_id: novel.id.clone(),
+        chapter_id: ch1.id.clone(),
+        version_id: proposal.version_id.clone(),
+    }).expect("采纳提案失败");
+    assert_eq!(accepted_ch.content.unwrap_or_default(), "外部 Agent 提交的候选高张力修订草稿正文。");
+    println!("62. 验证非破坏性候选提案暂存与采纳流转 (create/list/accept proposal): 隔离保护与生效验证通过");
+
+    // 63. 验证版本快照因果安全回滚与级联事实失效 (rollback_chapter_version)
+    let _rollback_fact = db.create_canon_fact(novelforge_ai_lib::models::CreateCanonFactInput {
+        novel_id: novel.id.clone(),
+        subject_id: Some("沈长青".to_string()),
+        predicate: "获得秘宝".to_string(),
+        object_value: "幽冥破界梭".to_string(),
+        truth_scope: Some("GLOBAL".to_string()),
+        authority_level: Some("CONFIRMED_PLOT".to_string()),
+        source_chapter_id: Some(ch1.id.clone()),
+    }).expect("创建因果事实失败");
+
+    let all_versions = db.list_chapter_versions(&ch1.id).expect("获取版本失败");
+    let target_old_ver = all_versions.last().expect("应当有早期版本");
+
+    let rollback_res = db.rollback_chapter_version(RollbackChapterVersionInput {
+        novel_id: novel.id.clone(),
+        chapter_id: ch1.id.clone(),
+        target_version_id: target_old_ver.id.clone(),
+        cascade_memory: Some(true),
+    }).expect("回滚章节失败");
+
+    assert!(rollback_res.invalidated_facts_count >= 1, "回滚时必须级联失效后续产生的事实");
+    let facts_after_rollback = db.list_canon_facts(&novel.id, Some("幽冥破界梭")).expect("查询事实失败");
+    assert_eq!(facts_after_rollback[0].status, "INVALIDATED_BY_ROLLBACK", "后续沉淀事实的状态必须被级联标记为 INVALIDATED_BY_ROLLBACK");
+    println!("63. 验证版本快照因果安全回滚与级联事实失效 (rollback_chapter_version): 记忆自洽保护验证通过");
+
+    // 64. 验证无头文学质量门禁巡检 (evaluate_chapter)
+    let dead_char = db.create_character(novelforge_ai_lib::models::CreateCharacterInput {
+        novel_id: novel.id.clone(),
+        name: "顾渊".to_string(),
+        aliases: Some("已故传功长老".to_string()),
+        profile: Some("传功长老".to_string()),
+        personality: None,
+        background: None,
+        motivation: None,
+    }).expect("创建角色");
+    db.update_character_status(&dead_char.id, "死亡").expect("更新状态为死亡");
+
+    let eval_bad_text = "他嘴角勾起一抹玩味的冷笑，眼中闪过一丝不易察觉的寒芒。深吸一口气，顾渊拔剑喝道：「此剑必斩你！」";
+    let eval_report = db.evaluate_chapter(EvaluateChapterInput {
+        novel_id: novel.id.clone(),
+        chapter_id: Some(ch1.id.clone()),
+        content: Some(eval_bad_text.to_string()),
+    }).expect("评估正文失败");
+
+    assert!(eval_report.humanizer_score < 85, "命中多个红线套话时人情味评分必须扣减");
+    assert!(eval_report.cliche_matches.len() >= 2, "必须成功检出嘴角勾起与眼中闪过等套话");
+    assert_eq!(eval_report.verdict, "CRITICAL_ISSUES", "已故角色拔剑动作必须被判定为 CRITICAL_ISSUES");
+    let dead_issue = eval_report.consistency_issues.iter().find(|i| i.issue_type == "DECEASED_CHARACTER_ACTION");
+    assert!(dead_issue.is_some(), "必须精准命中已故角色【顾渊】违规出场");
+    println!("64. 验证无头文学质量门禁巡检 (evaluate_chapter): 套话扣分与死者动作拦截 100% 验证通过");
+
+    // 65. 验证智能实体反哺提案提取 (scan_entity_proposals)
+    let eval_proposals = db.evaluate_chapter(EvaluateChapterInput {
+        novel_id: novel.id.clone(),
+        chapter_id: Some(ch1.id.clone()),
+        content: Some("张三丰站起身道：「贫道愿往一试。」东方不败冷笑道：「找死！」".to_string()),
+    }).expect("提取实体失败");
+    let names: Vec<String> = eval_proposals.entity_proposals.iter().map(|p| p.name.clone()).collect();
+    assert!(names.contains(&"张三丰".to_string()) || names.contains(&"东方不败".to_string()), "必须从对话动作中识别未登记人物");
+    println!("65. 验证智能实体反哺提案提取 (scan_entity_proposals): 候选人物提取验证通过");
+
     // 清理临时文件与沙箱数据库目录，保障环境零污染
     let _ = std::fs::remove_file(&epub_res.file_path);
     let _ = std::fs::remove_dir_all(&test_dir);
 
-    println!("=== 100% 测试验证通过！V2.6 核心业务与设定生命周期 61 项验证完毕！ ===");
+    println!("=== 100% 测试验证通过！V3.3 核心业务与 Agent 驱动闭环 65 项全量断言通过！ ===");
 }
 
 

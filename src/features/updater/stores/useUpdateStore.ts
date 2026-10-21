@@ -169,7 +169,9 @@ export const useUpdateStore = create<UpdateStoreState>((set, get) => ({
   },
 
   startSafeUpdateFlow: async ({ hasUnsavedChanges, activeChapterTitle }) => {
+    // 立即将状态置为 PRECHECKING，消除按钮旧状态并展示确定性的安全审查加载反馈
     set({
+      status: 'PRECHECKING',
       isPrechecking: true,
       precheckStatusText: '开始执行更新前数据安全与多 Agent 状态检查...',
       errorMessage: null,
@@ -247,7 +249,7 @@ export const useUpdateStore = create<UpdateStoreState>((set, get) => ({
   },
 
   cancelPrecheck: () => {
-    set({ precheckResult: null, isPrechecking: false });
+    set({ precheckResult: null, isPrechecking: false, status: 'UPDATE_AVAILABLE' });
   },
 
   loadHistoryChangelogs: async () => {

@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod database;
+pub mod eval;
 pub mod export;
 pub mod models;
 pub mod providers;
@@ -54,6 +55,11 @@ pub fn run() {
             commands::list_chapter_versions,
             commands::delete_chapter,
             commands::update_chapter_title,
+            commands::create_chapter_proposal,
+            commands::list_chapter_proposals,
+            commands::accept_chapter_proposal,
+            commands::rollback_chapter_version,
+            commands::evaluate_chapter,
             // Story Bible
             commands::list_characters,
             commands::create_character,

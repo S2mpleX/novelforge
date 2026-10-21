@@ -70,6 +70,9 @@ import type {
   EpubExportResult,
   OptimizeWritingPromptInput,
   OptimizeWritingPromptResult,
+  ChapterProposal,
+  RollbackResult,
+  EvaluationReport,
 } from '@/types';
 
 /**
@@ -177,6 +180,31 @@ export const api = {
     }),
   listChapterVersions: (chapterId: string) =>
     safeInvoke<ChapterVersion[]>('list_chapter_versions', { chapterId }),
+  createChapterProposal: (input: {
+    novel_id: string;
+    chapter_id: string;
+    content: string;
+    proposal_summary?: string;
+    reasoning_trace?: string;
+  }) => safeInvoke<ChapterProposal>('create_chapter_proposal', { input }),
+  listChapterProposals: (chapterId: string) =>
+    safeInvoke<ChapterProposal[]>('list_chapter_proposals', { chapterId }),
+  acceptChapterProposal: (input: {
+    novel_id: string;
+    chapter_id: string;
+    version_id: string;
+  }) => safeInvoke<Chapter>('accept_chapter_proposal', { input }),
+  rollbackChapterVersion: (input: {
+    novel_id: string;
+    chapter_id: string;
+    target_version_id: string;
+    cascade_memory?: boolean;
+  }) => safeInvoke<RollbackResult>('rollback_chapter_version', { input }),
+  evaluateChapter: (input: {
+    novel_id: string;
+    chapter_id?: string;
+    content?: string;
+  }) => safeInvoke<EvaluationReport>('evaluate_chapter', { input }),
   deleteChapter: (id: string) => safeInvoke<void>('delete_chapter', { id }),
 
   // Story Bible

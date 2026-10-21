@@ -249,6 +249,20 @@ export const Header: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [zenMode, toggleZenMode]);
 
+  // Global open settings event listener
+  useEffect(() => {
+    const handleOpenSettings = (e: any) => {
+      if (e?.detail?.tab) {
+        setSettingsInitialTab(e.detail.tab);
+      } else {
+        setSettingsInitialTab('MODEL');
+      }
+      setShowSettings(true);
+    };
+    window.addEventListener('novelforge:open-settings', handleOpenSettings);
+    return () => window.removeEventListener('novelforge:open-settings', handleOpenSettings);
+  }, []);
+
   const handleExport = async (format: 'txt' | 'markdown') => {
     if (!activeChapter) return;
     try {
@@ -970,10 +984,7 @@ export const Header: React.FC = () => {
             >
               <Settings className="w-4 h-4 shrink-0" />
               {status === 'UPDATE_AVAILABLE' && (
-                <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping absolute top-1.5 right-1.5" />
-              )}
-              {status === 'UPDATE_AVAILABLE' && (
-                <span className="w-2 h-2 rounded-full bg-rose-600 absolute top-1.5 right-1.5" />
+                <span className="w-2 h-2 rounded-full bg-rose-600 ring-2 ring-surface dark:ring-[#282421] shadow-xs absolute top-1.5 right-1.5" />
               )}
             </button>
 

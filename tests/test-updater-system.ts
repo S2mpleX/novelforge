@@ -6,6 +6,7 @@
 import { ChangelogParser } from '../src/features/updater/services/ChangelogParser';
 import { DataSafetyGuard } from '../src/features/updater/services/DataSafetyGuard';
 import { APP_CURRENT_VERSION } from '../src/features/updater/services/UpdateService';
+import { useUpdateStore } from '../src/features/updater/stores/useUpdateStore';
 import fs from 'fs';
 import path from 'path';
 
@@ -191,6 +192,33 @@ async function runTestSuite() {
   console.log('\n▶ [测试 12] SQLite 灾备与数据库完整性守护');
   assert(precheckClean.backupCreated !== undefined, 'DataSafetyGuard 集成数据库热备份能力 (novelforge_pre_update_backup_*.db)');
   assert(precheckClean.databaseIntegrityOk !== undefined, 'DataSafetyGuard 集成 PRAGMA integrity_check 诊断');
+
+  // -------------------------------------------------------------
+  // 测试 13：更新按钮防闪烁与点击状态机即时跃迁验证 (UPDATE_AVAILABLE -> PRECHECKING)
+  // -------------------------------------------------------------
+  console.log('\n▶ [测试 13] 更新按钮防闪烁与状态机即时跃迁验证');
+  // 初始模拟进入 UPDATE_AVAILABLE 状态
+  useUpdateStore.setState({ status: 'UPDATE_AVAILABLE', latestVersion: '2.5.0' });
+  assert(useUpdateStore.getState().status === 'UPDATE_AVAILABLE', '成功置为 UPDATE_AVAILABLE 状态');
+
+  // 用户点击更新按钮触发 startSafeUpdateFlow 时，状态必须立即进入 PRECHECKING（严禁滞留在 UPDATE_AVAILABLE 导致按钮持续呼吸闪烁）
+  const updatePromise = useUpdateStore.getState().startSafeUpdateFlow({
+    hasUnsavedChanges: true, // 模拟未保存正文，触发弹窗阻断模式
+    activeChapterTitle: '测试章节',
+  });
+  assert(useUpdateStore.getState().status === 'PRECHECKING', '点击更新按钮后，status 必须瞬间跃迁为 PRECHECKING，消除按钮呼吸闪烁假象');
+  assert(useUpdateStore.getState().isPrechecking === true, 'isPrechecking 标志必须为 true');
+
+  // 等待流程完成
+  await updatePromise;
+  assert(useUpdateStore.getState().isPrechecking === false, '检查结束后 isPrechecking 必须恢复为 false');
+  assert(useUpdateStore.getState().precheckResult !== null, '存在未保存草稿时成功生成 precheckResult 弹窗数据');
+
+  // 测试取消预检弹窗时，状态必须平滑安全恢复为 UPDATE_AVAILABLE
+  useUpdateStore.getState().cancelPrecheck();
+  assert(useUpdateStore.getState().status === 'UPDATE_AVAILABLE', '取消安全检查弹窗时，状态必须安全回退至 UPDATE_AVAILABLE');
+  assert(useUpdateStore.getState().isPrechecking === false, '取消后 isPrechecking 必须为 false');
+  assert(useUpdateStore.getState().precheckResult === null, '取消后 precheckResult 必须清空');
 
   // -------------------------------------------------------------
   // 测试汇总

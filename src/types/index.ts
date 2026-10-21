@@ -882,4 +882,67 @@ export interface OptimizeWritingPromptResult {
   suggested_tags: string[];
 }
 
+// ==========================================
+// V3.3.0 AGENTIC HEADLESS & PROPOSAL TYPES
+// ==========================================
+
+export interface ClicheMatch {
+  rule_key: string;
+  label: string;
+  matched_text: string;
+  excerpt: string;
+  suggestion: string;
+}
+
+export interface ConsistencyIssue {
+  issue_type: string;
+  severity: 'CRITICAL' | 'WARNING' | 'INFO';
+  title: string;
+  description: string;
+  target_entity?: string;
+  suggestion: string;
+}
+
+export interface EntityProposal {
+  entity_type: string;
+  name: string;
+  frequency: number;
+  context_sample: string;
+  suggested_action: string;
+}
+
+export interface EvaluationReport {
+  novel_id: string;
+  chapter_id?: string;
+  word_count: number;
+  reading_time_minutes: number;
+  humanizer_score: number;
+  verdict: 'PASS' | 'NEEDS_REVISION' | 'CRITICAL_ISSUES';
+  cliche_matches: ClicheMatch[];
+  consistency_issues: ConsistencyIssue[];
+  entity_proposals: EntityProposal[];
+  actionable_summary: string;
+}
+
+export interface ChapterProposal {
+  version_id: string;
+  chapter_id: string;
+  version_number: number;
+  word_count: number;
+  source_type: string;
+  proposal_summary?: string;
+  content_snippet: string;
+  created_at: number;
+}
+
+export interface RollbackResult {
+  chapter_id: string;
+  restored_version_id: string;
+  restored_version_number: number;
+  word_count: number;
+  invalidated_facts_count: number;
+  message: string;
+}
+
+
 

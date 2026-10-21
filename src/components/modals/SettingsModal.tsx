@@ -323,10 +323,7 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
               >
                 <span>软件更新</span>
                 {status === 'UPDATE_AVAILABLE' && (
-                  <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping absolute -top-0.5 -right-0.5" />
-                )}
-                {status === 'UPDATE_AVAILABLE' && (
-                  <span className="w-2 h-2 rounded-full bg-rose-600 absolute -top-0.5 -right-0.5" />
+                  <span className="w-2 h-2 rounded-full bg-rose-600 ring-2 ring-surface dark:ring-[#2d2825] shadow-xs absolute -top-0.5 -right-0.5" />
                 )}
               </button>
             </div>

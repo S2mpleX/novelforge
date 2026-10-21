@@ -25,6 +25,8 @@ use crate::models::{
     VoiceProfile, SaveVoiceProfileInput, ModelArenaRun, SaveModelArenaRunInput,
     UpdateNovelInput, UpdateVolumeInput,
     UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput, UpdateStoryPhaseInput,
+    ChapterProposal, CreateChapterProposalInput, AcceptChapterProposalInput,
+    RollbackChapterVersionInput, RollbackResult, EvaluationReport, EvaluateChapterInput,
 };
 
 #[derive(Clone)]
@@ -506,6 +508,15 @@ impl DbManager {
         Ok(novels)
     }
 
+    pub fn get_novel_target_length(&self, novel_id: &str) -> i64 {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT chapter_target_length FROM novel_settings WHERE novel_id = ?1",
+            params![novel_id],
+            |r| r.get(0),
+        ).unwrap_or(3000)
+    }
+
     pub fn get_novel(&self, id: &str) -> Result<Novel> {
         let conn = self.conn.lock();
         conn.query_row(
@@ -886,6 +897,226 @@ impl DbManager {
             vers.push(r?);
         }
         Ok(vers)
+    }
+
+    pub fn create_chapter_proposal(
+        &self,
+        input: CreateChapterProposalInput,
+    ) -> Result<ChapterProposal> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+        let word_count = count_chinese_characters(&input.content);
+
+        // Fetch current max version
+        let max_ver: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(version_number), 0) FROM chapter_versions WHERE chapter_id = ?1",
+                params![&input.chapter_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+
+        let next_ver = max_ver + 1;
+        let proposal_version_id = Uuid::new_v4().to_string();
+
+        let source_type = "AI_PROPOSAL".to_string();
+        let created_by = input.reasoning_trace.as_deref().unwrap_or("agent");
+
+        conn.execute(
+            "INSERT INTO chapter_versions (id, chapter_id, version_number, content, source_type, created_by, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![&proposal_version_id, &input.chapter_id, next_ver, &input.content, source_type, created_by, now],
+        )?;
+
+        let content_snippet = if input.content.chars().count() > 80 {
+            input.content.chars().take(80).collect::<String>() + "..."
+        } else {
+            input.content.clone()
+        };
+
+        Ok(ChapterProposal {
+            version_id: proposal_version_id,
+            chapter_id: input.chapter_id,
+            version_number: next_ver,
+            word_count,
+            source_type: "AI_PROPOSAL".to_string(),
+            proposal_summary: input.proposal_summary,
+            content_snippet,
+            created_at: now,
+        })
+    }
+
+    pub fn list_chapter_proposals(&self, chapter_id: &str) -> Result<Vec<ChapterProposal>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, chapter_id, version_number, content, source_type, created_at
+             FROM chapter_versions WHERE chapter_id = ?1 AND source_type = 'AI_PROPOSAL'
+             ORDER BY version_number DESC",
+        )?;
+
+        let rows = stmt.query_map(params![chapter_id], |row| {
+            let content: String = row.get(3)?;
+            let word_count = count_chinese_characters(&content);
+            let snippet = if content.chars().count() > 80 {
+                content.chars().take(80).collect::<String>() + "..."
+            } else {
+                content
+            };
+            Ok(ChapterProposal {
+                version_id: row.get(0)?,
+                chapter_id: row.get(1)?,
+                version_number: row.get(2)?,
+                word_count,
+                source_type: row.get(4)?,
+                proposal_summary: None,
+                content_snippet: snippet,
+                created_at: row.get(5)?,
+            })
+        })?;
+
+        let mut proposals = Vec::new();
+        for r in rows {
+            proposals.push(r?);
+        }
+        Ok(proposals)
+    }
+
+    pub fn accept_chapter_proposal(
+        &self,
+        input: AcceptChapterProposalInput,
+    ) -> Result<Chapter> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+
+        // 1. Get version content and chapter info
+        let (content, novel_id): (String, String) = conn.query_row(
+            "SELECT v.content, c.novel_id FROM chapter_versions v JOIN chapters c ON v.chapter_id = c.id WHERE v.id = ?1 AND c.id = ?2",
+            params![&input.version_id, &input.chapter_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+
+        let word_count = count_chinese_characters(&content);
+
+        // 2. Set active_version_id to this proposal version
+        conn.execute(
+            "UPDATE chapters SET active_version_id = ?1, word_count = ?2, updated_at = ?3 WHERE id = ?4",
+            params![&input.version_id, word_count, now, &input.chapter_id],
+        )?;
+
+        conn.execute(
+            "UPDATE novels SET updated_at = ?1 WHERE id = ?2",
+            params![now, &novel_id],
+        )?;
+
+        // Update FTS
+        let plain_text = crate::export::html_to_plain_text(&content);
+        let _ = conn.execute(
+            "DELETE FROM chapters_fts WHERE chapter_id = ?1",
+            params![&input.chapter_id],
+        );
+        let title: String = conn
+            .query_row(
+                "SELECT title FROM chapters WHERE id = ?1",
+                params![&input.chapter_id],
+                |r| r.get(0),
+            )
+            .unwrap_or_default();
+        let _ = conn.execute(
+            "INSERT INTO chapters_fts (chapter_id, novel_id, title, content) VALUES (?1, ?2, ?3, ?4)",
+            params![&input.chapter_id, &novel_id, &title, &plain_text],
+        );
+
+        drop(conn);
+        self.get_chapter(&input.chapter_id)
+    }
+
+    pub fn rollback_chapter_version(
+        &self,
+        input: RollbackChapterVersionInput,
+    ) -> Result<RollbackResult> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp_millis();
+
+        // 1. Get target version details
+        let (target_content, target_version_num, target_created_at, novel_id, title): (String, i64, i64, String, String) = conn.query_row(
+            "SELECT v.content, v.version_number, v.created_at, c.novel_id, c.title
+             FROM chapter_versions v JOIN chapters c ON v.chapter_id = c.id
+             WHERE v.id = ?1 AND c.id = ?2",
+            params![&input.target_version_id, &input.chapter_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+        )?;
+
+        let word_count = count_chinese_characters(&target_content);
+
+        // Create a new snapshot for this rollback restoration so history is never destroyed
+        let max_ver: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(version_number), 0) FROM chapter_versions WHERE chapter_id = ?1",
+                params![&input.chapter_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let next_ver = max_ver + 1;
+        let restored_version_id = Uuid::new_v4().to_string();
+
+        conn.execute(
+            "INSERT INTO chapter_versions (id, chapter_id, version_number, content, source_type, created_by, created_at)
+             VALUES (?1, ?2, ?3, ?4, 'ROLLBACK_RESTORE', 'user', ?5)",
+            params![&restored_version_id, &input.chapter_id, next_ver, &target_content, now],
+        )?;
+
+        conn.execute(
+            "UPDATE chapters SET active_version_id = ?1, word_count = ?2, updated_at = ?3 WHERE id = ?4",
+            params![&restored_version_id, word_count, now, &input.chapter_id],
+        )?;
+
+        // 2. Cascade memory invalidation if requested
+        let mut invalidated_count = 0;
+        if input.cascade_memory.unwrap_or(true) {
+            let res = conn.execute(
+                "UPDATE canon_facts SET status = 'INVALIDATED_BY_ROLLBACK'
+                 WHERE novel_id = ?1 AND source_chapter_id = ?2 AND created_at > ?3 AND status = 'ACTIVE'",
+                params![&novel_id, &input.chapter_id, target_created_at],
+            );
+            if let Ok(c) = res {
+                invalidated_count = c;
+            }
+        }
+
+        // Update FTS
+        let plain_text = crate::export::html_to_plain_text(&target_content);
+        let _ = conn.execute("DELETE FROM chapters_fts WHERE chapter_id = ?1", params![&input.chapter_id]);
+        let _ = conn.execute(
+            "INSERT INTO chapters_fts (chapter_id, novel_id, title, content) VALUES (?1, ?2, ?3, ?4)",
+            params![&input.chapter_id, &novel_id, &title, &plain_text],
+        );
+
+        let msg = format!(
+            "已将章节《{}》成功安全回滚至第 {} 版快照内容 (当前生成恢复版本 v{})，累计字数: {} 字；级联置为失效的后续因果事实: {} 条。",
+            title, target_version_num, next_ver, word_count, invalidated_count
+        );
+
+        Ok(RollbackResult {
+            chapter_id: input.chapter_id,
+            restored_version_id,
+            restored_version_number: next_ver,
+            word_count,
+            invalidated_facts_count: invalidated_count,
+            message: msg,
+        })
+    }
+
+    pub fn evaluate_chapter(&self, input: EvaluateChapterInput) -> Result<EvaluationReport, String> {
+        let content = if let Some(c) = input.content {
+            c
+        } else if let Some(ref ch_id) = input.chapter_id {
+            let ch = self.get_chapter(ch_id).map_err(|e| e.to_string())?;
+            ch.content.unwrap_or_default()
+        } else {
+            return Err("Either chapter_id or content must be provided".to_string());
+        };
+
+        crate::eval::evaluate_chapter_content(self, &input.novel_id, input.chapter_id.as_deref(), &content)
     }
 
     pub fn delete_chapter(&self, id: &str) -> Result<()> {

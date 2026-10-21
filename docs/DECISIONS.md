@@ -1590,6 +1590,68 @@
   - TypeScript 类型检查 `pnpm exec tsc --noEmit`：0 错误；
   - 生产构建 `pnpm run build`：2.07s 零错误完成。
 
+## ADR-048: 自动更新按钮防闪烁与点击状态机即时跃迁架构 (Auto-Updater Interaction Anti-Flicker & Instant State Transition)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户反馈：“点击更新按钮后会一直闪烁，但是更新进程没有问题”；
+  2. 深入排查代码交互与状态机流转，定位到双重根本原因：
+     - **视觉样式硬编码呼吸动效**：在 `UpdateCenter.tsx` 中，更新按钮（“下载并安装”）和 `UpdateStatusBadge.tsx` 徽章类名中硬编码了 Tailwind 的 `animate-pulse`；在 CSS 规范中，`animate-pulse` 会使透明度在 100% 与 50% 之间无限循环（每两秒闪烁一次）；
+     - **点击事件后状态未即时推进**：用户点击更新按钮触发 `startSafeUpdateFlow` 时，该异步函数首先执行 SQLite 在线热备份（`backupDatabase`）、数据库完整性核验（`optimizeDatabase`）和连载任务挂起；这一过程需 1~3 秒磁盘 I/O。但在 `useUpdateStore.ts` 中，`startSafeUpdateFlow` 遗漏了 `status: 'PRECHECKING'` 的设置，导致在此期间 `status` 仍停留在 `UPDATE_AVAILABLE`；
+     - 此时前台条件渲染判断 `{status === 'UPDATE_AVAILABLE' && <button ... className="... animate-pulse" />}` 依然成立，按钮没有进入 disabled 状态，没有展示任何转圈 Spinner，也没有文字变化，而是在原地**以 2 秒为周期持续呼吸闪烁**；
+     - 后台真实的 SQLite 备份和 Tauri 原生下载进程完全正常推进（“更新进程没有问题”），但前台用户看到按钮在狂闪且毫无点击反馈，误以为操作卡死或未点中，甚至重复狂点引发并发锁。
+- **决策与重构实装**：
+  1. **彻底根除 `animate-pulse` 与 `animate-ping` 闪烁动效**：
+     - 移除更新按钮和状态徽章上的 `animate-pulse`，换为稳定、确定性的专业按钮样式（宋韵琥珀茶金渐变 `bg-gradient-to-r from-amber-700 via-amber-600 to-orange-700`），具备优雅的 `hover:from-amber-600 hover:to-orange-600` 与 `active:scale-95` 物理触感；
+     - 将 `Header.tsx` 与 `SettingsModal.tsx` 顶栏/Tab 上的剧烈 `animate-ping` 闪烁红点升级为精致高光静态红点（`ring-2 shadow-xs`），彻底消除视觉光闪感。
+  2. **状态机即时跃迁与生命周期闭环 (`useUpdateStore.ts`)**：
+     - 在 `startSafeUpdateFlow` 触发瞬间，立即将状态置为 `status: 'PRECHECKING'`，彻底消除 `UPDATE_AVAILABLE` 按钮残留；
+     - 在用户取消安全检查弹窗时（`cancelPrecheck`），平滑安全将状态回滚至 `UPDATE_AVAILABLE`；
+  3. **顶部按钮操作区全生命周期状态感知 (`UpdateCenter.tsx`)**：
+     - `UPDATE_AVAILABLE`：呈现清晰的 `[下载并安装 (v{version})]` 按钮；
+     - `PRECHECKING`：呈现禁用态 `[<Loader2 className="animate-spin" /> 安全检查与灾备中...]`；
+     - `DOWNLOADING`：呈现禁用态 `[<Loader2 className="animate-spin" /> 正在下载更新包 (xx%)]`；
+     - `INSTALLING`：呈现禁用态 `[<Loader2 className="animate-spin" /> 正在启动安装向导...]`；
+     - `RESTART_REQUIRED`：呈现绿色高亮 `[<RotateCw /> 立即重启应用生效]` 按钮；
+     - `ERROR`：呈现醒目的 `[<RefreshCw /> 重试更新流程]` 按钮；
+     - 在更新期间（`PRECHECKING` / `DOWNLOADING` / `INSTALLING`），安全禁用【检查更新】与【更新设置】按钮，防止状态打乱。
+  4. **升级前数据守卫弹窗增加防重提交保护 (`PreUpdateSafetyModal.tsx`)**：
+     - 新增 `isSubmitting` 局部状态，用户点击“一键保存草稿并开始更新”或“安全继续更新”后立即置灰并展示转圈 Spinner，杜绝连击。
+  5. **平滑化未定态进度条 (`UpdateProgressBar.tsx`)**：
+     - 当更新包 `percent === null` 时，将进度条闪烁动画替换为柔和连贯的过渡流动条。
+- **验证结果**：
+  - 更新专项测试套件 `tests/test-updater-system.ts` 扩充测试 13，验证状态机点击瞬间跃迁与回滚保护，**36/36 项全量测试 100% 全部通过**；
+  - `pnpm check:version`、`pnpm test:docking`、`pnpm test:zen`、`pnpm test:bugfixes` 全套前端测试全部通过；
+  - 生产打包 `pnpm run build` 2.09s 零错误完成。
+
+- **状态**：已采纳
+- **上下文**：
+  在 NovelForge AI 演进至外部 AI Agent（如 Claude Code, Cursor, Antigravity, AutoGen, CrewAI 或自主作家守护进程）全面驱动创作的场景下，原系统显露出五大关键制约：
+  1. 核心文学质检与一致性规则（套话检测、死者言行拦截、新实体反哺）被锁死在前端 TS 组件中，外部 Agent 无法调用；
+  2. MCP 协议工具集严重不足（仅 20 个基础工具），缺失场景细纲节拍、分章合章、文风规范、伏笔追踪等核心能力；
+  3. 缺乏非破坏性暂存提案机制，外部 Agent 写入正文容易直接覆盖人类作者未保存的工作；
+  4. 章节正文回滚后，已沉淀入库的长期因果事实无法级联失效，产生严重因果脏数据污染；
+  5. 上下文组装仅能返回预渲染的单体字符串，剥夺了外部高级 Agent 自主分配各层 Token 预算的灵活性。
+- **决策**：
+  1. **能力下沉与无头评估引擎 (`src-tauri/src/eval/`)**：
+     - 在 Rust 核心层实现 `evaluate_chapter_content`，内置 14 项中文网文高频红线套话诊断算法，计算 0~100 人情味评分；
+     - 深度核验角色生命状态，强力拦截已故角色拔剑/发言等违规动作；
+     - 基于动作对话模式自动提取未登记在 Story Bible 中的新实体与候选角色。
+  2. **协作安全与非破坏性提案暂存 (`ChapterProposal`)**：
+     - 增加 `create_chapter_proposal` 与 `accept_chapter_proposal`，草稿以 `source_type: AI_PROPOSAL` 保存，不变更 `chapters.active_version_id`，等待人类作者或主管 Agent 审核批准。
+  3. **因果事实级联回滚保护 (`rollback_chapter_version`)**：
+     - 当回退至旧版本快照时，自动将该版本之后沉淀的因果事实标记为 `INVALIDATED_BY_ROLLBACK`，杜绝因果事实残留污染。
+  4. **全量补齐 MCP 工具集至 40 个**：
+     - 补齐剧情推演流水线模板与执行工具 (`novelforge_list_workflow_templates`、`novelforge_create_workflow_run`、`novelforge_advance_workflow_step`)；
+     - 补齐 `novelforge_evaluate_chapter`、`novelforge_scan_entity_proposals`、`novelforge_propose_chapter_revision`、`novelforge_accept_chapter_proposal`、`novelforge_list_chapter_versions`、`novelforge_rollback_chapter_version`、`novelforge_split_chapter`、`novelforge_merge_chapters`、`novelforge_list_scenes`、`novelforge_create_scene`、`novelforge_get_active_voice_profile`、`novelforge_list_plot_threads`、`novelforge_update_plot_thread`。
+  5. **解耦双模上下文组装 (`novelforge_assemble_context`) 与桌面端提案审阅全闭环**：
+     - 支持 `format: structured | text | both`，外部 Agent 可自由读取独立的 `working_memory_l0`、`short_term_l1`、`arc_memory_l2`、`canon_rules_l3` 等分层对象；
+     - 桌面端版本抽屉与历史面板完整呈现 Agent 提案徽章、推理思考链与一键采纳生效。
+- **验证结果**：
+  - Rust 核心全功能自动化测试套件 `cargo run --bin db_test` 扩充至 **65 项断言 100% 全部通过**；
+  - MCP 端到端全链路自动化测试 `node scripts/test-mcp-e2e.cjs` **18 项全流程断言 100% 全部通过**；
+  - 前端回归测试 `pnpm test:zen` 11 项及生产构建 2.13s 全部零错误通过！
+
+
 
 
 

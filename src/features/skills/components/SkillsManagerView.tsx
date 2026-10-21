@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useSkillsStore } from '../useSkillsStore';
+import { APP_CURRENT_VERSION } from '@/features/updater/services/UpdateService';
 import { api } from '@/utils/tauriBridge';
 import { alertDialog } from '@/utils/dialog';
 import {
@@ -149,7 +150,7 @@ export const SkillsManagerView: React.FC = () => {
                 Agent Skills 技能管理中心
               </h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-amber-100 text-primary dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                Local Engine v2.5
+                Local Engine v{APP_CURRENT_VERSION}
               </span>
             </div>
             <p className="text-xs text-ink-2 dark:text-[#a8a29e] mt-1 max-w-2xl">

@@ -1209,3 +1209,103 @@ pub struct OptimizeWritingPromptResult {
     pub suggested_tags: Vec<String>,
 }
 
+// ==========================================
+// V3.3.0 AGENTIC HEADLESS EVALUATION & PROPOSAL MODELS
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClicheMatch {
+    pub rule_key: String,
+    pub label: String,
+    pub matched_text: String,
+    pub excerpt: String,
+    pub suggestion: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsistencyIssue {
+    pub issue_type: String, // DECEASED_CHARACTER_ACTION, SECLUDED_CHARACTER, UNRESOLVED_THREAD, WORD_COUNT_ANOMALY
+    pub severity: String,   // CRITICAL, WARNING, INFO
+    pub title: String,
+    pub description: String,
+    pub target_entity: Option<String>,
+    pub suggestion: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityProposal {
+    pub entity_type: String, // CHARACTER
+    pub name: String,
+    pub frequency: usize,
+    pub context_sample: String,
+    pub suggested_action: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvaluationReport {
+    pub novel_id: String,
+    pub chapter_id: Option<String>,
+    pub word_count: usize,
+    pub reading_time_minutes: usize,
+    pub humanizer_score: u32,
+    pub verdict: String, // PASS, NEEDS_REVISION, CRITICAL_ISSUES
+    pub cliche_matches: Vec<ClicheMatch>,
+    pub consistency_issues: Vec<ConsistencyIssue>,
+    pub entity_proposals: Vec<EntityProposal>,
+    pub actionable_summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvaluateChapterInput {
+    pub novel_id: String,
+    pub chapter_id: Option<String>,
+    pub content: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChapterProposal {
+    pub version_id: String,
+    pub chapter_id: String,
+    pub version_number: i64,
+    pub word_count: i64,
+    pub source_type: String,
+    pub proposal_summary: Option<String>,
+    pub content_snippet: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateChapterProposalInput {
+    pub novel_id: String,
+    pub chapter_id: String,
+    pub content: String,
+    pub proposal_summary: Option<String>,
+    pub reasoning_trace: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AcceptChapterProposalInput {
+    pub novel_id: String,
+    pub chapter_id: String,
+    pub version_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RollbackChapterVersionInput {
+    pub novel_id: String,
+    pub chapter_id: String,
+    pub target_version_id: String,
+    pub cascade_memory: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RollbackResult {
+    pub chapter_id: String,
+    pub restored_version_id: String,
+    pub restored_version_number: i64,
+    pub word_count: i64,
+    pub invalidated_facts_count: usize,
+    pub message: String,
+}
+
+

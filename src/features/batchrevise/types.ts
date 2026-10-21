@@ -36,6 +36,8 @@ export interface BatchReviseProposal {
   removedChars: number;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
   appliedAt?: number;
+  isOfflineFallback?: boolean;
+  fallbackReason?: string;
 }
 
 export interface BatchReviseJob {

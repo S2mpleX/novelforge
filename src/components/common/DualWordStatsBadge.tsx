@@ -2,13 +2,14 @@ import React, { useState, useMemo } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
 import { DualWordStatsEngine } from '@/features/stats/DualWordStatsEngine';
-import { Feather, Sparkles, Activity } from 'lucide-react';
+import { Feather, Sparkles, Activity, X } from 'lucide-react';
 
 export interface DualWordStatsBadgeProps {
   className?: string;
+  modal?: boolean;
 }
 
-export const DualWordStatsBadge: React.FC<DualWordStatsBadgeProps> = ({ className }) => {
+export const DualWordStatsBadge: React.FC<DualWordStatsBadgeProps> = ({ className, modal = true }) => {
   const { activeNovel, chapters, activeChapter, versions } = useNovelStore();
   const [showDetail, setShowDetail] = useState(false);
   const [extraVersionsMap, setExtraVersionsMap] = useState<Record<string, any[]>>({});
@@ -95,58 +96,136 @@ export const DualWordStatsBadge: React.FC<DualWordStatsBadgeProps> = ({ classNam
         <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-400 shrink-0" />
       </div>
 
-      {/* Popover Detail Card */}
+      {/* Detail View (Modal or Popover) */}
       {showDetail && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowDetail(false)} />
-          <div className="absolute right-0 top-full mt-2 w-72 z-50 p-3.5 rounded-xl bg-[#fcfaf7] dark:bg-[#1f1b17] border border-line dark:border-[#38332d] shadow-xl animate-in fade-in duration-150">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-xs text-ink dark:text-[#dfdbd0] flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-primary" />
-                字数双轨归因与心流看板
-              </span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-800/10 text-primary font-semibold">
-                {stats.purityLabel.split(' · ')[0]}
-              </span>
-            </div>
-
-            <p className="text-[11px] text-ink-2 dark:text-[#a0978d] mb-3 leading-relaxed">
-              {stats.purityDescription}
-            </p>
-
-            {/* Metrics */}
-            <div className="space-y-2 mb-3">
-              <div>
-                <div className="flex justify-between text-[11px] mb-1">
-                  <span className="text-primary dark:text-amber-400 font-medium flex items-center gap-1">
-                    <Feather className="w-3 h-3" /> 纯手打字数
+        modal ? (
+          <div
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 select-text"
+            onClick={() => setShowDetail(false)}
+          >
+            <div
+              className="w-full max-w-sm p-5 rounded-2xl bg-[#fcfaf7] dark:bg-[#1f1b17] border border-line dark:border-[#38332d] shadow-2xl animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3 border-b border-line dark:border-[#38332d] pb-2.5">
+                <span className="font-bold text-sm text-ink dark:text-[#dfdbd0] flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-primary shrink-0" />
+                  字数双轨归因与心流看板
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-800/10 dark:bg-amber-400/10 text-primary dark:text-amber-400 font-semibold">
+                    {stats.purityLabel.split(' · ')[0]}
                   </span>
-                  <span className="font-bold">{stats.manualWordCount.toLocaleString()} 字 ({stats.manualRatio}%)</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-surface-3 dark:bg-[#2e2a27] overflow-hidden">
-                  <div className="h-full bg-amber-700" style={{ width: `${stats.manualRatio}%` }} />
+                  <button
+                    type="button"
+                    onClick={() => setShowDetail(false)}
+                    className="p-1 rounded text-ink-2 hover:text-ink hover:bg-surface-3 transition cursor-pointer"
+                    title="关闭"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
-              <div>
-                <div className="flex justify-between text-[11px] mb-1">
-                  <span className="text-purple-700 dark:text-purple-400 font-medium flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> AI 辅助 / 润色
-                  </span>
-                  <span className="font-bold">{stats.aiWordCount.toLocaleString()} 字 ({stats.aiRatio}%)</span>
+              <p className="text-xs text-ink-2 dark:text-[#a0978d] mb-4 leading-relaxed">
+                {stats.purityDescription}
+              </p>
+
+              {/* Metrics */}
+              <div className="space-y-3 mb-4">
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-primary dark:text-amber-400 font-medium flex items-center gap-1.5">
+                      <Feather className="w-3.5 h-3.5 shrink-0" /> 纯手打字数
+                    </span>
+                    <span className="font-bold font-mono text-ink dark:text-[#f3eee7]">
+                      {stats.manualWordCount.toLocaleString()} 字 ({stats.manualRatio}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-surface-3 dark:bg-[#2e2a27] overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-600 to-amber-700 transition-all duration-300"
+                      style={{ width: `${stats.manualRatio}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full h-1.5 rounded-full bg-surface-3 dark:bg-[#2e2a27] overflow-hidden">
-                  <div className="h-full bg-purple-600" style={{ width: `${stats.aiRatio}%` }} />
+
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-purple-700 dark:text-purple-400 font-medium flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" /> AI 辅助 / 润色
+                    </span>
+                    <span className="font-bold font-mono text-ink dark:text-[#f3eee7]">
+                      {stats.aiWordCount.toLocaleString()} 字 ({stats.aiRatio}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-surface-3 dark:bg-[#2e2a27] overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-300"
+                      style={{ width: `${stats.aiRatio}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="pt-2 border-t border-line dark:border-[#2e2a27] flex items-center justify-between text-[10px] text-ink-2">
-              <span>全书累计：{stats.totalWordCount.toLocaleString()} 字</span>
-              <span>签约申报合规凭证</span>
+              <div className="pt-2.5 border-t border-line dark:border-[#2e2a27] flex items-center justify-between text-xs text-ink-2 dark:text-[#9e9486]">
+                <span>全书累计：<strong className="font-mono text-ink dark:text-[#f3eee7]">{stats.totalWordCount.toLocaleString()}</strong> 字</span>
+                <span className="text-primary dark:text-amber-400 font-medium text-[11px]">签约申报合规凭证</span>
+              </div>
             </div>
           </div>
-        </>
+        ) : (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowDetail(false)} />
+            <div className="absolute right-0 top-full mt-2 w-72 z-50 p-3.5 rounded-xl bg-[#fcfaf7] dark:bg-[#1f1b17] border border-line dark:border-[#38332d] shadow-xl animate-in fade-in duration-150">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-bold text-xs text-ink dark:text-[#dfdbd0] flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-primary" />
+                  字数双轨归因与心流看板
+                </span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-800/10 text-primary font-semibold">
+                  {stats.purityLabel.split(' · ')[0]}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-ink-2 dark:text-[#a0978d] mb-3 leading-relaxed">
+                {stats.purityDescription}
+              </p>
+
+              {/* Metrics */}
+              <div className="space-y-2 mb-3">
+                <div>
+                  <div className="flex justify-between text-[11px] mb-1">
+                    <span className="text-primary dark:text-amber-400 font-medium flex items-center gap-1">
+                      <Feather className="w-3 h-3" /> 纯手打字数
+                    </span>
+                    <span className="font-bold">{stats.manualWordCount.toLocaleString()} 字 ({stats.manualRatio}%)</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-surface-3 dark:bg-[#2e2a27] overflow-hidden">
+                    <div className="h-full bg-amber-700" style={{ width: `${stats.manualRatio}%` }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] mb-1">
+                    <span className="text-purple-700 dark:text-purple-400 font-medium flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> AI 辅助 / 润色
+                    </span>
+                    <span className="font-bold">{stats.aiWordCount.toLocaleString()} 字 ({stats.aiRatio}%)</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-surface-3 dark:bg-[#2e2a27] overflow-hidden">
+                    <div className="h-full bg-purple-600" style={{ width: `${stats.aiRatio}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-line dark:border-[#2e2a27] flex items-center justify-between text-[10px] text-ink-2">
+                <span>全书累计：{stats.totalWordCount.toLocaleString()} 字</span>
+                <span>签约申报合规凭证</span>
+              </div>
+            </div>
+          </>
+        )
       )}
     </div>
   );

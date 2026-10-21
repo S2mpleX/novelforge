@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DataSafetyPrecheckResult } from '../types';
 import {
   ShieldAlert,
@@ -8,6 +8,7 @@ import {
   Cpu,
   Database,
   ArrowRight,
+  Loader2,
 } from 'lucide-react';
 
 interface Props {
@@ -23,6 +24,25 @@ export const PreUpdateSafetyModal: React.FC<Props> = ({
   onCancel,
   onSaveAndProceed,
 }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSaveAndProceedInternal = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      if (onSaveAndProceed) {
+        await onSaveAndProceed();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleProceedInternal = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    onProceed();
+  };
   return (
     <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
       <div className="w-full max-w-lg bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden font-serif">
@@ -142,8 +162,9 @@ export const PreUpdateSafetyModal: React.FC<Props> = ({
         <div className="p-4 bg-surface-2 border-t border-line flex items-center justify-end gap-3">
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-xs font-serif font-medium text-ink-2 hover:bg-surface-3-hover transition cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-serif font-medium text-ink-2 hover:bg-surface-3-hover transition cursor-pointer disabled:opacity-50"
           >
             暂缓更新
           </button>
@@ -151,21 +172,40 @@ export const PreUpdateSafetyModal: React.FC<Props> = ({
           {result.unsavedEditorContent && onSaveAndProceed ? (
             <button
               type="button"
-              onClick={onSaveAndProceed}
-              className="px-4 py-2 rounded-xl text-xs font-serif font-bold bg-amber-700 hover:bg-amber-600 text-white shadow-md transition flex items-center gap-1.5 cursor-pointer"
+              disabled={isSubmitting}
+              onClick={handleSaveAndProceedInternal}
+              className="px-4 py-2 rounded-xl text-xs font-serif font-bold bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-white shadow-md transition flex items-center gap-1.5 cursor-pointer"
             >
-              <span>一键保存草稿并开始更新</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>正在保存草稿并启动更新...</span>
+                </>
+              ) : (
+                <>
+                  <span>一键保存草稿并开始更新</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
             </button>
           ) : (
             <button
               type="button"
-              disabled={!result.canProceed}
-              onClick={onProceed}
+              disabled={!result.canProceed || isSubmitting}
+              onClick={handleProceedInternal}
               className="px-4 py-2 rounded-xl text-xs font-serif font-bold bg-gradient-to-r from-amber-700 to-orange-700 hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 text-white shadow-md transition flex items-center gap-1.5 cursor-pointer"
             >
-              <span>安全继续更新</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>正在启动安全下载与安装...</span>
+                </>
+              ) : (
+                <>
+                  <span>安全继续更新</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
             </button>
           )}
         </div>

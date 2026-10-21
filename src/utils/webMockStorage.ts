@@ -483,6 +483,100 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         .sort((a, b) => b.version_number - a.version_number);
     }
 
+    case 'create_chapter_proposal': {
+      const { input } = args;
+      const versions = getStorage<ChapterVersion[]>('chapter_versions', []);
+      const chVersions = versions.filter((v) => v.chapter_id === input.chapter_id);
+      const maxVer = chVersions.length > 0 ? Math.max(...chVersions.map((v) => v.version_number)) : 0;
+      const newVer: ChapterVersion = {
+        id: crypto.randomUUID(),
+        chapter_id: input.chapter_id,
+        version_number: maxVer + 1,
+        content: input.content,
+        content_hash: 'hash_' + Date.now(),
+        source_type: 'AI_PROPOSAL',
+        created_by: input.reasoning_trace || 'agent',
+        created_at: Date.now(),
+      };
+      versions.push(newVer);
+      setStorage('chapter_versions', versions);
+      return {
+        version_id: newVer.id,
+        chapter_id: newVer.chapter_id,
+        version_number: newVer.version_number,
+        word_count: input.content.length,
+        source_type: 'AI_PROPOSAL',
+        proposal_summary: input.proposal_summary,
+        content_snippet: input.content.slice(0, 80),
+        created_at: newVer.created_at,
+      };
+    }
+
+    case 'list_chapter_proposals': {
+      const versions = getStorage<ChapterVersion[]>('chapter_versions', []);
+      return versions
+        .filter((v) => v.chapter_id === args.chapterId && v.source_type === 'AI_PROPOSAL')
+        .sort((a, b) => b.version_number - a.version_number);
+    }
+
+    case 'accept_chapter_proposal': {
+      const { input } = args;
+      const versions = getStorage<ChapterVersion[]>('chapter_versions', []);
+      const chapters = getStorage<Chapter[]>('chapters', []);
+      const ch = chapters.find((c) => c.id === input.chapter_id);
+      const ver = versions.find((v) => v.id === input.version_id);
+      if (ch && ver) {
+        ch.active_version_id = ver.id;
+        ch.content = ver.content;
+        ch.word_count = ver.content.length;
+        ch.updated_at = Date.now();
+        setStorage('chapters', chapters);
+        return ch;
+      }
+      return ch;
+    }
+
+    case 'rollback_chapter_version': {
+      const { input } = args;
+      const versions = getStorage<ChapterVersion[]>('chapter_versions', []);
+      const chapters = getStorage<Chapter[]>('chapters', []);
+      const ch = chapters.find((c) => c.id === input.chapter_id);
+      const targetVer = versions.find((v) => v.id === input.target_version_id);
+      if (ch && targetVer) {
+        ch.active_version_id = targetVer.id;
+        ch.content = targetVer.content;
+        ch.word_count = targetVer.content.length;
+        ch.updated_at = Date.now();
+        setStorage('chapters', chapters);
+        return {
+          chapter_id: ch.id,
+          restored_version_id: targetVer.id,
+          restored_version_number: targetVer.version_number,
+          word_count: ch.word_count,
+          invalidated_facts_count: 0,
+          message: `已安全回滚至版本 V${targetVer.version_number}`,
+        };
+      }
+      return { chapter_id: input.chapter_id, restored_version_id: '', restored_version_number: 1, word_count: 0, invalidated_facts_count: 0, message: '' };
+    }
+
+    case 'evaluate_chapter': {
+      const { input } = args;
+      const content = input.content || '';
+      return {
+        novel_id: input.novel_id,
+        chapter_id: input.chapter_id,
+        word_count: content.length,
+        reading_time_minutes: Math.max(1, Math.floor(content.length / 400)),
+        humanizer_score: 90,
+        verdict: 'PASS',
+        cliche_matches: [],
+        consistency_issues: [],
+        entity_proposals: [],
+        actionable_summary: '质量门禁巡检完成 (WebMock 环境)',
+      };
+    }
+
     case 'delete_chapter': {
       let chapters = getStorage<Chapter[]>('chapters', []);
       chapters = chapters.filter((c) => c.id !== args.id);

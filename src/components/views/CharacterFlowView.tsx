@@ -27,6 +27,8 @@ import {
   Heart,
   Swords,
   BookOpen,
+  ArrowLeftRight,
+  X,
 } from 'lucide-react';
 
 interface CharacterFlowViewProps {
@@ -171,13 +173,17 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
       await alertDialog('关系源角色与目标角色不能相同');
       return;
     }
+    if (!relType.trim()) {
+      await alertDialog('请输入或选择关系类型');
+      return;
+    }
 
     try {
       await api.createCharacterRelationship({
         novel_id: novelId,
         source_character_id: sourceId,
         target_character_id: targetId,
-        relation_type: relType,
+        relation_type: relType.trim(),
         description: relDesc.trim() || undefined,
       });
 
@@ -201,24 +207,18 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
   };
 
   const onConnect = useCallback(
-    async (params: Connection) => {
+    (params: Connection) => {
       if (!params.source || !params.target) return;
       if (params.source === params.target) return;
 
-      try {
-        await api.createCharacterRelationship({
-          novel_id: novelId,
-          source_character_id: params.source,
-          target_character_id: params.target,
-          relation_type: '利益结盟',
-          description: '通过拓扑图快速连接建立',
-        });
-        loadData();
-      } catch (err) {
-        console.error('连线创建关系失败:', err);
-      }
+      // 拖拽拉线后，自动填入源角色和目标角色，并唤起关系选择面板
+      setSourceId(params.source);
+      setTargetId(params.target);
+      setRelType((prev) => (prev ? prev : RELATION_PRESETS[0].label));
+      setRelDesc('');
+      setShowAddModal(true);
     },
-    [novelId, loadData]
+    []
   );
 
   const handleNodesChange = useCallback(
@@ -269,7 +269,18 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
           )}
 
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              if (characters.length >= 2) {
+                if (!sourceId || !characters.some((c) => c.id === sourceId)) {
+                  setSourceId(characters[0].id);
+                }
+                if (!targetId || !characters.some((c) => c.id === targetId) || targetId === sourceId) {
+                  const other = characters.find((c) => c.id !== (sourceId || characters[0].id));
+                  if (other) setTargetId(other.id);
+                }
+              }
+              setShowAddModal(true);
+            }}
             disabled={characters.length < 2}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-800 hover:bg-amber-700 text-white rounded-lg text-xs font-medium transition-all disabled:opacity-40 shadow-xs shrink-0 whitespace-nowrap"
           >
@@ -331,18 +342,79 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
           ))}
         </div>
         <div className="text-[11px] text-slate-500">
-          提示：拖拽节点可自由排列；直接从节点连接点拉线可快速建立关联
+          提示：拖拽节点可自由排列；直接从节点连接点拉线可立即选择建立人物关系
         </div>
       </div>
 
       {/* Modal: Add Relationship */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAddModal(false);
+              setRelDesc('');
+            }
+          }}
+        >
           <div className="bg-surface border border-line rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-base font-serif font-bold text-ink mb-4 flex items-center gap-2">
-              <GitCommit className="w-5 h-5 text-primary" />
-              建立新的人物关联
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-serif font-bold text-ink flex items-center gap-2">
+                <GitCommit className="w-5 h-5 text-primary" />
+                建立人物关系连线
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setRelDesc('');
+                }}
+                className="text-ink-2 hover:text-ink p-1 rounded-lg hover:bg-surface-2 transition-colors"
+                title="关闭"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 可视化方向指示条与快速翻转 */}
+            <div className="flex items-center justify-between p-3 bg-surface-2 rounded-xl border border-line mb-4">
+              <div className="flex items-center gap-2 min-w-0 max-w-[42%]">
+                <div className="w-7 h-7 rounded-full bg-amber-800/10 border border-amber-800/30 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                  {characters.find((c) => c.id === sourceId)?.name?.slice(0, 1) || '源'}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] text-ink-2">起始角色</div>
+                  <div className="text-xs font-bold text-ink truncate">
+                    {characters.find((c) => c.id === sourceId)?.name || '未选择'}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const temp = sourceId;
+                  setSourceId(targetId);
+                  setTargetId(temp);
+                }}
+                title="交换关系方向"
+                className="p-1.5 hover:bg-surface-3 rounded-lg text-ink-2 hover:text-ink border border-line transition-all shrink-0 flex items-center gap-1 text-[11px]"
+              >
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="flex items-center gap-2 min-w-0 max-w-[42%] justify-end text-right">
+                <div className="min-w-0">
+                  <div className="text-[10px] text-ink-2">目标角色</div>
+                  <div className="text-xs font-bold text-ink truncate">
+                    {characters.find((c) => c.id === targetId)?.name || '未选择'}
+                  </div>
+                </div>
+                <div className="w-7 h-7 rounded-full bg-amber-800/10 border border-amber-800/30 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                  {characters.find((c) => c.id === targetId)?.name?.slice(0, 1) || '目'}
+                </div>
+              </div>
+            </div>
 
             <form onSubmit={handleCreateRelationship} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -353,7 +425,7 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
                   <select
                     value={sourceId}
                     onChange={(e) => setSourceId(e.target.value)}
-                    className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-hidden focus:border-[#854d0e]"
+                    className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-hidden focus:border-amber-800"
                   >
                     {characters.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -370,7 +442,7 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
                   <select
                     value={targetId}
                     onChange={(e) => setTargetId(e.target.value)}
-                    className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-hidden focus:border-[#854d0e]"
+                    className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-hidden focus:border-amber-800"
                   >
                     {characters.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -382,23 +454,38 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
               </div>
 
               <div>
-                <label className="block text-xs font-serif font-medium text-ink-2 mb-1">关系类型</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {RELATION_PRESETS.map((p) => (
-                    <button
-                      key={p.label}
-                      type="button"
-                      onClick={() => setRelType(p.label)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-serif font-medium border text-center transition-all ${
-                        relType === p.label
-                          ? 'bg-surface-2 border-[#854d0e] text-primary shadow-2xs font-bold'
-                          : 'bg-surface border-line text-ink-2 hover:bg-surface-2'
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
+                <label className="block text-xs font-serif font-medium text-ink-2 mb-1.5 flex items-center justify-between">
+                  <span>关系类型</span>
+                  <span className="text-[10px] text-ink-2 font-normal">点击预设或下方输入</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {RELATION_PRESETS.map((p) => {
+                    const isSelected = relType === p.label;
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => setRelType(p.label)}
+                        className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-serif font-medium border text-center transition-all ${
+                          isSelected
+                            ? 'bg-amber-800/10 border-amber-800 text-primary shadow-2xs font-bold'
+                            : 'bg-surface border-line text-ink-2 hover:bg-surface-2'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                        <span>{p.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
+                <input
+                  type="text"
+                  value={relType}
+                  onChange={(e) => setRelType(e.target.value)}
+                  placeholder="关系类型名称"
+                  required
+                  className="w-full bg-surface border border-line rounded-lg px-3 py-1.5 text-xs text-ink placeholder-ink-2/50 focus:outline-hidden focus:border-amber-800"
+                />
               </div>
 
               <div>
@@ -408,23 +495,26 @@ export const CharacterFlowView: React.FC<CharacterFlowViewProps> = ({ novelId })
                 <textarea
                   value={relDesc}
                   onChange={(e) => setRelDesc(e.target.value)}
-                  placeholder="例如：自小一同在宗门修炼，数次生死相托……"
+                  placeholder="例如：数次生死相托，但在某些利益分配上暗藏提防……"
                   rows={2}
-                  className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder-[#a89f91] focus:outline-hidden focus:border-[#854d0e] resize-none"
+                  className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-2/50 focus:outline-hidden focus:border-amber-800 resize-none"
                 />
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-line">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setRelDesc('');
+                  }}
                   className="px-4 py-2 text-xs font-serif font-medium text-ink-2 hover:text-ink transition-colors"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] text-xs font-serif font-medium rounded-lg shadow-xs transition-all"
+                  className="px-4 py-2 bg-amber-800 hover:bg-amber-700 text-white text-xs font-serif font-medium rounded-lg shadow-xs transition-all"
                 >
                   确认建立
                 </button>

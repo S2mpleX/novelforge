@@ -193,7 +193,7 @@ export const App: React.FC = () => {
       {status === 'UPDATE_AVAILABLE' && settings.notifyNewVersion && showUpdateBanner && (
         <div className="bg-gradient-to-r from-amber-700 via-amber-800 to-orange-800 border-b border-amber-600/50 px-4 py-2 text-xs text-white flex items-center justify-between font-serif shrink-0 shadow-sm animate-in slide-in-from-top-2">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
+            <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
             <span>
               <strong>发现 NovelForge AI 新版本 v{latestVersion}！</strong> 包含多项创作引擎升级与稳定性优化，建议及时更新以获取最佳体验。
             </span>

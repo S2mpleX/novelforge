@@ -1298,4 +1298,93 @@ pnpm test:bugfixes
   - `tsc && vite build`：2.58s 完成生产构建，0 错误，0 警告；
   - 累计测试断言数：**477 项，通过率 100% (0 错误，0 失败)**！
 
+### 2.18 应用内自动更新防闪烁与点击状态机即时流转验证 (2026-10-21)
+- **验证目的**：
+  1. 彻底解决用户反馈“点击更新按钮后会一直闪烁，但是更新进程没有问题”的交互缺陷；
+  2. 彻底移除更新按钮身上的 `animate-pulse`（Tailwind 无限循环淡入淡出闪烁），杜绝视觉假象；
+  3. 修复 `useUpdateStore.ts` 中 `startSafeUpdateFlow` 遗漏设置 `status: 'PRECHECKING'` 的状态机 Bug，确保点击瞬间立即跃迁至安全审查与备份状态；
+  4. 为 `UpdateCenter.tsx` 顶部操作区补齐全生命周期连贯状态按钮（`PRECHECKING`、`DOWNLOADING`、`INSTALLING`、`RESTART_REQUIRED`、`ERROR` 重试），防止按钮突兀消失或卡在旧状态；
+  5. 为 `PreUpdateSafetyModal.tsx` 升级前安全守护弹窗增加 `isSubmitting` 提交态与旋转 Spinner，杜绝用户重复点击；
+  6. 移除 `Header.tsx` 与 `SettingsModal.tsx` 上的剧烈 `animate-ping` 闪烁红点，换为稳定柔和的指示徽标；
+  7. 修复 `webMockStorage.ts` 中 `create_chapter_proposal` 遗漏 `content_hash` 导致的 TypeScript 类型检查报错。
+- **测试命令**：
+  ```powershell
+  pnpm test:updater
+  pnpm build
+  ```
+- **测试输出**：
+  ```text
+  ▶ [测试 13] 更新按钮防闪烁与状态机即时跃迁验证
+    ✅ PASS: 成功置为 UPDATE_AVAILABLE 状态
+    ✅ PASS: 点击更新按钮后，status 必须瞬间跃迁为 PRECHECKING，消除按钮呼吸闪烁假象
+    ✅ PASS: isPrechecking 标志必须为 true
+    ✅ PASS: 检查结束后 isPrechecking 必须恢复为 false
+    ✅ PASS: 存在未保存草稿时成功生成 precheckResult 弹窗数据
+    ✅ PASS: 取消安全检查弹窗时，状态必须安全回退至 UPDATE_AVAILABLE
+    ✅ PASS: 取消后 isPrechecking 必须为 false
+    ✅ PASS: 取消后 precheckResult 必须清空
+
+  验收测试完成：总计 36 项，通过 36 项，失败 0 项。
+  ```
+- **构建结果**：
+  - `tsc && vite build`：2.09s 零错误完成生产构建；
+  - 自动更新测试断言数：**36/36 项全量通过**；
+  - 累计测试套件断言数：**485 项，通过率 100% (0 错误，0 失败)**！
+
+### 2.19 Agentic Headless 驱动中枢与高阶 MCP 40 项工具集全链路验证 (2026-10-21)
+- **验证目的**：
+  1. 验证在 Rust 核心层下沉实现的文学质量门禁与反思自检引擎（套话红线模式扣分诊断、已故角色违规言行动作强力拦截、字数异常巡检）；
+  2. 验证智能实体反哺提案提取（从未登记正文中高频动作对话中准确识别新角色候选）；
+  3. 验证非破坏性候选提案暂存模式 (`create_chapter_proposal` & `accept_chapter_proposal`)：未采纳前绝对不篡改活动正文；
+  4. 验证原子级版本快照安全回滚与因果事实级联失效 (`rollback_chapter_version` + `INVALIDATED_BY_ROLLBACK`)；
+  5. 验证解耦双模五层记忆上下文组装器 (`novelforge_assemble_context` format: structured/both/text)；
+  6. 验证全量 40 项 MCP 工具端到端闭环执行（含剧情推演流水线模板列举与执行创建）；
+  7. 验证桌面端版本抽屉与历史版本面板对 Agent 提案的优雅呈现、思考链回显与一键采纳生效。
+- **测试命令**：
+  ```powershell
+  $env:PATH = "E:\tools\winlibs_msvcrt\mingw64\bin;" + $env:PATH
+  cargo run --bin db_test
+  node scripts/test-mcp-e2e.cjs
+  pnpm test:zen
+  pnpm build
+  ```
+- **测试输出**：
+  ```text
+  === 开始 NovelForge AI 本地数据库与全功能验证 ===
+  ...
+  61. 验证故事大纲阶段与情节弧级联解绑 (delete_story_arc & delete_story_phase): 阶段解绑与关联清理验证通过
+  62. 验证非破坏性候选提案暂存与采纳流转 (create/list/accept proposal): 隔离保护与生效验证通过
+  63. 验证版本快照因果安全回滚与级联事实失效 (rollback_chapter_version): 记忆自洽保护验证通过
+  64. 验证无头文学质量门禁巡检 (evaluate_chapter): 套话扣分与死者动作拦截 100% 验证通过
+  65. 验证智能实体反哺提案提取 (scan_entity_proposals): 候选人物提取验证通过
+  === 100% 测试验证通过！V3.3 核心业务与 Agent 驱动闭环 65 项全量断言通过！ ===
+
+  🚀 开始 MCP E2E 接口测试...
+  1. [PASS] Initialize: { name: 'novelforge-ai', version: '2.3.3' }
+  2. [PASS] List Novels: 获取到 3 部作品
+  3. [PASS] Get Outline: 包含 0 个分卷, 0 个独立章节
+  4. [PASS] World Rules: 获取到 4 条世界观规则
+  5. [PASS] FTS5 Search Result: []...
+  6. [PASS] List Chapters: 获取到 5 章，选取第 1 章 ID: 6af151f8-6466-4741-9b9c-b1da4258b77f
+  7. [PASS] Structured Context Pack (L0~L4 解耦上下文组装验证通过)
+  8. [PASS] Evaluate Chapter: 人情味评分 58/100, 检出套话 7 处, 判定: [NEEDS_REVISION]
+  9. [PASS] Scan Entity Proposals: 检出 2 位候选新人物: 风清扬, 独孤求败
+  10. [PASS] Propose Chapter Revision: 成功暂存候选修订草稿版本 v4
+  11. [PASS] List Chapter Versions: 包含 4 个历史快照/提案版本
+  12. [PASS] Accept Chapter Proposal: 🎉 成功采纳并生效候选提案！第 1 章已更新为该版本正文
+  13. [PASS] Create Scene: 场景《破晓之遇》创建成功
+  14. [PASS] List Scenes: 获取到本章 2 个场景细纲节拍
+  15. [PASS] Active Voice Profile: 硬核科幻·冷峻考据风
+  16. [PASS] List Plot Threads: 获取到 2 条剧情伏笔线索
+  17. [PASS] List Workflow Templates: 获取到 2 套创作推演模板
+  18. [PASS] Create & Advance Workflow Run: 实例创建成功，状态 [PENDING]
+  🎉 所有 18 项高阶 MCP 核心能力与 Agent 驱动闭环 100% 验证全部通过！
+  ```
+- **构建结果**：
+  - Rust 核心测试：**65/65 全部通过**；
+  - MCP E2E 接口测试：**18/18 全部通过**；
+  - 前端回归测试：`pnpm test:zen` 11 项 100% 全部通过；
+  - 生产构建：`pnpm build` 2.13s 零错误完成！
+
+
 

@@ -14,10 +14,18 @@ function findBinary() {
     path.join(__dirname, 'novelforge_mcp.exe'),
     'novelforge_mcp.exe'
   ];
+  let best = null;
+  let bestMtime = 0;
   for (const p of candidatePaths) {
-    if (fs.existsSync(p)) return p;
+    if (fs.existsSync(p)) {
+      const mt = fs.statSync(p).mtimeMs;
+      if (mt > bestMtime) {
+        bestMtime = mt;
+        best = p;
+      }
+    }
   }
-  return 'E:\\tools\\novelforge_target\\x86_64-pc-windows-gnu\\release\\novelforge_mcp.exe';
+  return best || 'E:\\tools\\novelforge_target\\x86_64-pc-windows-gnu\\release\\novelforge_mcp.exe';
 }
 
 const binaryPath = findBinary();

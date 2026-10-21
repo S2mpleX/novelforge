@@ -56,7 +56,7 @@ export const UpdateProgressBar: React.FC<Props> = ({ progress }) => {
             style={{ width: `${Math.max(2, Math.min(100, percent))}%` }}
           />
         ) : (
-          <div className="h-full bg-amber-600/70 rounded-full w-1/3 animate-pulse" />
+          <div className="h-full bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 rounded-full w-2/5 opacity-85 transition-all" />
         )}
       </div>
 

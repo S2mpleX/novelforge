@@ -17,6 +17,7 @@ import {
   AlertCircle,
   ExternalLink,
   Info,
+  Loader2,
 } from 'lucide-react';
 
 export const UpdateCenter: React.FC = () => {
@@ -31,6 +32,7 @@ export const UpdateCenter: React.FC = () => {
     selectedChangelog,
     isLoadingHistory,
     precheckResult,
+    isPrechecking,
     loadSettings,
     updateSettings,
     checkForUpdates,
@@ -127,8 +129,9 @@ export const UpdateCenter: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             type="button"
+            disabled={status === 'PRECHECKING' || status === 'DOWNLOADING' || status === 'INSTALLING'}
             onClick={() => setShowSettingsView(!showSettingsView)}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border cursor-pointer ${
+            className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
               showSettingsView
                 ? 'bg-[#854d0e] text-white border-[#854d0e] shadow-xs'
                 : 'bg-surface text-ink-2 border-line hover:bg-surface-2'
@@ -141,24 +144,77 @@ export const UpdateCenter: React.FC = () => {
 
           <button
             type="button"
-            disabled={status === 'CHECKING' || status === 'DOWNLOADING' || status === 'INSTALLING'}
+            disabled={status === 'CHECKING' || status === 'PRECHECKING' || status === 'DOWNLOADING' || status === 'INSTALLING'}
             onClick={handleManualCheck}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-2 disabled:opacity-50 text-ink border border-line transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-2 disabled:opacity-50 disabled:cursor-not-allowed text-ink border border-line transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
             title="手动向远端更新端点发起查询"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-primary ${status === 'CHECKING' ? 'animate-spin' : ''}`} />
             <span>{status === 'CHECKING' ? '检查中...' : '检查更新'}</span>
           </button>
 
-          {/* 发现新版本时的下载安装按钮 */}
+          {/* 发现新版本时的下载安装按钮（已彻底移除 animate-pulse，杜绝点击前后呼吸闪烁假象） */}
           {status === 'UPDATE_AVAILABLE' && (
             <button
               type="button"
               onClick={handleStartUpdate}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-700 via-amber-600 to-orange-700 hover:from-amber-600 hover:to-orange-600 text-white shadow-md transition flex items-center gap-1.5 cursor-pointer active:scale-95 animate-pulse"
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-700 via-amber-600 to-orange-700 hover:from-amber-600 hover:to-orange-600 text-white shadow-md transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="执行升级前安全检查并下载安装新版本"
             >
               <Download className="w-3.5 h-3.5" />
               <span>下载并安装 (v{latestVersion})</span>
+            </button>
+          )}
+
+          {/* 升级前安全检查状态指示按钮 */}
+          {(status === 'PRECHECKING' || isPrechecking) && (
+            <button
+              type="button"
+              disabled
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-800/80 text-amber-100 border border-amber-600/40 shadow-xs flex items-center gap-1.5 cursor-wait opacity-90"
+            >
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
+              <span>安全检查与灾备中...</span>
+            </button>
+          )}
+
+          {/* 正在下载更新包状态指示按钮 */}
+          {status === 'DOWNLOADING' && (
+            <button
+              type="button"
+              disabled
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-800/85 text-blue-100 border border-blue-600/40 shadow-xs flex items-center gap-1.5 cursor-wait opacity-90"
+            >
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-300" />
+              <span>
+                正在下载更新包
+                {downloadProgress.percent !== null ? ` (${downloadProgress.percent}%)` : '...'}
+              </span>
+            </button>
+          )}
+
+          {/* 正在安装更新包状态指示按钮 */}
+          {status === 'INSTALLING' && (
+            <button
+              type="button"
+              disabled
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-purple-800/85 text-purple-100 border border-purple-600/40 shadow-xs flex items-center gap-1.5 cursor-wait opacity-90"
+            >
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-300" />
+              <span>正在解压与启动安装向导...</span>
+            </button>
+          )}
+
+          {/* 重试更新按钮（下载或安装失败时展示） */}
+          {(status === 'ERROR_DOWNLOAD' || status === 'ERROR_INSTALL') && (
+            <button
+              type="button"
+              onClick={handleStartUpdate}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-700 hover:bg-rose-600 text-white shadow-md transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="点击重新尝试安全更新流程"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>重试更新流程</span>
             </button>
           )}
 
@@ -167,7 +223,7 @@ export const UpdateCenter: React.FC = () => {
             <button
               type="button"
               onClick={handleRelaunch}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-600 text-white shadow-md transition flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-600 text-white shadow-md transition flex items-center gap-1.5 cursor-pointer active:scale-95"
             >
               <RotateCw className="w-3.5 h-3.5" />
               <span>立即重启应用生效</span>

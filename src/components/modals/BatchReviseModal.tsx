@@ -15,6 +15,8 @@ import {
   Anchor,
   Eye,
   Wand2,
+  AlertTriangle,
+  Settings,
 } from 'lucide-react';
 import {
   BatchRevisePresetKey,
@@ -85,6 +87,8 @@ export const BatchReviseModal: React.FC<Props> = ({
     });
   };
 
+  const hasConfiguredModel = Boolean(activeProvider && activeModel);
+
   // 运行批量修订
   const handleStartBatchRevise = async () => {
     if (targetChapters.length === 0) return;
@@ -96,9 +100,16 @@ export const BatchReviseModal: React.FC<Props> = ({
 
     for (let i = 0; i < targetChapters.length; i++) {
       const ch = targetChapters[i];
-      setProgressText(`正在修订第 ${i + 1} / ${targetChapters.length} 章：《${ch.title}》...`);
+      if (hasConfiguredModel) {
+        setProgressText(`正在调用 AI 大模型重塑第 ${i + 1} / ${targetChapters.length} 章：《${ch.title}》...`);
+      } else {
+        setProgressText(`[离线降级中] 正在以本地规则清洗第 ${i + 1} / ${targetChapters.length} 章：《${ch.title}》...`);
+      }
 
       let revised = '';
+      let isOffline = false;
+      let fallbackReason = '';
+
       const promptPack = BatchReviseEngine.assemblePrompt({
         chapterTitle: ch.title,
         content: ch.content || '',
@@ -108,16 +119,25 @@ export const BatchReviseModal: React.FC<Props> = ({
 
       try {
         // 如果已配置模型网关且处于激活态，尝试调用大模型
-        if (activeProvider && activeModel) {
+        if (hasConfiguredModel) {
           const res = await api.executeLlmChat({
             system_prompt: promptPack.systemPrompt,
             user_prompt: promptPack.userPrompt,
             temperature: 0.6,
           });
           revised = res?.trim() || '';
+          if (!revised) {
+            isOffline = true;
+            fallbackReason = '大模型未返回有效正文';
+          }
+        } else {
+          isOffline = true;
+          fallbackReason = '未检测到激活的模型服务（API Key 未配置）';
         }
-      } catch (err) {
+      } catch (err: any) {
         console.warn(`第 ${i + 1} 章模型修订调用失败，降级为离线规则清洗:`, err);
+        isOffline = true;
+        fallbackReason = `大模型调用异常: ${err?.message || '网络连接或接口失败'}`;
       }
 
       // 若未配置模型或调用失败，自动降级为 0-Token 纯离线快速清洗
@@ -125,7 +145,7 @@ export const BatchReviseModal: React.FC<Props> = ({
         revised = BatchReviseEngine.offlineFastRevise(ch.content || '', selectedPreset);
       }
 
-      const diff = BatchReviseEngine.calculateDiffMetrics(ch.content || '', revised);
+      const diff = BatchReviseEngine.calculateDiffMetrics(ch.content || '', revised, isOffline);
       const origText = BatchReviseEngine.stripHtml(ch.content || '');
 
       const proposal: BatchReviseProposal = {
@@ -141,6 +161,8 @@ export const BatchReviseModal: React.FC<Props> = ({
         addedChars: diff.addedChars,
         removedChars: diff.removedChars,
         status: 'PENDING',
+        isOfflineFallback: isOffline,
+        fallbackReason: fallbackReason,
       };
 
       generatedProposals.push(proposal);
@@ -148,7 +170,14 @@ export const BatchReviseModal: React.FC<Props> = ({
     }
 
     setIsRunning(false);
-    setProgressText(`批量重塑完成！共生成 ${generatedProposals.length} 份修订草案。`);
+    const offlineCount = generatedProposals.filter((p) => p.isOfflineFallback).length;
+    if (offlineCount > 0) {
+      setProgressText(
+        `处理完成！共生成 ${generatedProposals.length} 份草案（⚠️ 提示：因未连通 API，已降级为离线规则清洗，未调用大模型）。`
+      );
+    } else {
+      setProgressText(`批量重塑完成！已由 AI 大模型成功生成 ${generatedProposals.length} 份修订草案。`);
+    }
   };
 
   // 采纳单章
@@ -375,8 +404,32 @@ export const BatchReviseModal: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Action Button */}
-          <div className="mt-auto pt-2">
+          {/* Action Button & Fallback Warning */}
+          <div className="mt-auto pt-2 flex flex-col gap-2">
+            {!hasConfiguredModel && (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-200 text-xs flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>未连接 AI 模型网关</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-amber-800/90 dark:text-amber-300/80">
+                  系统将自动降级为【本地 0-Token 离线规则清洗】（仅对预设套话进行有限正则替换）。如需体验大模型智能重塑与扩写，请先配置 API Key。
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.dispatchEvent(
+                      new CustomEvent('novelforge:open-settings', { detail: { tab: 'MODEL' } })
+                    )
+                  }
+                  className="self-start text-[11px] text-[#854d0e] dark:text-amber-400 font-bold underline hover:opacity-80 flex items-center gap-1 cursor-pointer"
+                >
+                  <Settings className="w-3 h-3" />
+                  前往设置 API Key
+                </button>
+              </div>
+            )}
+
             <button
               disabled={isRunning || targetChapters.length === 0}
               onClick={handleStartBatchRevise}
@@ -395,7 +448,7 @@ export const BatchReviseModal: React.FC<Props> = ({
               )}
             </button>
             {progressText && (
-              <p className="text-[11px] text-primary font-medium text-center mt-2 animate-pulse">
+              <p className="text-[11px] text-primary font-medium text-center mt-1 animate-pulse leading-snug">
                 {progressText}
               </p>
             )}
@@ -430,6 +483,11 @@ export const BatchReviseModal: React.FC<Props> = ({
                       }`}
                     >
                       <span>{p.chapterTitle}</span>
+                      {p.isOfflineFallback && (
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-amber-600/20 text-amber-200 dark:text-amber-300">
+                          离线
+                        </span>
+                      )}
                       {p.status === 'ACCEPTED' && <Check className="w-3 h-3 text-emerald-400 shrink-0" />}
                       {p.status === 'REJECTED' && <X className="w-3 h-3 text-rose-400 shrink-0" />}
                     </button>
@@ -450,6 +508,46 @@ export const BatchReviseModal: React.FC<Props> = ({
               {/* Proposal Detail Card */}
               {activeProp && (
                 <div className="flex-1 flex flex-col min-h-0 p-4 gap-3 overflow-y-auto">
+                  {/* Offline Fallback Alert Banner */}
+                  {activeProp.isOfflineFallback && (
+                    <div className="flex items-start justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-200 text-xs shrink-0 gap-2">
+                      <div className="flex items-start gap-2.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold">自动降级提示：当前草案由【本地 0-Token 离线规则】生成</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-600/20 text-amber-900 dark:text-amber-300 font-semibold">
+                              未调用大模型
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-amber-900/80 dark:text-amber-300/80 mt-1 leading-relaxed">
+                            <strong>降级原因：</strong>{activeProp.fallbackReason || '未连通大模型 API'}。
+                            {activeProp.originalContent === activeProp.revisedContent ? (
+                              <span className="text-amber-800 dark:text-amber-300 font-medium ml-1">
+                                本章正文未命中任何硬编码套话正则，因此文字完全保持不变（+0 字）。如需大模型深度润色，请配置 API Key。
+                              </span>
+                            ) : (
+                              <span className="ml-1">
+                                仅针对部分固定机械套话进行了规则替换，并非大模型智能润色。
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.dispatchEvent(
+                            new CustomEvent('novelforge:open-settings', { detail: { tab: 'MODEL' } })
+                          )
+                        }
+                        className="text-xs text-[#854d0e] dark:text-amber-400 font-bold underline hover:opacity-80 shrink-0 ml-3 whitespace-nowrap cursor-pointer"
+                      >
+                        前往配置 API
+                      </button>
+                    </div>
+                  )}
+
                   {/* Status Banner */}
                   <div className="flex items-center justify-between p-3 rounded-xl bg-[#f4ece0] dark:bg-[#231e1a] border border-line dark:border-[#38332d] shrink-0 gap-3 min-w-0">
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -457,7 +555,14 @@ export const BatchReviseModal: React.FC<Props> = ({
                         #{activeProp.chapterOrder}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="font-bold text-xs truncate">{activeProp.chapterTitle}</h4>
+                        <h4 className="font-bold text-xs truncate flex items-center gap-2">
+                          <span>{activeProp.chapterTitle}</span>
+                          {activeProp.isOfflineFallback && (
+                            <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/25">
+                              离线规则
+                            </span>
+                          )}
+                        </h4>
                         <div className="flex items-center gap-2 text-[11px] text-ink-2 truncate">
                           <span>{activeProp.diffSummary}</span>
                           <span>• 原文 {activeProp.originalWordCount} 字 ➔ 重塑后 {activeProp.revisedWordCount} 字</span>
@@ -506,7 +611,14 @@ export const BatchReviseModal: React.FC<Props> = ({
 
                     <div className="flex flex-col border border-amber-800/30 rounded-xl overflow-hidden bg-amber-50/20 dark:bg-[#201c18]">
                       <div className="px-3 py-1.5 bg-amber-800/10 text-xs font-bold text-primary dark:text-amber-200 border-b border-amber-800/20 flex items-center justify-between">
-                        <span>重塑草案（修改后）</span>
+                        <div className="flex items-center gap-1.5">
+                          <span>重塑草案（修改后）</span>
+                          {activeProp.isOfflineFallback && (
+                            <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-amber-600/15 text-amber-800 dark:text-amber-300 border border-amber-600/20">
+                              离线规则结果
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-emerald-700 font-semibold">
                           +{activeProp.addedChars} / -{activeProp.removedChars}
                         </span>

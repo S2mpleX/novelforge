@@ -347,41 +347,47 @@ export const DashboardView: React.FC = () => {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-5 rounded-xl bg-surface dark:bg-[#201d1a] border border-line dark:border-[#38332e] shadow-xs">
-            <div className="flex items-center justify-between text-ink-2 dark:text-[#9e9486] mb-2">
-              <span className="text-xs font-medium">总创作字数</span>
-              <TrendingUp className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+          <div className="p-5 rounded-xl bg-surface dark:bg-[#201d1a] border border-line dark:border-[#38332e] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-ink-2 dark:text-[#9e9486] mb-2">
+                <span className="text-xs font-medium">总创作字数</span>
+                <TrendingUp className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+              </div>
+              <div className="text-2xl font-bold text-ink dark:text-[#f3eee7] font-mono">
+                {totalWords.toLocaleString()} <span className="text-xs font-sans text-ink-2 font-normal">字</span>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-ink dark:text-[#f3eee7] font-mono">
-              {totalWords.toLocaleString()} <span className="text-xs font-sans text-ink-2 font-normal">字</span>
-            </div>
-            <div className="text-[11px] text-ink-2 dark:text-[#9e9486] mt-1">
+            <div className="text-[11px] text-ink-2 dark:text-[#9e9486] mt-2 truncate" title={`平均每章约 ${avgWords.toLocaleString()} 字`}>
               平均每章约 {avgWords.toLocaleString()} 字
             </div>
           </div>
 
-          <div className="p-5 rounded-xl bg-surface dark:bg-[#201d1a] border border-line dark:border-[#38332e] shadow-xs">
-            <div className="flex items-center justify-between text-ink-2 dark:text-[#9e9486] mb-2">
-              <span className="text-xs font-medium">连载章节数</span>
-              <FileText className="w-4 h-4 text-primary dark:text-amber-400" />
+          <div className="p-5 rounded-xl bg-surface dark:bg-[#201d1a] border border-line dark:border-[#38332e] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-ink-2 dark:text-[#9e9486] mb-2">
+                <span className="text-xs font-medium">连载章节数</span>
+                <FileText className="w-4 h-4 text-primary dark:text-amber-400" />
+              </div>
+              <div className="text-2xl font-bold text-ink dark:text-[#f3eee7] font-mono">
+                {chapters.length} <span className="text-xs font-sans text-ink-2 font-normal">章</span>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-ink dark:text-[#f3eee7] font-mono">
-              {chapters.length} <span className="text-xs font-sans text-ink-2 font-normal">章</span>
-            </div>
-            <div className="text-[11px] text-ink-2 dark:text-[#9e9486] mt-1">
+            <div className="text-[11px] text-ink-2 dark:text-[#9e9486] mt-2 truncate" title="已完成本地 SQLite WAL 存盘与版本快照">
               已完成本地 SQLite WAL 存盘与版本快照
             </div>
           </div>
 
-          <div className="p-5 rounded-xl bg-surface dark:bg-[#201d1a] border border-line dark:border-[#38332e] shadow-xs">
-            <div className="flex items-center justify-between text-ink-2 dark:text-[#9e9486] mb-2">
-              <span className="text-xs font-medium">文风与语言</span>
-              <Award className="w-4 h-4 text-primary dark:text-amber-400" />
+          <div className="p-5 rounded-xl bg-surface dark:bg-[#201d1a] border border-line dark:border-[#38332e] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-ink-2 dark:text-[#9e9486] mb-2">
+                <span className="text-xs font-medium">文风与语言</span>
+                <Award className="w-4 h-4 text-primary dark:text-amber-400" />
+              </div>
+              <div className="text-sm font-semibold text-ink dark:text-[#ede6dc] truncate" title={activeNovel.writing_style}>
+                {activeNovel.writing_style}
+              </div>
             </div>
-            <div className="text-sm font-semibold text-ink dark:text-[#ede6dc] truncate">
-              {activeNovel.writing_style}
-            </div>
-            <div className="text-[11px] text-ink-2 dark:text-[#9e9486] mt-1">
+            <div className="text-[11px] text-ink-2 dark:text-[#9e9486] mt-2 truncate" title="内置 Humanizer 去 AI 味与对话呼吸感">
               内置 Humanizer 去 AI 味与对话呼吸感
             </div>
           </div>
@@ -393,10 +399,10 @@ export const DashboardView: React.FC = () => {
                 <PenTool className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               </div>
               <div className="mt-1">
-                <DualWordStatsBadge />
+                <DualWordStatsBadge modal={true} />
               </div>
             </div>
-            <div className="text-[10px] text-ink-2 dark:text-[#9e9486] mt-2">
+            <div className="text-[10px] text-ink-2 dark:text-[#9e9486] mt-2 truncate" title="金黄手打 · 蓝紫AI · 签约申报存证">
               金黄手打 · 蓝紫AI · 签约申报存证
             </div>
           </div>

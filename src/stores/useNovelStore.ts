@@ -98,6 +98,7 @@ interface NovelState {
   saveCurrentChapter: (createNewVersion?: boolean, sourceType?: string) => Promise<void>;
   loadVersions: (chapterId: string) => Promise<void>;
   restoreVersion: (version: ChapterVersion) => Promise<void>;
+  acceptProposal: (version: ChapterVersion) => Promise<void>;
   deleteChapter: (chapterId: string) => Promise<void>;
 
   loadProviders: () => Promise<void>;
@@ -454,6 +455,22 @@ export const useNovelStore = create<NovelState>((set, get) => ({
     if (!activeChapter) return;
     set({ editorContent: version.content });
     await get().saveCurrentChapter(true, 'RESTORE_VERSION');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('novelforge:force-editor-reload'));
+    }
+  },
+
+  acceptProposal: async (version) => {
+    const { activeNovel, activeChapter } = get();
+    if (!activeNovel || !activeChapter) return;
+    await api.acceptChapterProposal({
+      novel_id: activeNovel.id,
+      chapter_id: activeChapter.id,
+      version_id: version.id,
+    });
+    set({ editorContent: version.content });
+    await get().loadChapters(activeNovel.id);
+    await get().loadVersions(activeChapter.id);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('novelforge:force-editor-reload'));
     }
