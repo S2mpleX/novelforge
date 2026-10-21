@@ -128,7 +128,11 @@ async function main() {
         console.log(`📝 已自动生成 updater 清单: ${latestJsonFile}`);
     } else if (fs.existsSync(latestJsonPath)) {
         try {
-            const latestMeta = JSON.parse(fs.readFileSync(latestJsonPath, 'utf-8'));
+            let rawContent = fs.readFileSync(latestJsonPath, 'utf-8');
+            if (rawContent.charCodeAt(0) === 0xFEFF) {
+                rawContent = rawContent.slice(1);
+            }
+            const latestMeta = JSON.parse(rawContent);
             if (!latestMeta.platforms) latestMeta.platforms = {};
             if (!latestMeta.platforms['windows-x86_64']) latestMeta.platforms['windows-x86_64'] = {};
             latestMeta.platforms['windows-x86_64'].url = `https://github.com/${owner}/${repo}/releases/download/${tagName}/${ghExeName}`;
@@ -138,7 +142,7 @@ async function main() {
             if (!latestMeta.version) latestMeta.version = version;
             if (!latestMeta.pub_date) latestMeta.pub_date = new Date().toISOString();
             fs.writeFileSync(latestJsonPath, JSON.stringify(latestMeta, null, 2), 'utf-8');
-            console.log(`📝 已同步规范化 updater 清单: ${latestJsonFile}`);
+            console.log(`📝 已同步规范化 updater 清单 (已去除 BOM): ${latestJsonFile}`);
         } catch (e) {
             console.warn('⚠️ 规范化 latest.json 链接时遇到轻微异常:', e.message);
         }

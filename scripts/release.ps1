@@ -1,4 +1,4 @@
-﻿# NovelForge AI — 一键版本发布脚本
+# NovelForge AI — 一键版本发布脚本
 # 用法：
 #   .\scripts\release.ps1 patch   → 2.2.0 → 2.2.1（修 Bug）
 #   .\scripts\release.ps1 minor   → 2.2.0 → 2.3.0（加功能）
@@ -226,8 +226,9 @@ if ($exeName) {
             }
         }
         $latestJsonPath = Join-Path $destDir "latest.json"
-        $latestMeta | ConvertTo-Json -Depth 5 | Set-Content -Path $latestJsonPath -Encoding UTF8
-        Write-Host "     ✅ 已就绪更新清单 latest.json" -ForegroundColor Green
+        $latestJsonContent = $latestMeta | ConvertTo-Json -Depth 5
+        [System.IO.File]::WriteAllText($latestJsonPath, $latestJsonContent, $utf8NoBom)
+        Write-Host "     ✅ 已就绪更新清单 latest.json (UTF-8 No BOM)" -ForegroundColor Green
     }
 
     # 自动打包绿色免安装便携版 (Portable ZIP)

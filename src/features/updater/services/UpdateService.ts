@@ -81,6 +81,8 @@ export class UpdateService {
           errorDetail = '更新包签名校验异常：远端发布包签名与客户端公钥不一致，已拒绝该更新以保障安全。';
         } else if (msg.includes('Could not fetch')) {
           errorDetail = '无法获取更新元数据：服务器未返回有效的 latest.json 清单。';
+        } else if (msg.includes('decoding response body') || msg.includes('expected value at line 1 column 1')) {
+          errorDetail = '更新清单解析异常：远端 latest.json 返回的内容不是合法 JSON 格式或存在编码问题。';
         } else {
           errorDetail = `更新服务异常：${msg}`;
         }
