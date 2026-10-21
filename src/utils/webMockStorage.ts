@@ -614,6 +614,9 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         personality: args.input.personality || '',
         background: args.input.background || '',
         motivation: args.input.motivation || '',
+        gender: args.input.gender || '',
+        avatar_url: args.input.avatar_url || '',
+        visual_summary: args.input.visual_summary || '',
         status: 'ACTIVE',
         created_at: Date.now(),
         updated_at: Date.now(),
@@ -646,6 +649,9 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
           personality: args.input.personality ?? chars[idx].personality,
           background: args.input.background ?? chars[idx].background,
           motivation: args.input.motivation ?? chars[idx].motivation,
+          gender: args.input.gender !== undefined ? args.input.gender : chars[idx].gender,
+          avatar_url: args.input.avatar_url !== undefined ? args.input.avatar_url : chars[idx].avatar_url,
+          visual_summary: args.input.visual_summary !== undefined ? args.input.visual_summary : chars[idx].visual_summary,
           status: args.input.status ?? chars[idx].status,
           updated_at: Date.now(),
         };
@@ -2260,6 +2266,7 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         synthesized_prose: '',
         branches_json: args.input?.branches_json || '[]',
         active_branch_id: args.input?.active_branch_id || 'main',
+        inspiration_notes_json: args.input?.inspiration_notes_json || '[]',
         created_at: Date.now(),
         updated_at: Date.now(),
       };
@@ -2293,6 +2300,7 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         if (input.synthesized_prose) item.synthesized_prose = input.synthesized_prose;
         if (input.branches_json) item.branches_json = input.branches_json;
         if (input.active_branch_id) item.active_branch_id = input.active_branch_id;
+        if (input.inspiration_notes_json !== undefined) item.inspiration_notes_json = input.inspiration_notes_json;
         item.updated_at = Date.now();
         sessions[idx] = item;
         setStorage('character_sandbox_sessions', sessions);
@@ -2364,6 +2372,59 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
       };
     }
 
+    case 'probe_character_next_actions': {
+      const input = args?.input;
+      const sessions = getStorage<any[]>('character_sandbox_sessions', []);
+      const session = sessions.find((s) => s.id === input?.session_id);
+      const actors = JSON.parse(session?.characters_config_json || '[]');
+      const speaker = actors[0] || { character_id: 'c1', character_name: '主要人物' };
+      return {
+        session_id: input?.session_id,
+        speaker_id: speaker.character_id,
+        speaker_name: speaker.character_name,
+        options: [
+          {
+            id: 'option_1',
+            label: '虚与委蛇 · 佯装退让',
+            stance: '面带微笑示弱，暗中试探对方实盘',
+            inner_motive: `稳住【${speaker.character_name}】的当场动机，绝不提前暴露底牌。`,
+            action_preview: '垂眸掩去眼底冷意，指尖轻轻摩挲袖口，神情显得无可奈何。',
+            speech_preview: '“阁下既执意如此，不妨开诚布公谈谈条件，何必将话说得这般绝？”',
+          },
+          {
+            id: 'option_2',
+            label: '针锋相对 · 触碰逆鳞',
+            stance: '正面戳破对方企图，寸土不让',
+            inner_motive: '绝不退让，直接撕开对方的虚伪面具与既得利益。',
+            action_preview: '猛然抬眸，目光如冷电般逼视对方，周身杀气隐现。',
+            speech_preview: '“笑话！当年那笔血债究竟算在谁头上，你当真以为瞒得过天下人？”',
+          },
+          {
+            id: 'option_3',
+            label: '出人意料 · 借势破局',
+            stance: '不按套路接招，转移焦点引入第三方致命变量',
+            inner_motive: '打破对方主导的审问节奏，制造环境异动伺机而动。',
+            action_preview: '忽然低声失笑，自顾自倒了一杯凉茶，甚至并未看向对方。',
+            speech_preview: '“你猜门外今夜听雨的人，除了你我，还有谁在候着？”',
+          },
+        ],
+      };
+    }
+
+    case 'distill_sandbox_inspirations': {
+      const input = args?.input;
+      const sessions = getStorage<any[]>('character_sandbox_sessions', []);
+      const session = sessions.find((s) => s.id === input?.session_id);
+      const history = JSON.parse(session?.dialogue_history_json || '[]');
+      return {
+        session_id: input?.session_id,
+        golden_quotes: history.filter((r: any) => !r.is_narrator_event).slice(0, 3).map((r: any) => `【${r.speaker_name}】“${r.speech}”`),
+        micro_actions: history.filter((r: any) => r.character_action).slice(0, 3).map((r: any) => `【${r.speaker_name}】（${r.character_action}）`),
+        psychological_insights: history.filter((r: any) => r.inner_thought).slice(0, 2).map((r: any) => `【${r.speaker_name}心理】${r.inner_thought}`),
+        plot_twists: [`在当前场景对峙达到顶峰时，可由第三方暗探突然闯入打破僵局。`],
+      };
+    }
+
     case 'synthesize_sandbox_dialogue_to_prose': {
       const input = args?.input;
       const sessions = getStorage<any[]>('character_sandbox_sessions', []);
@@ -2380,6 +2441,28 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         synthesized_prose: text,
         word_count: 120,
         duration_ms: 1200,
+      };
+    }
+
+    case 'analyze_character_appearance': {
+      const input = args?.input;
+      const name = input?.character_name || '角色';
+      const gender = input?.gender || '男';
+      const isFemale = gender.includes('女');
+      return {
+        visual_summary: isFemale
+          ? `【${name}】墨发如瀑，以一枚青玉步摇轻挽于脑后。眉如远山含黛，眸若秋水横波，眼角微挑，自带几分不食人间烟火的清冷出尘。身着一袭霜白流云暗纹广袖仙裙，腰系织银软烟罗缎带，身姿轻盈，周身隐隐有出尘灵气萦绕。`
+          : `【${name}】墨发高束，以一根古朴墨玉发簪稳固。剑眉斜飞入鬓，眸如深渊寒星，神色冷峻沉毅。身着一袭玄色暗金云纹劲装长袍，腰悬一柄三尺寒铁古剑，身形如挺拔古松，举手投足间带着久历风霜的沉稳与压迫感。`,
+        appearance_tags: isFemale
+          ? ['墨色长发', '青玉步摇', '霜白流云裙', '秋水清眸', '清冷出尘', '身姿轻盈']
+          : ['墨发高束', '剑眉寒星', '玄色暗金袍', '腰悬古剑', '冷峻沉毅', '宽肩窄腰'],
+        facial_features: isFemale
+          ? '眉目清秀如画，眸光清澈如寒潭，神态淡漠沉静，气质高华出尘。'
+          : '面容刚毅俊朗，剑眉入鬓，眸光深邃锐利如刃，唇线紧抿，不怒自威。',
+        clothing_style: isFemale
+          ? '一袭霜白配素蓝的流云暗纹广袖仙裙，腰系织银罗带，配有温润压裙古玉。'
+          : '玄底滚暗金纹利落劲装，护腕裹革，腰悬冷铁佩剑，行动便捷干练。',
+        body_type: isFemale ? '身形纤细匀称，步履轻盈飘逸。' : '身姿修长挺拔，体魄矫健有力。',
       };
     }
 

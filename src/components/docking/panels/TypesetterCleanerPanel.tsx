@@ -31,7 +31,6 @@ export const TypesetterCleanerPanel: React.FC = () => {
   const {
     activeNovel,
     activeChapter,
-    editorContent,
     updateEditorContent,
     saveCurrentChapter,
   } = useNovelStore();
@@ -48,7 +47,7 @@ export const TypesetterCleanerPanel: React.FC = () => {
 
   // 当切换章节时，默认载入当前正文（自动转换为无标签纯文本供清洗）
   useEffect(() => {
-    const text = editorContent || activeChapter?.content || '';
+    const text = useNovelStore.getState().editorContent || activeChapter?.content || '';
     setRawText(TypesetterEngine.htmlToPlainText(text));
   }, [activeChapter?.id]);
 
@@ -70,7 +69,7 @@ export const TypesetterCleanerPanel: React.FC = () => {
 
   // 载入当前正文
   const handleReloadCurrentChapter = () => {
-    const text = editorContent || activeChapter?.content || '';
+    const text = useNovelStore.getState().editorContent || activeChapter?.content || '';
     setRawText(TypesetterEngine.htmlToPlainText(text));
   };
 

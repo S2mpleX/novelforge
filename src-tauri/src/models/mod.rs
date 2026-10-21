@@ -204,6 +204,12 @@ pub struct Character {
     pub background: String,
     pub motivation: String,
     pub status: String,
+    #[serde(default)]
+    pub gender: String,
+    #[serde(default)]
+    pub avatar_url: String,
+    #[serde(default)]
+    pub visual_summary: String,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -217,6 +223,12 @@ pub struct CreateCharacterInput {
     pub personality: Option<String>,
     pub background: Option<String>,
     pub motivation: Option<String>,
+    #[serde(default)]
+    pub gender: Option<String>,
+    #[serde(default)]
+    pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub visual_summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -229,6 +241,31 @@ pub struct UpdateCharacterInput {
     pub background: Option<String>,
     pub motivation: Option<String>,
     pub status: Option<String>,
+    #[serde(default)]
+    pub gender: Option<String>,
+    #[serde(default)]
+    pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub visual_summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalyzeCharacterAppearanceInput {
+    pub image_url: String,
+    pub character_name: Option<String>,
+    pub gender: Option<String>,
+    pub genre: Option<String>,
+    pub provider_id: Option<String>,
+    pub model_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalyzeCharacterAppearanceResult {
+    pub visual_summary: String,
+    pub appearance_tags: Vec<String>,
+    pub facial_features: Option<String>,
+    pub clothing_style: Option<String>,
+    pub body_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1362,6 +1399,8 @@ pub struct CharacterSandboxSession {
     pub branches_json: Option<String>, // 树状分支推演列表 JSON
     #[serde(default)]
     pub active_branch_id: Option<String>, // 当前活跃分支 ID (默认 'main')
+    #[serde(default)]
+    pub inspiration_notes_json: Option<String>, // 捕获并提炼的灵感火花与金句列表 JSON
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -1377,6 +1416,7 @@ pub struct CreateSandboxSessionInput {
     pub characters_config: Vec<CharacterActorConfig>,
     pub branches_json: Option<String>,
     pub active_branch_id: Option<String>,
+    pub inspiration_notes_json: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1391,6 +1431,7 @@ pub struct UpdateSandboxSessionInput {
     pub synthesized_prose: Option<String>,
     pub branches_json: Option<String>,
     pub active_branch_id: Option<String>,
+    pub inspiration_notes_json: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1399,6 +1440,8 @@ pub struct ExecuteSandboxStepInput {
     pub target_speaker_id: Option<String>, // 若指定则由该角色发言，否则按顺序轮换
     pub narrator_intervention: Option<String>, // 作者作为旁白插入的环境变故/台词
     pub temperature: Option<f32>,
+    #[serde(default)]
+    pub action_guidance: Option<String>, // 作者指定该角色的核心行动路线/应对策略
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1410,10 +1453,54 @@ pub struct ExecuteSandboxStepResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterActionOption {
+    pub id: String,
+    pub label: String,          // 策略标签，如 "隐忍探底" / "寸步不让" / "借刀破局"
+    pub stance: String,         // 策略立场描述
+    pub inner_motive: String,   // 内心暗流与动机算盘
+    pub action_preview: String, // 肢体微动作预判
+    pub speech_preview: String, // 话术策略与示例台词
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProbeCharacterActionsInput {
+    pub session_id: String,
+    pub target_speaker_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProbeCharacterActionsResult {
+    pub session_id: String,
+    pub speaker_id: String,
+    pub speaker_name: String,
+    pub options: Vec<CharacterActionOption>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistillSandboxInspirationsInput {
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistillSandboxInspirationsResult {
+    pub session_id: String,
+    pub golden_quotes: Vec<String>,
+    pub micro_actions: Vec<String>,
+    pub psychological_insights: Vec<String>,
+    pub plot_twists: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SynthesizeSandboxProseInput {
     pub session_id: String,
     pub custom_guidance: Option<String>,
     pub pov_mode: Option<String>, // 'THIRD_LIMITED' | 'THIRD_OMNISCIENT'
+    #[serde(default)]
+    pub polishing_style: Option<String>, // 'CINEMATIC' | 'PSYCHOLOGICAL' | 'HARDCORE_TENSE'
+    #[serde(default)]
+    pub start_round_index: Option<usize>,
+    #[serde(default)]
+    pub end_round_index: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

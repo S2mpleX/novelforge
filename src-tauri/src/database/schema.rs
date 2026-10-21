@@ -78,6 +78,9 @@ CREATE TABLE IF NOT EXISTS characters (
     background TEXT DEFAULT '',
     motivation TEXT DEFAULT '',
     status TEXT DEFAULT 'ACTIVE',
+    gender TEXT DEFAULT '',
+    avatar_url TEXT DEFAULT '',
+    visual_summary TEXT DEFAULT '',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
@@ -523,6 +526,7 @@ CREATE TABLE IF NOT EXISTS character_sandbox_sessions (
     synthesized_prose TEXT DEFAULT '',
     branches_json TEXT DEFAULT '[]',
     active_branch_id TEXT DEFAULT 'main',
+    inspiration_notes_json TEXT DEFAULT '[]',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE

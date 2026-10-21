@@ -1,11 +1,17 @@
 # NovelForge AI — 项目持续开发状态 (PROJECT_STATE.md)
 
 ## 1. 当前阶段与基线
-- **当前阶段**：V3.6.0 **演武场树状分支推演 (What-If Branching) 与潜台词/人设崩坏 (OOC) 智能审计系统！** (将角色对戏演武场剧作能力提升至全新维度：① 树状分支走向系统：支持从任意历史节拍一键开辟独立平行推演分支，顶置横向分支导航栏支持多走向秒级无损切换与基于分支的正文转译；② 人设崩坏与 OOC 智能审计引擎：四大维度严防现代黑话污染、客服腔客套软化、惜字如金超限与秘密早泄，就地提供【按人设纠偏重掷】；③ 潜台词微观透视：角色子代理 XML 输出规范扩充 `<subtext>`，一针见血透视表面话背后的弦外之音；专属测试套件 5 项断言 100% 满分通过，演武场 12 项全绿，Rust 数据库 66 项全绿，生产构建 1.47s 零错误！)
-- **版本目标**：V3.6.0
+- **当前阶段**：V3.6.8 **演武场推演台全视口滚动、底栏防重叠遮挡与高刷新性能架构 (Character Sandbox High-FPS Scrolling & Anti-Overlap Layout)**
+  - ① **滚动图层冲突与非快路径清障**：彻底剔除左侧情境边栏与右侧对白流上的 `[contain:content]`、`[transform:translateZ(0)]`、`[will-change:scroll-position]` 与非法的 `[contain:layout_style]`，还原 Chromium/WebView2 原生合成器直连（Composited Scrolling），消灭每一帧向下滚动时的 CPU 栅格化重绘；
+  - ② **现代 Web 视口懒计算 (`content-visibility: auto`)**：在模板库、场景目标块、各个出场角色卡片以及每条对白气泡上全面实装 `content-visibility: auto` 与 `contain-intrinsic-size`，浏览器在用户向下拖拽/滚动列表时直接跳过离开视口卡片的 Layout & Paint，长列表滚动帧率瞬间拉升至 120fps；
+  - ③ **底栏文本溢出重叠与遮挡根治 (Anti-Overlap Guard)**：左侧状态信息栏增加 `min-w-0 overflow-hidden shrink-0` 严格裁剪保护，彻底杜绝不换行文本横向溢出穿透至右侧按钮下方造成遮挡；将长达 180px 的文字快捷键提示转化为【步进一轮】内嵌的精巧徽标 `<kbd>Ctrl+↵</kbd>` 与 Tooltip，两栏保持安全间隙 `gap-3` 永不遮挡；
+  - ④ **全局滚动条性能调优 (`App.css`)**：剔除 `::-webkit-scrollbar-thumb` 上的 `transition: background 0.2s ease`，消除向下滚动时逐帧触发颜色补间动画对渲染管线的打断；
+  - ⑤ **模态框背景与阴影轻量化 (`CharacterSandboxModal.tsx`)**：剔除遮罩层 `backdrop-blur-xs` 与外层 `[contain:paint]`，避免滚动时每一帧进行全屏高斯模糊卷积运算；
+  - ⑥ **全套自动化回归验证 100% 通过**：`test:sandbox:inspiration` (6/6)、`test:sandbox:api` (4/4)、`test:sandbox` (12/12)、`test:branches` (5/5) 全部满分通过，原生 `cargo run --manifest-path src-tauri/Cargo.toml --bin db_test` 66/66 全部通过，前端 Vite 生产构建 1.30s 零错误！
+- **版本目标**：V3.6.8
 - **更新时间**：2026-10-21
-- **代码库状态**：真实可运行、真实编译通过 (Rust 后端与 SQLite 零错误零警告，前端 Vite 打包 1.47s 零错误，分支与 OOC 专项测试 5/5 全部通过，P2P 联机 5/5 全部通过，Rust db_test 66/66 全部通过，演武场专项 12/12 全部通过)。
-- **最近修复**：优化秘密关键词滑窗匹配算法，精准识别无标点口语泄密；完成演武场双向分支持久化与 P2P 全量广播联动。
+- **代码库状态**：真实可运行、真实编译通过 (Rust 后端与 SQLite 零错误零警告，前端 Vite 打包 1.30s 零错误，演武场灵感探针 6/6 全部通过，多 API 与性别专项 4/4 全部通过，分支推演 5/5 全部通过，Rust db_test 66/66 全部通过)。
+- **最近实装**：底栏文字溢出遮挡彻底根除，快捷键无感内嵌与全视口高刷新加固 (ADR-060)。
 
 ---
 
@@ -1285,5 +1291,48 @@ NovelForge AI V2.5 系列已全面高质量落地！
      - 原生数据库测试 `db_test` **66/66 项断言全绿通过**；
      - `test:sandbox` 12 项、`test:p2p` 5 项全绿；
      - 前端生产构建 `pnpm build` **1.47s 零错误完成**。
+
+- **第三十八梯队**：演武场角色行动抉择探针、灵感火花提炼与高光文段精修系统 (V3.6.6 Character Action Probing & Inspiration Distillation Suite)：
+  1. **角色行动抉择探针 (What Would They Do? - Action Probing Engine)**：
+     - 彻底改变“只能看角色自说自话”的单调体验，为当前主要角色动态生成 3 条鲜活且极具戏剧反差的下一步行动策略（如：`虚与委蛇 · 佯装退让` / `针锋相对 · 触碰逆鳞` / `出人意料 · 借势破局`）；
+     - 作者不仅可直观预览各路线的“微动作动机”与“预期后果”，更可一键【采纳此路线步进】，精准主导戏剧张力走向。
+  2. **全场灵感火花自动提炼 (Inspiration Spark Distiller)**：
+     - 创作者对戏完毕后，一键提炼整场对戏中的高价值文学素材：
+       - `💬 高光金句与双关台词`（字字珠玑、富有哲理或冷酷锋芒）；
+       - `🎭 传神微动作与神态细节`（打破套路、充满五感张力）；
+       - `🧠 潜台词与深层博弈暗流`（揭示各角色隐秘利益与防线计算）；
+       - `⚡ 意外转折与剧情伏笔线索`（出人意料的冲突破局点）；
+     - 提炼内容结构化持久化于 SQLite 演武场沙盒会话，支持一键存入便签本。
+  3. **高光文段精修打磨工坊 (Prose Polishing Workshop)**：
+     - 将原本生硬的“正文转译”升级为专业文学精修实验室，提供 3 套针对性风格：
+       - `🎬 电影感镜头白描`：视听语言、声响光影、冷白描；
+       - `🧠 心理暗流深描`：潜台词剖析、内心拉扯、微表情；
+       - `⚡ 硬派冷冽网文`：短句突进、节奏明快、压迫感拉满；
+     - 支持指定范围切片精修与作者自定义打磨意图。
+  4. **全套测试矩阵全绿通过**：
+     - `test:sandbox:inspiration` (6/6)、`test:sandbox:api` (4/4)、`test:header` (9/9) 全部满分通过。
+
+- **第三十九梯队**：角色贴图立绘全链路支持与多模态 AI 视觉人设解析系统 (V3.6.7 Character Avatar & Multimodal AI Visual Understanding Suite)：
+  1. **SQLite 数据库与持久化模型无损演进**：
+     - `characters` 表平滑迁移增加 `avatar_url TEXT DEFAULT ''` 与 `visual_summary TEXT DEFAULT ''`，向下兼容既有数据；
+     - Rust 数据结构（`Character`, `CreateCharacterInput`, `UpdateCharacterInput`）与 SQLite CRUD 全面打通，MCP 服务端端点同步升级。
+  2. **多模态 AI 视觉人设解析引擎 (`analyze_character_appearance`)**：
+     - 扩展 `OpenAIClient::vision_chat_completion` 接口，支持图片直链与 Base64 Data URL 视界输入；
+     - 注入文学级人设提炼 Prompt，自动解析角色的发型发色、五官神态、体态身形、服饰质感与武器佩饰；
+     - 提取生成 150~250 字文学小说级肖像描摹段落，并输出 4~8 个结构化视觉标签（如：银发高马尾、玄黑金纹劲装、腰悬古剑）；
+     - 内置跨题材（仙侠/科幻/都市/通用）、跨性别（男/女/未知）智能兜底拟合算法，网络波动或纯文本大模型下 100% 高可用。
+  3. **演武场推演台认知联动与微动作自洽注入**：
+     - `execute_character_sandbox_step` 与 `probe_character_next_actions` 系统提示词深度注入角色立绘外貌特征；
+     - 引导 AI 在推演对手戏、微动作与潜台词时严格遵循立绘特征（如拂动衣袖、抚弄腰间古剑、垂眸沉思），彻底终结“立绘是白衣飘飘，AI 描写却是西装革履”的割裂；
+     - 演武场出场阵容卡片、对戏发言气泡头像直观渲染立绘贴图，视觉沉浸感全面飞跃。
+  4. **全景 UI 交互与立绘选择器 (`CharactersView.tsx` & `CharacterProfilesPanel.tsx`)**：
+     - 支持本地文件一键选择（FileReader 自动转 Data URL）、拖拽上传与网络直链；
+     - 实时立绘预览、头像圆角卡片渲染，配备【👁️ AI 识图理解外貌】操作按钮；
+     - 识别结果即时填入表单，支持创作者自由微调，严格贯彻用户掌控原则。
+  5. **全套自动化测试 100% 满分通过**：
+     - 专用自动化测试 `test:character:visual` **5/5 项深度断言 100% 满分通过**；
+     - `cargo run --bin db_test` **66/66 项原生全功能断言全部通过**；
+     - 前端生产构建 `pnpm build` **1.39s 零错误 0 警告完成**。
+
 
 

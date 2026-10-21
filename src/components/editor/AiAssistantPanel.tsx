@@ -81,7 +81,6 @@ export const AiAssistantPanel: React.FC = () => {
   const {
     activeNovel,
     activeChapter,
-    editorContent,
     updateEditorContent,
     saveCurrentChapter,
     activeProvider,
@@ -485,7 +484,7 @@ export const AiAssistantPanel: React.FC = () => {
         novel_id: activeNovel.id,
         chapter_id: activeChapter.id,
         instruction: enhancedInstruction,
-        current_content: editorContent,
+        current_content: useNovelStore.getState().editorContent,
         temperature: creativity,
         max_tokens: computedMaxTokens,
       });
@@ -517,7 +516,7 @@ export const AiAssistantPanel: React.FC = () => {
     const formattedParagraphs = formatTextToParagraphs(text);
 
     if (mode === 'APPEND') {
-      const newContent = (editorContent || '') + formattedParagraphs;
+      const newContent = (useNovelStore.getState().editorContent || '') + formattedParagraphs;
       updateEditorContent(newContent);
       await saveCurrentChapter(true, 'AI_STASH_APPEND');
       setStatusMessage('草稿已追加至文末！');
@@ -562,7 +561,7 @@ export const AiAssistantPanel: React.FC = () => {
   };
 
   const handleScanAuditWords = () => {
-    const raw = editorContent.replace(/<[^>]+>/g, '');
+    const raw = (useNovelStore.getState().editorContent || '').replace(/<[^>]+>/g, '');
     const suspiciousKeywords = [
       '涉暴', '毒品', '血腥虐杀', '枪支走私', '反动政变', '极端主义', '淫秽露骨', '洗钱地下庄家', '违禁违规', '刑讯逼供', '走私军火'
     ];
@@ -582,7 +581,7 @@ export const AiAssistantPanel: React.FC = () => {
     if (!textToApply) return;
     const formattedParagraphs = formatTextToParagraphs(textToApply);
 
-    const newContent = (editorContent || '') + formattedParagraphs;
+    const newContent = (useNovelStore.getState().editorContent || '') + formattedParagraphs;
     updateEditorContent(newContent);
     await saveCurrentChapter(true, 'AI_APPEND');
     setStatusMessage('已成功追加到正文末尾并保存快照！');
@@ -687,7 +686,7 @@ export const AiAssistantPanel: React.FC = () => {
   // --- HANDLERS: STYLE POLISH ---
   const handleRunPolish = async () => {
     if (!activeNovel) return;
-    const textToPolish = polishInput.trim() || editorContent?.replace(/<[^>]+>/g, '').slice(0, 1000);
+    const textToPolish = polishInput.trim() || useNovelStore.getState().editorContent?.replace(/<[^>]+>/g, '').slice(0, 1000);
     if (!textToPolish) {
       setStatusMessage('请选择或输入待润色的段落文本');
       return;

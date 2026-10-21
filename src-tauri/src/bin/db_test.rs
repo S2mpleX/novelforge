@@ -85,6 +85,9 @@ fn main() {
             personality: Some("沉着敏锐、孤傲冷峻".to_string()),
             background: Some("经历过第三次太阳风暴的幸存者".to_string()),
             motivation: Some("寻找失落的先驱者舰队".to_string()),
+            gender: Some("男".to_string()),
+            avatar_url: Some("https://example.com/linyuan.png".to_string()),
+            visual_summary: Some("墨黑短发，眉目坚毅，身着藏青色领航员作战常服，眼神冷冽如星海".to_string()),
         })
         .expect("创建人物失败");
     println!("7. 成功创建角色档案: 【{}】 (动机: {})", character.name, character.motivation);
@@ -120,6 +123,9 @@ fn main() {
             personality: Some("理智严谨、快言快语".to_string()),
             background: Some("空间动力研究所高材生".to_string()),
             motivation: Some("维护舰队动力系统周全".to_string()),
+            gender: Some("女".to_string()),
+            avatar_url: None,
+            visual_summary: None,
         })
         .expect("创建角色2失败");
 
@@ -815,6 +821,9 @@ fn main() {
         personality: Some("冷酷严正".to_string()),
         background: Some("皇室近卫出身".to_string()),
         motivation: Some("查明跃迁引擎失控真相".to_string()),
+        gender: Some("男".to_string()),
+        avatar_url: Some("https://example.com/avatar1.png".to_string()),
+        visual_summary: Some("面如冠玉，长身玉立".to_string()),
     }).expect("创建待测角色失败");
 
     let updated_char = db.update_character(UpdateCharacterInput {
@@ -826,9 +835,15 @@ fn main() {
         background: Some("跨越因果律循环后的觉醒者".to_string()),
         motivation: Some("引导人类文明避开大过滤器".to_string()),
         status: Some("ACTIVE".to_string()),
+        gender: Some("男".to_string()),
+        avatar_url: Some("https://example.com/avatar_final.png".to_string()),
+        visual_summary: Some("长发披肩束以星冠，玄金星河披风，双眸如有亿万星辰湮灭".to_string()),
     }).expect("更新角色档案失败");
     assert_eq!(updated_char.name, "陈渊 (终极形态)");
     assert_eq!(updated_char.personality, "深沉博爱、运筹帷幄");
+    assert_eq!(updated_char.gender, "男");
+    assert_eq!(updated_char.avatar_url, "https://example.com/avatar_final.png");
+    assert!(updated_char.visual_summary.contains("星河披风"));
 
     // 为该角色建立关系、人物弧、关联场景与 plot_association
     let char_rel = db.create_character_relationship(novelforge_ai_lib::models::CreateCharacterRelationshipInput {
@@ -1082,6 +1097,9 @@ fn main() {
         personality: None,
         background: None,
         motivation: None,
+        gender: Some("男".to_string()),
+        avatar_url: None,
+        visual_summary: None,
     }).expect("创建角色");
     db.update_character_status(&dead_char.id, "死亡").expect("更新状态为死亡");
 
@@ -1124,6 +1142,7 @@ fn main() {
         synthesized_prose: Some("烛光下，萧离慢慢放下茶盏，面色冷若寒霜。".to_string()),
         branches_json: Some("[]".to_string()),
         active_branch_id: Some("main".to_string()),
+        inspiration_notes_json: Some("[]".to_string()),
         created_at: chrono::Utc::now().timestamp_millis(),
         updated_at: chrono::Utc::now().timestamp_millis(),
     }).expect("保存角色对戏沙盒会话失败");

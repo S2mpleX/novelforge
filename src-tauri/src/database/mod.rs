@@ -58,6 +58,11 @@ impl DbManager {
         let _ = conn.pragma_update(None, "foreign_keys", "ON");
         let _ = conn.pragma_update(None, "synchronous", "NORMAL");
         let _ = conn.pragma_update(None, "busy_timeout", 5000);
+        let _ = conn.pragma_update(None, "cache_size", -64000);
+        let _ = conn.pragma_update(None, "mmap_size", 268435456);
+        let _ = conn.pragma_update(None, "temp_store", "MEMORY");
+        let _ = conn.pragma_update(None, "wal_autocheckpoint", 1000);
+        let _ = conn.execute_batch("PRAGMA optimize;");
 
         // Execute table schemas
         conn.execute_batch(schema::INIT_SCHEMA)?;
@@ -84,6 +89,10 @@ impl DbManager {
             "ALTER TABLE novels ADD COLUMN cover_url TEXT DEFAULT ''",
             "ALTER TABLE character_sandbox_sessions ADD COLUMN branches_json TEXT DEFAULT '[]'",
             "ALTER TABLE character_sandbox_sessions ADD COLUMN active_branch_id TEXT DEFAULT 'main'",
+            "ALTER TABLE character_sandbox_sessions ADD COLUMN inspiration_notes_json TEXT DEFAULT '[]'",
+            "ALTER TABLE characters ADD COLUMN gender TEXT DEFAULT ''",
+            "ALTER TABLE characters ADD COLUMN avatar_url TEXT DEFAULT ''",
+            "ALTER TABLE characters ADD COLUMN visual_summary TEXT DEFAULT ''",
         ];
         for sql in migrations {
             let _ = conn.execute(sql, []);
@@ -1184,7 +1193,7 @@ impl DbManager {
     pub fn list_characters(&self, novel_id: &str) -> Result<Vec<Character>> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, novel_id, name, aliases, profile, personality, background, motivation, status, created_at, updated_at
+            "SELECT id, novel_id, name, aliases, profile, personality, background, motivation, status, gender, avatar_url, visual_summary, created_at, updated_at
              FROM characters WHERE novel_id = ?1 ORDER BY created_at ASC",
         )?;
 
@@ -1199,8 +1208,11 @@ impl DbManager {
                 background: row.get(6)?,
                 motivation: row.get(7)?,
                 status: row.get(8)?,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
+                gender: row.get(9).unwrap_or_default(),
+                avatar_url: row.get(10).unwrap_or_default(),
+                visual_summary: row.get(11).unwrap_or_default(),
+                created_at: row.get(12)?,
+                updated_at: row.get(13)?,
             })
         })?;
 
@@ -1220,10 +1232,13 @@ impl DbManager {
         let personality = input.personality.unwrap_or_default();
         let background = input.background.unwrap_or_default();
         let motivation = input.motivation.unwrap_or_default();
+        let gender = input.gender.unwrap_or_default();
+        let avatar_url = input.avatar_url.unwrap_or_default();
+        let visual_summary = input.visual_summary.unwrap_or_default();
 
         conn.execute(
-            "INSERT INTO characters (id, novel_id, name, aliases, profile, personality, background, motivation, status, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'ACTIVE', ?9, ?10)",
+            "INSERT INTO characters (id, novel_id, name, aliases, profile, personality, background, motivation, status, gender, avatar_url, visual_summary, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'ACTIVE', ?9, ?10, ?11, ?12, ?13)",
             params![
                 &id,
                 &input.novel_id,
@@ -1233,6 +1248,9 @@ impl DbManager {
                 &personality,
                 &background,
                 &motivation,
+                &gender,
+                &avatar_url,
+                &visual_summary,
                 now,
                 now
             ],
@@ -1248,6 +1266,9 @@ impl DbManager {
             background,
             motivation,
             status: "ACTIVE".to_string(),
+            gender,
+            avatar_url,
+            visual_summary,
             created_at: now,
             updated_at: now,
         })
@@ -1256,7 +1277,7 @@ impl DbManager {
     pub fn get_character(&self, id: &str) -> Result<Character> {
         let conn = self.conn.lock();
         conn.query_row(
-            "SELECT id, novel_id, name, aliases, profile, personality, background, motivation, status, created_at, updated_at
+            "SELECT id, novel_id, name, aliases, profile, personality, background, motivation, status, gender, avatar_url, visual_summary, created_at, updated_at
              FROM characters WHERE id = ?1",
             params![id],
             |row| {
@@ -1270,14 +1291,18 @@ impl DbManager {
                     background: row.get(6)?,
                     motivation: row.get(7)?,
                     status: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
+                    gender: row.get(9).unwrap_or_default(),
+                    avatar_url: row.get(10).unwrap_or_default(),
+                    visual_summary: row.get(11).unwrap_or_default(),
+                    created_at: row.get(12)?,
+                    updated_at: row.get(13)?,
                 })
             },
         )
     }
 
     pub fn update_character(&self, input: UpdateCharacterInput) -> Result<Character> {
+        let existing = self.get_character(&input.id)?;
         let conn = self.conn.lock();
         let now = chrono::Utc::now().timestamp_millis();
         let aliases = input.aliases.unwrap_or_default();
@@ -1286,10 +1311,13 @@ impl DbManager {
         let background = input.background.unwrap_or_default();
         let motivation = input.motivation.unwrap_or_default();
         let status = input.status.unwrap_or_else(|| "ACTIVE".to_string());
+        let gender = input.gender.unwrap_or(existing.gender);
+        let avatar_url = input.avatar_url.unwrap_or(existing.avatar_url);
+        let visual_summary = input.visual_summary.unwrap_or(existing.visual_summary);
 
         conn.execute(
-            "UPDATE characters SET name = ?1, aliases = ?2, profile = ?3, personality = ?4, background = ?5, motivation = ?6, status = ?7, updated_at = ?8 WHERE id = ?9",
-            params![&input.name, &aliases, &profile, &personality, &background, &motivation, &status, now, &input.id],
+            "UPDATE characters SET name = ?1, aliases = ?2, profile = ?3, personality = ?4, background = ?5, motivation = ?6, status = ?7, gender = ?8, avatar_url = ?9, visual_summary = ?10, updated_at = ?11 WHERE id = ?12",
+            params![&input.name, &aliases, &profile, &personality, &background, &motivation, &status, &gender, &avatar_url, &visual_summary, now, &input.id],
         )?;
         drop(conn);
         self.get_character(&input.id)
@@ -3165,6 +3193,9 @@ impl DbManager {
                 personality: Some(c.personality),
                 background: Some(c.background),
                 motivation: Some(c.motivation),
+                gender: Some(c.gender),
+                avatar_url: Some(c.avatar_url),
+                visual_summary: Some(c.visual_summary),
             }) {
                 char_map.insert(old_id, new_c.id);
             }
@@ -5733,8 +5764,8 @@ impl DbManager {
             "INSERT INTO character_sandbox_sessions (
                 id, novel_id, chapter_id, scene_id, title,
                 scene_setting, scene_goal, characters_config_json, dialogue_history_json,
-                status, synthesized_prose, branches_json, active_branch_id, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+                status, synthesized_prose, branches_json, active_branch_id, inspiration_notes_json, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
              ON CONFLICT(id) DO UPDATE SET
                 title=excluded.title,
                 scene_setting=excluded.scene_setting,
@@ -5745,6 +5776,7 @@ impl DbManager {
                 synthesized_prose=excluded.synthesized_prose,
                 branches_json=excluded.branches_json,
                 active_branch_id=excluded.active_branch_id,
+                inspiration_notes_json=excluded.inspiration_notes_json,
                 updated_at=excluded.updated_at",
             params![
                 &session.id,
@@ -5760,6 +5792,7 @@ impl DbManager {
                 &session.synthesized_prose,
                 session.branches_json.as_deref().unwrap_or("[]"),
                 session.active_branch_id.as_deref().unwrap_or("main"),
+                session.inspiration_notes_json.as_deref().unwrap_or("[]"),
                 session.created_at,
                 session.updated_at,
             ],
@@ -5772,7 +5805,7 @@ impl DbManager {
         let mut stmt = conn.prepare(
             "SELECT id, novel_id, chapter_id, scene_id, title,
                     scene_setting, scene_goal, characters_config_json, dialogue_history_json,
-                    status, synthesized_prose, branches_json, active_branch_id, created_at, updated_at
+                    status, synthesized_prose, branches_json, active_branch_id, inspiration_notes_json, created_at, updated_at
              FROM character_sandbox_sessions WHERE id = ?1",
         )?;
         let mut rows = stmt.query_map(params![id], |row| {
@@ -5790,8 +5823,9 @@ impl DbManager {
                 synthesized_prose: row.get(10)?,
                 branches_json: row.get(11).ok().flatten().or_else(|| Some("[]".to_string())),
                 active_branch_id: row.get(12).ok().flatten().or_else(|| Some("main".to_string())),
-                created_at: row.get(13)?,
-                updated_at: row.get(14)?,
+                inspiration_notes_json: row.get(13).ok().flatten().or_else(|| Some("[]".to_string())),
+                created_at: row.get(14)?,
+                updated_at: row.get(15)?,
             })
         })?;
         if let Some(row) = rows.next() {
@@ -5806,7 +5840,7 @@ impl DbManager {
         let mut stmt = conn.prepare(
             "SELECT id, novel_id, chapter_id, scene_id, title,
                     scene_setting, scene_goal, characters_config_json, dialogue_history_json,
-                    status, synthesized_prose, branches_json, active_branch_id, created_at, updated_at
+                    status, synthesized_prose, branches_json, active_branch_id, inspiration_notes_json, created_at, updated_at
              FROM character_sandbox_sessions WHERE novel_id = ?1 ORDER BY updated_at DESC",
         )?;
         let rows = stmt.query_map(params![novel_id], |row| {
@@ -5824,8 +5858,9 @@ impl DbManager {
                 synthesized_prose: row.get(10)?,
                 branches_json: row.get(11).ok().flatten().or_else(|| Some("[]".to_string())),
                 active_branch_id: row.get(12).ok().flatten().or_else(|| Some("main".to_string())),
-                created_at: row.get(13)?,
-                updated_at: row.get(14)?,
+                inspiration_notes_json: row.get(13).ok().flatten().or_else(|| Some("[]".to_string())),
+                created_at: row.get(14)?,
+                updated_at: row.get(15)?,
             })
         })?;
         let mut list = Vec::new();
@@ -5953,6 +5988,9 @@ mod tests {
             personality: Some("外冷内热、沉静果断".to_string()),
             background: Some("幼年流落街头，被师尊带上山".to_string()),
             motivation: Some("追寻父母失踪的真相".to_string()),
+            gender: Some("男".to_string()),
+            avatar_url: None,
+            visual_summary: None,
         }).unwrap();
 
         assert_eq!(chara.name, "李观棋");

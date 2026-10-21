@@ -1,8 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
 import { confirmDialog } from '@/utils/dialog';
 import type { Character } from '@/types';
+
+const showToast = (title: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
+  window.dispatchEvent(
+    new CustomEvent('novelforge:toast', {
+      detail: { title, type },
+    })
+  );
+};
 import {
   Users,
   Plus,
@@ -14,6 +22,11 @@ import {
   Filter,
   Edit3,
   Trash2,
+  Image,
+  Sparkles,
+  Upload,
+  Eye,
+  Loader2,
 } from 'lucide-react';
 
 interface Props {
@@ -95,11 +108,17 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
 
   // Form state
   const [charName, setCharName] = useState('');
+  const [charGender, setCharGender] = useState('男');
   const [charAliases, setCharAliases] = useState('');
   const [charPersonality, setCharPersonality] = useState('');
   const [charMotivation, setCharMotivation] = useState('');
   const [charBackground, setCharBackground] = useState('');
+  const [charAvatarUrl, setCharAvatarUrl] = useState('');
+  const [charVisualSummary, setCharVisualSummary] = useState('');
+  const [isAnalyzingVisual, setIsAnalyzingVisual] = useState(false);
   const [charInitialStatus, setCharInitialStatus] = useState<CharacterLifeStatus>('健康');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadCharacters = async () => {
     if (!activeNovel) return;
@@ -130,10 +149,13 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
   const handleStartAdd = () => {
     setEditingChar(null);
     setCharName('');
+    setCharGender('男');
     setCharAliases('');
     setCharPersonality('');
     setCharMotivation('');
     setCharBackground('');
+    setCharAvatarUrl('');
+    setCharVisualSummary('');
     setCharInitialStatus('健康');
     setShowAddModal(true);
   };
@@ -141,12 +163,62 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
   const handleStartEdit = (char: Character) => {
     setEditingChar(char);
     setCharName(char.name);
+    setCharGender(char.gender || '男');
     setCharAliases(char.aliases || '');
     setCharPersonality(char.personality || '');
     setCharMotivation(char.motivation || '');
     setCharBackground(char.background || '');
+    setCharAvatarUrl(char.avatar_url || '');
+    setCharVisualSummary(char.visual_summary || '');
     setCharInitialStatus(getNormalizedStatus(char.status));
     setShowAddModal(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('请选择有效的图片文件', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      if (base64) {
+        setCharAvatarUrl(base64);
+        showToast('角色贴图已就绪，点击【AI 识图】可自动提取人设外貌', 'info');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAiAnalyzeAvatar = async () => {
+    if (!charAvatarUrl) {
+      showToast('请先选择角色立绘图片', 'warning');
+      return;
+    }
+
+    setIsAnalyzingVisual(true);
+    try {
+      const res = await api.analyzeCharacterAppearance({
+        image_url: charAvatarUrl,
+        character_name: charName.trim() || '本角色',
+        gender: charGender,
+        genre: activeNovel?.genre_profile,
+      });
+
+      if (res && res.visual_summary) {
+        setCharVisualSummary(res.visual_summary);
+        showToast('AI 识图成功！已深度理解并生成人设外貌描写', 'success');
+      }
+    } catch (e: any) {
+      console.error('AI 识图失败:', e);
+      showToast(`AI 识图解析出现偏差: ${e?.message || e}`, 'error');
+    } finally {
+      setIsAnalyzingVisual(false);
+    }
   };
 
   const handleDeleteCharacter = async (char: Character) => {
@@ -178,10 +250,13 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
       await api.updateCharacter({
         id: editingChar.id,
         name: charName.trim(),
+        gender: charGender,
         aliases: charAliases.trim() || undefined,
         personality: charPersonality.trim(),
         motivation: charMotivation.trim(),
         background: charBackground.trim(),
+        avatar_url: charAvatarUrl.trim() || undefined,
+        visual_summary: charVisualSummary.trim() || undefined,
       });
       if (charInitialStatus !== getNormalizedStatus(editingChar.status)) {
         await handleStatusChange(editingChar.id, charInitialStatus);
@@ -190,10 +265,13 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
       const created = await api.createCharacter({
         novel_id: activeNovel.id,
         name: charName.trim(),
+        gender: charGender,
         aliases: charAliases.trim() || undefined,
         personality: charPersonality.trim(),
         motivation: charMotivation.trim(),
         background: charBackground.trim(),
+        avatar_url: charAvatarUrl.trim() || undefined,
+        visual_summary: charVisualSummary.trim() || undefined,
       });
 
       if (charInitialStatus !== '健康' && created?.id) {
@@ -206,6 +284,8 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
     setCharPersonality('');
     setCharMotivation('');
     setCharBackground('');
+    setCharAvatarUrl('');
+    setCharVisualSummary('');
     setCharInitialStatus('健康');
     setEditingChar(null);
     setShowAddModal(false);
@@ -395,13 +475,33 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                   <div>
                     {/* 卡片头部：姓名与生存状态选择 */}
                     <div className="flex items-center justify-between pb-2 mb-2 border-b border-line">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-bold text-sm text-primary truncate">{char.name}</span>
-                        {char.aliases && (
-                          <span className="text-[10px] text-ink-2 font-serif truncate max-w-[80px]">
-                            ({char.aliases})
-                          </span>
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        {char.avatar_url ? (
+                          <img
+                            src={char.avatar_url}
+                            alt={char.name}
+                            className="w-8 h-8 rounded-lg object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-amber-800/10 text-primary flex items-center justify-center font-bold text-xs font-serif shrink-0 border border-dashed border-amber-800/20">
+                            {char.name.slice(0, 1)}
+                          </div>
                         )}
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-sm text-primary truncate">{char.name}</span>
+                            {char.gender && (
+                              <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-sans shrink-0">
+                                {char.gender}
+                              </span>
+                            )}
+                          </div>
+                          {char.aliases && (
+                            <span className="text-[10px] text-ink-2 font-serif truncate max-w-[80px] block">
+                              ({char.aliases})
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* 状态徽章与快捷流转 */}
@@ -432,6 +532,11 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                     </p>
 
                     {/* 性格与动机速览 */}
+                    {char.visual_summary && (
+                      <p className="text-[10px] text-amber-900/80 dark:text-amber-300/80 line-clamp-1 mb-1 font-serif bg-amber-500/5 px-1.5 py-0.5 rounded border border-amber-800/10">
+                        <span className="font-semibold">立绘:</span> {char.visual_summary}
+                      </p>
+                    )}
                     {char.personality && (
                       <p className="text-[10.5px] text-ink-2 line-clamp-2 mb-1">
                         <span className="text-ink-2">性格:</span> {char.personality}
@@ -491,11 +596,33 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                 >
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm text-primary">{char.name}</span>
-                        {char.aliases && (
-                          <span className="text-[10px] text-ink-2 font-serif">（{char.aliases}）</span>
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        {char.avatar_url ? (
+                          <img
+                            src={char.avatar_url}
+                            alt={char.name}
+                            className="w-8 h-8 rounded-lg object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-amber-800/10 text-primary flex items-center justify-center font-bold text-xs font-serif shrink-0 border border-dashed border-amber-800/20">
+                            {char.name.slice(0, 1)}
+                          </div>
                         )}
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-sm text-primary">{char.name}</span>
+                            {char.gender && (
+                              <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-sans shrink-0">
+                                {char.gender}
+                              </span>
+                            )}
+                          </div>
+                          {char.aliases && (
+                            <span className="text-[10px] text-ink-2 font-serif block truncate max-w-[80px]">
+                              （{char.aliases}）
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span
@@ -569,7 +696,94 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
             </div>
 
             <form onSubmit={handleSaveChar} className="space-y-2.5">
-              <div className="grid grid-cols-2 gap-2">
+              {/* 角色立绘贴图与 AI 识图识别区 */}
+              <div className="p-2.5 rounded-lg bg-amber-500/5 dark:bg-amber-400/5 border border-amber-800/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-ink flex items-center gap-1">
+                    <Image className="w-3.5 h-3.5 text-amber-700" />
+                    角色立绘贴图 / 视觉头像
+                  </label>
+                  <span className="text-[10px] text-ink-2">支持本地图片与图片直链</span>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  {charAvatarUrl ? (
+                    <div className="relative shrink-0">
+                      <img
+                        src={charAvatarUrl}
+                        alt="立绘"
+                        className="w-12 h-12 rounded-lg object-cover border border-amber-800/40 shadow-2xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCharAvatarUrl('')}
+                        className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-600 text-white flex items-center justify-center text-[9px] hover:bg-red-700"
+                        title="移除立绘"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-12 h-12 rounded-lg border border-dashed border-line hover:border-amber-700 flex flex-col items-center justify-center text-ink-2 hover:text-amber-800 transition cursor-pointer bg-surface/50 shrink-0"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span className="text-[8px] mt-0.5">立绘</span>
+                    </div>
+                  )}
+
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-2 py-1 rounded border border-line bg-surface hover:bg-surface-3 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+                      >
+                        <Upload className="w-3 h-3 text-amber-700" />
+                        选择本地图片
+                      </button>
+                      {charAvatarUrl && (
+                        <button
+                          type="button"
+                          onClick={handleAiAnalyzeAvatar}
+                          disabled={isAnalyzingVisual}
+                          className="px-2.5 py-1 rounded bg-amber-800 hover:bg-amber-700 disabled:opacity-50 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer active:scale-95"
+                          title="让 AI 深度细致观察立绘外貌特征"
+                        >
+                          {isAnalyzingVisual ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <span>识图中...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3 h-3 text-amber-300" />
+                              <span>👁️ AI 识图</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      value={charAvatarUrl.startsWith('data:') ? '已载入本地立绘数据' : charAvatarUrl}
+                      onChange={(e) => setCharAvatarUrl(e.target.value)}
+                      placeholder="或输入图片 URL..."
+                      disabled={charAvatarUrl.startsWith('data:')}
+                      className="w-full bg-surface border border-line rounded px-2 py-0.5 text-[10px] text-ink"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
                   <label className="block text-[11px] font-semibold text-ink-2 mb-1">角色姓名 *</label>
                   <input
@@ -583,17 +797,31 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                 </div>
 
                 <div>
+                  <label className="block text-[11px] font-semibold text-ink-2 mb-1">性别</label>
+                  <select
+                    value={charGender}
+                    onChange={(e) => setCharGender(e.target.value)}
+                    className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
+                  >
+                    <option value="男">♂ 男</option>
+                    <option value="女">♀ 女</option>
+                    <option value="其他">⚧ 其他</option>
+                    <option value="未知">未知</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="block text-[11px] font-semibold text-ink-2 mb-1">初始生存状态</label>
                   <select
                     value={charInitialStatus}
                     onChange={(e) => setCharInitialStatus(e.target.value as CharacterLifeStatus)}
                     className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
                   >
-                    <option value="健康">🟢 {getStatusDisplayName('健康', activeNovel?.genre_profile)} (全盛/正常)</option>
-                    <option value="受伤">🟠 {getStatusDisplayName('受伤', activeNovel?.genre_profile)} (战损/虚弱)</option>
-                    <option value="闭关">🔵 {getStatusDisplayName('闭关', activeNovel?.genre_profile)} (隐匿/离线)</option>
-                    <option value="离场">⚪ {getStatusDisplayName('离场', activeNovel?.genre_profile)} (远行/未入局)</option>
-                    <option value="死亡">🔴 {getStatusDisplayName('死亡', activeNovel?.genre_profile)} (阵亡/剧情锚点)</option>
+                    <option value="健康">🟢 {getStatusDisplayName('健康', activeNovel?.genre_profile)}</option>
+                    <option value="受伤">🟠 {getStatusDisplayName('受伤', activeNovel?.genre_profile)}</option>
+                    <option value="闭关">🔵 {getStatusDisplayName('闭关', activeNovel?.genre_profile)}</option>
+                    <option value="离场">⚪ {getStatusDisplayName('离场', activeNovel?.genre_profile)}</option>
+                    <option value="死亡">🔴 {getStatusDisplayName('死亡', activeNovel?.genre_profile)}</option>
                   </select>
                 </div>
               </div>
@@ -606,6 +834,22 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                   value={charAliases}
                   onChange={(e) => setCharAliases(e.target.value)}
                   className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-ink-2 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Eye className="w-3 h-3 text-amber-700" /> 人设外貌与视觉特征
+                  </span>
+                  <span className="text-[9px] text-amber-700 font-normal">正文描写与微动作基石</span>
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="发型发色、五官神态、身形体态、典型服饰佩饰... (上传立绘后点击上方的【AI 识图】可一键生成)"
+                  value={charVisualSummary}
+                  onChange={(e) => setCharVisualSummary(e.target.value)}
+                  className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700 font-serif leading-relaxed"
                 />
               </div>
 

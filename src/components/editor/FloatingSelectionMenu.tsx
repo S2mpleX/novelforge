@@ -28,6 +28,8 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
   const { activeNovel, saveCurrentChapter } = useNovelStore();
 
   const [visible, setVisible] = useState(false);
+  const visibleRef = useRef(false);
+  visibleRef.current = visible;
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [selectedText, setSelectedText] = useState('');
   const [selectionRange, setSelectionRange] = useState<{ from: number; to: number } | null>(null);
@@ -52,14 +54,14 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
 
       const { from, to, empty } = editor.state.selection;
       if (empty || from === to) {
-        setVisible(false);
+        if (visibleRef.current) setVisible(false);
         return;
       }
 
       const text = editor.state.doc.textBetween(from, to, ' ').trim();
       // 至少选中 2 个字符才触发悬浮胶囊
       if (text.length < 2) {
-        setVisible(false);
+        if (visibleRef.current) setVisible(false);
         return;
       }
 
@@ -78,17 +80,28 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
         setVisible(true);
       } catch (e) {
         // 坐标异常时安全隐藏
-        setVisible(false);
+        if (visibleRef.current) setVisible(false);
       }
     };
 
-    // 监听 Tiptap 选区更新
+    let rafId: number | null = null;
+    const handleScroll = () => {
+      // 关键优化：菜单未显示时绝不打扰任何全局滚动，彻底杜绝 Forced Synchronous Reflow
+      if (!visibleRef.current) return;
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        updateMenuPosition();
+      });
+    };
+
+    // 监听 Tiptap 选区更新与安全滚动
     editor.on('selectionUpdate', updateMenuPosition);
-    window.addEventListener('scroll', updateMenuPosition, true);
+    window.addEventListener('scroll', handleScroll, true);
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       editor.off('selectionUpdate', updateMenuPosition);
-      window.removeEventListener('scroll', updateMenuPosition, true);
+      window.removeEventListener('scroll', handleScroll, true);
     };
   }, [editor, activeAction]);
 

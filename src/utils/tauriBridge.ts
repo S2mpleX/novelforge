@@ -80,6 +80,12 @@ import type {
   ExecuteSandboxStepResult,
   SynthesizeSandboxProseInput,
   SynthesizeSandboxProseResult,
+  ProbeCharacterActionsInput,
+  ProbeCharacterActionsResult,
+  DistillSandboxInspirationsInput,
+  DistillSandboxInspirationsResult,
+  AnalyzeCharacterAppearanceInput,
+  AnalyzeCharacterAppearanceResult,
 } from '@/types';
 
 /**
@@ -224,6 +230,9 @@ export const api = {
     personality?: string;
     background?: string;
     motivation?: string;
+    gender?: string;
+    avatar_url?: string;
+    visual_summary?: string;
   }) => safeInvoke<Character>('create_character', { input }),
   updateCharacterStatus: (id: string, status: string) =>
     safeInvoke<void>('update_character_status', { id, status }),
@@ -235,6 +244,9 @@ export const api = {
     personality?: string;
     background?: string;
     motivation?: string;
+    gender?: string;
+    avatar_url?: string;
+    visual_summary?: string;
     status?: string;
   }) => safeInvoke<Character>('update_character', { input }),
   deleteCharacter: (id: string) => safeInvoke<void>('delete_character', { id }),
@@ -671,6 +683,12 @@ export const api = {
     safeInvoke<void>('delete_character_sandbox_session', { id }),
   executeSandboxStep: (input: ExecuteSandboxStepInput) =>
     safeInvoke<ExecuteSandboxStepResult>('execute_character_sandbox_step', { input }),
+  probeCharacterNextActions: (input: ProbeCharacterActionsInput) =>
+    safeInvoke<ProbeCharacterActionsResult>('probe_character_next_actions', { input }),
+  distillSandboxInspirations: (input: DistillSandboxInspirationsInput) =>
+    safeInvoke<DistillSandboxInspirationsResult>('distill_sandbox_inspirations', { input }),
   synthesizeSandboxProse: (input: SynthesizeSandboxProseInput) =>
     safeInvoke<SynthesizeSandboxProseResult>('synthesize_sandbox_dialogue_to_prose', { input }),
+  analyzeCharacterAppearance: (input: AnalyzeCharacterAppearanceInput) =>
+    safeInvoke<AnalyzeCharacterAppearanceResult>('analyze_character_appearance', { input }),
 };

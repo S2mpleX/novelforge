@@ -881,6 +881,9 @@ fn handle_tool_call(db: &DbManager, tool_name: &str, args: &Value) -> Result<Str
             let personality = args["personality"].as_str().map(|s| s.to_string());
             let background = args["background"].as_str().map(|s| s.to_string());
             let motivation = args["motivation"].as_str().map(|s| s.to_string());
+            let gender = args["gender"].as_str().map(|s| s.to_string());
+            let avatar_url = args["avatar_url"].as_str().map(|s| s.to_string());
+            let visual_summary = args["visual_summary"].as_str().map(|s| s.to_string());
 
             let char = db.create_character(CreateCharacterInput {
                 novel_id,
@@ -890,6 +893,9 @@ fn handle_tool_call(db: &DbManager, tool_name: &str, args: &Value) -> Result<Str
                 personality,
                 background,
                 motivation,
+                gender,
+                avatar_url,
+                visual_summary,
             }).map_err(|e| e.to_string())?;
 
             serde_json::to_string_pretty(&char).map_err(|e| e.to_string())

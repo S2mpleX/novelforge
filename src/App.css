@@ -154,7 +154,7 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
-/* Custom Sleek Scrollbars (Ink Wash Style) */
+/* Custom Sleek Scrollbars (Ink Wash Style - High Performance, zero animation transition on thumb) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -167,7 +167,6 @@ body {
 ::-webkit-scrollbar-thumb {
   background: rgba(140, 120, 95, 0.25);
   border-radius: 9999px;
-  transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {

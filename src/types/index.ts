@@ -64,6 +64,7 @@ export interface Chapter {
   chapter_number: number;
   sequence?: number;
   title: string;
+  chapter_goal?: string;
   status: string;
   active_version_id?: string;
   word_count: number;
@@ -92,9 +93,29 @@ export interface Character {
   personality: string;
   background: string;
   motivation: string;
+  gender?: string;
+  avatar_url?: string;
+  visual_summary?: string;
   status: string;
   created_at: number;
   updated_at: number;
+}
+
+export interface AnalyzeCharacterAppearanceInput {
+  image_url: string;
+  character_name?: string;
+  gender?: string;
+  genre?: string;
+  provider_id?: string;
+  model_name?: string;
+}
+
+export interface AnalyzeCharacterAppearanceResult {
+  visual_summary: string;
+  appearance_tags: string[];
+  facial_features?: string;
+  clothing_style?: string;
+  body_type?: string;
 }
 
 export interface WorldRule {
@@ -997,8 +1018,18 @@ export interface CharacterSandboxSession {
   synthesized_prose?: string;
   branches_json?: string;
   active_branch_id?: string;
+  inspiration_notes_json?: string;
   created_at: number;
   updated_at: number;
+}
+
+export interface InspirationNote {
+  id: string;
+  type: 'QUOTE' | 'ACTION' | 'PSYCHOLOGY' | 'TWIST';
+  content: string;
+  speaker_name?: string;
+  round_index?: number;
+  created_at: number;
 }
 
 export interface CreateSandboxSessionInput {
@@ -1011,6 +1042,7 @@ export interface CreateSandboxSessionInput {
   characters_config: CharacterActorConfig[];
   branches_json?: string;
   active_branch_id?: string;
+  inspiration_notes_json?: string;
 }
 
 export interface UpdateSandboxSessionInput {
@@ -1024,6 +1056,7 @@ export interface UpdateSandboxSessionInput {
   synthesized_prose?: string;
   branches_json?: string;
   active_branch_id?: string;
+  inspiration_notes_json?: string;
 }
 
 export interface ExecuteSandboxStepInput {
@@ -1031,6 +1064,40 @@ export interface ExecuteSandboxStepInput {
   target_speaker_id?: string;
   narrator_intervention?: string;
   temperature?: number;
+  action_guidance?: string;
+}
+
+export interface CharacterActionOption {
+  id: string;
+  label: string;
+  stance: string;
+  inner_motive: string;
+  action_preview: string;
+  speech_preview: string;
+}
+
+export interface ProbeCharacterActionsInput {
+  session_id: string;
+  target_speaker_id?: string;
+}
+
+export interface ProbeCharacterActionsResult {
+  session_id: string;
+  speaker_id: string;
+  speaker_name: string;
+  options: CharacterActionOption[];
+}
+
+export interface DistillSandboxInspirationsInput {
+  session_id: string;
+}
+
+export interface DistillSandboxInspirationsResult {
+  session_id: string;
+  golden_quotes: string[];
+  micro_actions: string[];
+  psychological_insights: string[];
+  plot_twists: string[];
 }
 
 export interface ExecuteSandboxStepResult {
@@ -1044,6 +1111,9 @@ export interface SynthesizeSandboxProseInput {
   session_id: string;
   custom_guidance?: string;
   pov_mode?: string;
+  polishing_style?: 'CINEMATIC' | 'PSYCHOLOGICAL' | 'HARDCORE_TENSE';
+  start_round_index?: number;
+  end_round_index?: number;
 }
 
 export interface SynthesizeSandboxProseResult {

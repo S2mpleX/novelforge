@@ -35,7 +35,7 @@ interface ModelArenaPanelProps {
 }
 
 export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isModal = false }) => {
-  const { activeNovel, activeChapter, editorContent, updateEditorContent, saveCurrentChapter } = useNovelStore();
+  const { activeNovel, activeChapter, updateEditorContent, saveCurrentChapter } = useNovelStore();
 
   // Providers & Models
   const [providers, setProviders] = useState<AiProvider[]>([]);
@@ -220,7 +220,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
       setMessage('当前未打开章节，无法提取前文');
       return;
     }
-    const currentText = editorContent || activeChapter.content || '';
+    const currentText = useNovelStore.getState().editorContent || activeChapter.content || '';
     if (!currentText.trim()) {
       setMessage('当前章节正文为空');
       return;
@@ -358,7 +358,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
       setMessage('请先在左侧选择小说章节');
       return;
     }
-    const current = editorContent || activeChapter.content || '';
+    const current = useNovelStore.getState().editorContent || activeChapter.content || '';
     let newContent = '';
     if (mode === 'REPLACE') {
       newContent = text.trim();

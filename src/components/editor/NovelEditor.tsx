@@ -207,16 +207,64 @@ const StreamingPreviewBox: React.FC<{ paperTheme: PaperTheme; fontSize: number }
   }
 );
 
+const EditorWordStatsTracker: React.FC<{ targetWords: number }> = React.memo(({ targetWords }) => {
+  const charCount = useNovelStore((s) => (s.editorContent ? s.editorContent.replace(/\s+/g, '').length : 0));
+  const targetPercent = Math.min(150, Math.round((charCount / Math.max(1, targetWords)) * 100));
+  const estimatedReadMinutes = (charCount / 400).toFixed(1);
+
+  return (
+    <div className="hidden 2xl:flex items-center gap-3 text-xs font-serif text-ink-2 bg-surface px-3 py-1 rounded-lg border border-line shrink-0 whitespace-nowrap">
+      <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+        <Target className="w-3.5 h-3.5 text-primary shrink-0" />
+        <span>目标:</span>
+        <span className="font-bold text-ink">
+          {charCount} / {targetWords} 字
+        </span>
+        <span
+          className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
+            targetPercent >= 100
+              ? 'bg-[#047857]/10 text-[#047857] border border-[#047857]/20'
+              : 'bg-[#854d0e]/10 text-primary border border-[#854d0e]/20'
+          }`}
+        >
+          {targetPercent}%
+        </span>
+      </div>
+
+      <div className="w-px h-3 bg-[#ded5c4] shrink-0" />
+
+      <div className="flex items-center gap-1 text-ink-2 shrink-0 whitespace-nowrap">
+        <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
+        <span>~{estimatedReadMinutes} 分钟</span>
+      </div>
+    </div>
+  );
+});
+
+const EditorSaveButton: React.FC<{ onSave: () => void }> = React.memo(({ onSave }) => {
+  const saveStatus = useNovelStore((s) => s.saveStatus);
+  return (
+    <button
+      type="button"
+      onClick={onSave}
+      disabled={saveStatus === 'SAVING'}
+      className="px-3 py-1 rounded-lg bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] text-xs font-serif font-medium flex items-center gap-1.5 transition shadow-xs active:scale-95 disabled:opacity-40 shrink-0 whitespace-nowrap cursor-pointer"
+      title="保存当前快照 (Ctrl+S)"
+    >
+      <Save className="w-3.5 h-3.5 shrink-0" />
+      <span className="hidden sm:inline whitespace-nowrap">{saveStatus === 'SAVING' ? '存盘中...' : '保存快照'}</span>
+    </button>
+  );
+});
+
 export const NovelEditor: React.FC = () => {
   const {
     activeNovel,
     activeChapter,
     chapters,
     selectChapter,
-    editorContent,
     updateEditorContent,
     saveCurrentChapter,
-    saveStatus,
     updateChapterTitle,
     zenMode,
     toggleZenMode,
@@ -419,11 +467,16 @@ export const NovelEditor: React.FC = () => {
   const storeUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const hasFocusHighlightRef = useRef(false);
+
   const updateFocusHighlight = useCallback(() => {
     if (!isFocusMode) {
-      document
-        .querySelectorAll('.editor-surface .has-focus')
-        .forEach((el) => el.classList.remove('has-focus'));
+      if (hasFocusHighlightRef.current) {
+        document
+          .querySelectorAll('.editor-surface .has-focus')
+          .forEach((el) => el.classList.remove('has-focus'));
+        hasFocusHighlightRef.current = false;
+      }
       return;
     }
     const domSelection = window.getSelection();
@@ -445,6 +498,7 @@ export const NovelEditor: React.FC = () => {
           .querySelectorAll('.editor-surface .has-focus')
           .forEach((el) => el.classList.remove('has-focus'));
         parent.classList.add('has-focus');
+        hasFocusHighlightRef.current = true;
       }
     }
   }, [isFocusMode]);
@@ -457,7 +511,7 @@ export const NovelEditor: React.FC = () => {
         },
       }),
     ],
-    content: editorContent || '',
+    content: useNovelStore.getState().editorContent || '',
     editorProps: {
       attributes: {
         class: 'prose max-w-none focus:outline-none min-h-[500px] leading-relaxed',
@@ -482,22 +536,22 @@ export const NovelEditor: React.FC = () => {
       const html = editor.getHTML();
       updateFocusHighlight();
 
-      // Debounce global store updates (250ms)
+      // Debounce global store updates (400ms)
       if (storeUpdateTimerRef.current) {
         clearTimeout(storeUpdateTimerRef.current);
       }
       storeUpdateTimerRef.current = setTimeout(() => {
         updateEditorContent(html);
-      }, 250);
+      }, 400);
 
-      // Debounce auto-save (800ms)
+      // Debounce auto-save (1500ms)
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
       debounceTimerRef.current = setTimeout(() => {
         updateEditorContent(editor.getHTML());
         saveCurrentChapter(false, 'USER_EDIT');
-      }, 800);
+      }, 1500);
     },
     onBlur: ({ editor }) => {
       if (storeUpdateTimerRef.current) {
@@ -518,13 +572,15 @@ export const NovelEditor: React.FC = () => {
 
     if (isChapterSwitch) {
       // 切换章节：无条件加载新章节内容
-      editor.commands.setContent(editorContent || '', { emitUpdate: false });
+      const currentContent = useNovelStore.getState().editorContent || activeChapter?.content || '';
+      editor.commands.setContent(currentContent, { emitUpdate: false });
       return;
     }
 
+    const currentContent = useNovelStore.getState().editorContent;
     // 同一章节内：仅当编辑器未聚焦（非主动输入中，如外部版本回滚、一键排版、批量修订采纳）且内容不一致时同步
-    if (!editor.isFocused && editorContent !== editor.getHTML()) {
-      editor.commands.setContent(editorContent || '', { emitUpdate: false });
+    if (!editor.isFocused && currentContent !== editor.getHTML()) {
+      editor.commands.setContent(currentContent || '', { emitUpdate: false });
     }
   }, [activeChapter?.id, activeChapter?.updated_at]);
 
@@ -532,7 +588,7 @@ export const NovelEditor: React.FC = () => {
   useEffect(() => {
     const handleForceReload = () => {
       if (editor) {
-        editor.commands.setContent(editorContent || '', { emitUpdate: false });
+        editor.commands.setContent(useNovelStore.getState().editorContent || '', { emitUpdate: false });
       }
     };
     const handleToggleFocus = () => toggleFocusMode();
@@ -547,7 +603,7 @@ export const NovelEditor: React.FC = () => {
       window.removeEventListener('novelforge:toggle-focus', handleToggleFocus);
       window.removeEventListener('novelforge:toggle-typewriter', handleToggleTypewriter);
     };
-  }, [editor, editorContent, toggleFocusMode, toggleTypewriterMode]);
+  }, [editor, toggleFocusMode, toggleTypewriterMode]);
 
   // Sync scratch notes when active novel changes
   useEffect(() => {
@@ -572,9 +628,9 @@ export const NovelEditor: React.FC = () => {
       updateEditorContent(editor.getHTML());
     }
     await saveCurrentChapter(true, 'USER_MANUAL_SAVE');
-    const curLen = (editor ? editor.getText() : editorContent).replace(/\s+/g, '').length;
+    const curLen = (editor ? editor.getText() : (useNovelStore.getState().editorContent || '')).replace(/\s+/g, '').length;
     toast.success('正文快照已存盘', `已安全写入本地 SQLite，当前章节共计 ${curLen} 字`);
-  }, [editor, updateEditorContent, saveCurrentChapter, editorContent]);
+  }, [editor, updateEditorContent, saveCurrentChapter]);
 
   // Comprehensive keyboard shortcuts (Ctrl+S, Ctrl+F, Ctrl+H, Ctrl+Alt+F, Ctrl+Alt+T, Alt+[, Alt+], Esc)
   useEffect(() => {
@@ -759,10 +815,7 @@ export const NovelEditor: React.FC = () => {
   };
 
   // Character stats & calculations
-  const charCount = editorContent.replace(/\s+/g, '').length;
   const targetWords = activeNovel?.chapter_target_length || 3000;
-  const targetPercent = Math.min(150, Math.round((charCount / Math.max(1, targetWords)) * 100));
-  const estimatedReadMinutes = (charCount / 400).toFixed(1);
 
   if (!activeNovel) {
     return (
@@ -1139,29 +1192,7 @@ export const NovelEditor: React.FC = () => {
         </div>
 
         {/* Center/Right: Target Word Count & Reading Time Tracker */}
-        <div className="hidden 2xl:flex items-center gap-3 text-xs font-serif text-ink-2 bg-surface px-3 py-1 rounded-lg border border-line shrink-0 whitespace-nowrap">
-          <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-            <Target className="w-3.5 h-3.5 text-primary shrink-0" />
-            <span>目标:</span>
-            <span className="font-bold text-ink">
-              {charCount} / {targetWords} 字
-            </span>
-            <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
-              targetPercent >= 100
-                ? 'bg-[#047857]/10 text-[#047857] border border-[#047857]/20'
-                : 'bg-[#854d0e]/10 text-primary border border-[#854d0e]/20'
-            }`}>
-              {targetPercent}%
-            </span>
-          </div>
-
-          <div className="w-px h-3 bg-[#ded5c4] shrink-0" />
-
-          <div className="flex items-center gap-1 text-ink-2 shrink-0 whitespace-nowrap">
-            <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
-            <span>~{estimatedReadMinutes} 分钟</span>
-          </div>
-        </div>
+        <EditorWordStatsTracker targetWords={targetWords} />
 
         {/* Right: Actions (Find/Replace, Focus, Typewriter, ChapterPeek, Scratchpad, Save, Fullscreen) */}
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap ml-auto z-10">
@@ -1236,15 +1267,7 @@ export const NovelEditor: React.FC = () => {
             <span className="hidden lg:inline whitespace-nowrap">灵感便签</span>
           </button>
 
-          <button
-            onClick={handleManualSave}
-            disabled={saveStatus === 'SAVING'}
-            className="px-3 py-1 rounded-lg bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] text-xs font-serif font-medium flex items-center gap-1.5 transition shadow-xs active:scale-95 disabled:opacity-40 shrink-0 whitespace-nowrap cursor-pointer"
-            title="保存当前快照 (Ctrl+S)"
-          >
-            <Save className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline whitespace-nowrap">保存快照</span>
-          </button>
+          <EditorSaveButton onSave={handleManualSave} />
 
           {isFullScreen ? (
             <button

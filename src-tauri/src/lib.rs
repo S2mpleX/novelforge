@@ -207,7 +207,10 @@ pub fn run() {
             commands::update_character_sandbox_session,
             commands::delete_character_sandbox_session,
             commands::execute_character_sandbox_step,
+            commands::probe_character_next_actions,
+            commands::distill_sandbox_inspirations,
             commands::synthesize_sandbox_dialogue_to_prose,
+            commands::analyze_character_appearance,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovelForge AI application");

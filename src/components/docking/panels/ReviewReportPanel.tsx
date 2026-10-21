@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const ReviewReportPanel: React.FC = () => {
-  const { activeNovel, activeChapter, editorContent, updateEditorContent, saveCurrentChapter } = useNovelStore();
+  const { activeNovel, activeChapter, updateEditorContent, saveCurrentChapter } = useNovelStore();
   const [report, setReport] = useState<ReviewReport | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -87,7 +87,7 @@ export const ReviewReportPanel: React.FC = () => {
     if (!repair) return;
 
     const draftText = (editedDrafts[findingId] || repair.revised_text_draft).trim();
-    const currentText = editorContent || activeChapter.content || '';
+    const currentText = useNovelStore.getState().editorContent || activeChapter.content || '';
     const quote = repair.original_quote.trim();
 
     let newContent = currentText;

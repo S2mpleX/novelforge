@@ -23,16 +23,97 @@ interface Props {
   onOpenChapterDrawer?: () => void;
 }
 
+export const ZenWordStatsBadge: React.FC<{ activeChapterContent?: string }> = React.memo(
+  ({ activeChapterContent }) => {
+    const editorContent = useNovelStore((s) => s.editorContent);
+    const wordCount = useMemo(() => {
+      const raw = editorContent ?? activeChapterContent ?? '';
+      return raw.replace(/<[^>]+>/g, '').replace(/\s+/g, '').length;
+    }, [editorContent, activeChapterContent]);
+
+    const readMinutes = useMemo(() => {
+      return Math.max(1, Math.ceil(wordCount / 400));
+    }, [wordCount]);
+
+    return (
+      <div className="flex items-center gap-2 text-[11px] text-ink-2 dark:text-[#a09485] font-mono shrink-0">
+        <span className="flex items-center gap-1">
+          <Feather className="w-3 h-3 text-primary dark:text-amber-400" />
+          <strong className="text-ink dark:text-[#ede6dc] font-sans">{wordCount}</strong> 字
+        </span>
+        <span className="hidden md:flex items-center gap-0.5 opacity-70">
+          <Clock className="w-2.5 h-2.5" />
+          <span>~{readMinutes}m</span>
+        </span>
+      </div>
+    );
+  }
+);
+ZenWordStatsBadge.displayName = 'ZenWordStatsBadge';
+
+export const ZenSaveStatusBadge: React.FC = React.memo(() => {
+  const saveStatus = useNovelStore((s) => s.saveStatus);
+  return (
+    <div className="flex items-center shrink-0">
+      {saveStatus === 'SAVED' && (
+        <span
+          className="flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 font-serif"
+          title="当前正文内容已自动同步至本地 SQLite 数据库"
+        >
+          <Check className="w-3 h-3" />
+          <span className="hidden sm:inline">已存</span>
+        </span>
+      )}
+      {saveStatus === 'SAVING' && (
+        <span className="flex items-center gap-1 text-[11px] text-primary dark:text-amber-400 font-serif animate-pulse">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-600 dark:bg-amber-400" />
+          <span className="hidden sm:inline">存盘中</span>
+        </span>
+      )}
+      {saveStatus === 'DIRTY' && (
+        <span className="flex items-center gap-1 text-[11px] text-ink-2 dark:text-[#8d8273] font-serif">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500/60" />
+          <span className="hidden sm:inline">待存</span>
+        </span>
+      )}
+      {saveStatus === 'ERROR' && (
+        <span className="flex items-center gap-1 text-[11px] text-rose-700 dark:text-rose-400 font-serif">
+          <AlertCircle className="w-3 h-3" />
+          <span className="hidden sm:inline">失败</span>
+        </span>
+      )}
+    </div>
+  );
+});
+ZenSaveStatusBadge.displayName = 'ZenSaveStatusBadge';
+
+export const ZenCollapsedButton: React.FC<{ onExpand: () => void }> = React.memo(({ onExpand }) => {
+  const wordCount = useNovelStore((s) => {
+    const raw = s.editorContent || s.activeChapter?.content || '';
+    return raw.replace(/<[^>]+>/g, '').replace(/\s+/g, '').length;
+  });
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 px-3 py-1 rounded-full bg-surface-2/90 dark:bg-[#1f1c19]/90 backdrop-blur-md border border-line dark:border-[#3d362e] shadow-lg text-[11px] text-ink-2 hover:text-primary dark:hover:text-amber-300 font-serif flex items-center gap-1.5 transition-all cursor-pointer opacity-70 hover:opacity-100 hover:scale-105"
+      title="展开案头浮岛"
+    >
+      <ChevronUp className="w-3.5 h-3.5" />
+      <span>案头浮岛 ({wordCount}字)</span>
+    </button>
+  );
+});
+ZenCollapsedButton.displayName = 'ZenCollapsedButton';
+
 export const ZenFloatingIsland: React.FC<Props> = ({ onOpenChapterDrawer }) => {
   const {
     chapters,
     activeChapter,
     selectChapter,
-    saveStatus,
     exitZenMode,
     themeMode,
     toggleThemeMode,
-    editorContent,
   } = useNovelStore();
 
   const [isFocusMode, setIsFocusMode] = useState<boolean>(() => {
@@ -55,16 +136,6 @@ export const ZenFloatingIsland: React.FC<Props> = ({ onOpenChapterDrawer }) => {
   const currentIndex = sortedChapters.findIndex((c) => c.id === activeChapter?.id);
   const prevChapter = currentIndex > 0 ? sortedChapters[currentIndex - 1] : null;
   const nextChapter = currentIndex >= 0 && currentIndex < sortedChapters.length - 1 ? sortedChapters[currentIndex + 1] : null;
-
-  // 实时字数与阅读时长预估
-  const wordCount = useMemo(() => {
-    const raw = editorContent || activeChapter?.content || '';
-    return raw.replace(/<[^>]+>/g, '').replace(/\s+/g, '').length;
-  }, [editorContent, activeChapter?.content]);
-
-  const readMinutes = useMemo(() => {
-    return Math.max(1, Math.ceil(wordCount / 400));
-  }, [wordCount]);
 
   const handleSwitchChapter = async (target: Chapter) => {
     if (!target || target.id === activeChapter?.id) return;
@@ -115,17 +186,7 @@ export const ZenFloatingIsland: React.FC<Props> = ({ onOpenChapterDrawer }) => {
   }, []);
 
   if (isCollapsed) {
-    return (
-      <button
-        type="button"
-        onClick={() => setIsCollapsed(false)}
-        className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 px-3 py-1 rounded-full bg-surface-2/90 dark:bg-[#1f1c19]/90 backdrop-blur-md border border-line dark:border-[#3d362e] shadow-lg text-[11px] text-ink-2 hover:text-primary dark:hover:text-amber-300 font-serif flex items-center gap-1.5 transition-all cursor-pointer opacity-70 hover:opacity-100 hover:scale-105"
-        title="展开案头浮岛"
-      >
-        <ChevronUp className="w-3.5 h-3.5" />
-        <span>案头浮岛 ({wordCount}字)</span>
-      </button>
-    );
+    return <ZenCollapsedButton onExpand={() => setIsCollapsed(false)} />;
   }
 
   return (
@@ -169,49 +230,12 @@ export const ZenFloatingIsland: React.FC<Props> = ({ onOpenChapterDrawer }) => {
         <div className="w-px h-3.5 bg-line dark:bg-[#352f2a] shrink-0" />
 
         {/* 2. 字数与阅读时长 */}
-        <div className="flex items-center gap-2 text-[11px] text-ink-2 dark:text-[#a09485] font-mono shrink-0">
-          <span className="flex items-center gap-1">
-            <Feather className="w-3 h-3 text-primary dark:text-amber-400" />
-            <strong className="text-ink dark:text-[#ede6dc] font-sans">{wordCount}</strong> 字
-          </span>
-          <span className="hidden md:flex items-center gap-0.5 opacity-70">
-            <Clock className="w-2.5 h-2.5" />
-            <span>~{readMinutes}m</span>
-          </span>
-        </div>
+        <ZenWordStatsBadge activeChapterContent={activeChapter?.content} />
 
         <div className="w-px h-3.5 bg-line dark:bg-[#352f2a] shrink-0" />
 
         {/* 3. 保存状态 */}
-        <div className="flex items-center shrink-0">
-          {saveStatus === 'SAVED' && (
-            <span
-              className="flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 font-serif"
-              title="当前正文内容已自动同步至本地 SQLite 数据库"
-            >
-              <Check className="w-3 h-3" />
-              <span className="hidden sm:inline">已存</span>
-            </span>
-          )}
-          {saveStatus === 'SAVING' && (
-            <span className="flex items-center gap-1 text-[11px] text-primary dark:text-amber-400 font-serif animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-600 dark:bg-amber-400" />
-              <span className="hidden sm:inline">存盘中</span>
-            </span>
-          )}
-          {saveStatus === 'DIRTY' && (
-            <span className="flex items-center gap-1 text-[11px] text-ink-2 dark:text-[#8d8273] font-serif">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500/60" />
-              <span className="hidden sm:inline">待存</span>
-            </span>
-          )}
-          {saveStatus === 'ERROR' && (
-            <span className="flex items-center gap-1 text-[11px] text-rose-700 dark:text-rose-400 font-serif">
-              <AlertCircle className="w-3 h-3" />
-              <span className="hidden sm:inline">失败</span>
-            </span>
-          )}
-        </div>
+        <ZenSaveStatusBadge />
 
         <div className="w-px h-3.5 bg-line dark:bg-[#352f2a] shrink-0" />
 

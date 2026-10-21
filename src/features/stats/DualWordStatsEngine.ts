@@ -6,6 +6,15 @@ import {
 } from './types';
 
 export class DualWordStatsEngine {
+  private static chapterCache = new Map<string, ChapterStatsRecord>();
+
+  /**
+   * 清空统计缓存
+   */
+  static clearCache(): void {
+    this.chapterCache.clear();
+  }
+
   /**
    * 清除正文 HTML 标签
    */
@@ -21,14 +30,17 @@ export class DualWordStatsEngine {
     chapter: Chapter,
     versions: ChapterVersion[] = []
   ): ChapterStatsRecord {
-    const text = this.stripHtml(chapter.content);
+    const cacheKey = `${chapter.id}_${chapter.updated_at || 0}_${chapter.word_count || 0}_${versions.length}`;
+    const cached = this.chapterCache.get(cacheKey);
+    if (cached) return cached;
+
     const totalWords =
-      typeof chapter.word_count === 'number' && chapter.word_count > 0
+      typeof chapter.word_count === 'number' && chapter.word_count >= 0
         ? chapter.word_count
-        : text.length;
+        : this.stripHtml(chapter.content).length;
 
     if (totalWords === 0) {
-      return {
+      const emptyRec: ChapterStatsRecord = {
         chapterId: chapter.id,
         chapterTitle: chapter.title,
         totalWords: 0,
@@ -36,6 +48,8 @@ export class DualWordStatsEngine {
         aiWords: 0,
         manualRatio: 100,
       };
+      this.chapterCache.set(cacheKey, emptyRec);
+      return emptyRec;
     }
 
     // 若存在版本历史，统计各版本 source_type
@@ -65,7 +79,7 @@ export class DualWordStatsEngine {
       const manualWords = Math.max(0, totalWords - aiWords);
       const manualRatio = totalWords > 0 ? Math.round((manualWords / totalWords) * 100) : 100;
 
-      return {
+      const rec: ChapterStatsRecord = {
         chapterId: chapter.id,
         chapterTitle: chapter.title,
         totalWords,
@@ -73,10 +87,13 @@ export class DualWordStatsEngine {
         aiWords,
         manualRatio,
       };
+      if (this.chapterCache.size > 500) this.chapterCache.clear();
+      this.chapterCache.set(cacheKey, rec);
+      return rec;
     }
 
     // 默认兜底：若暂无版本记录，默认视为纯作者手打原创 (100% 手打 / 0% AI)
-    return {
+    const defaultRec: ChapterStatsRecord = {
       chapterId: chapter.id,
       chapterTitle: chapter.title,
       totalWords,
@@ -84,6 +101,9 @@ export class DualWordStatsEngine {
       aiWords: 0,
       manualRatio: 100,
     };
+    if (this.chapterCache.size > 500) this.chapterCache.clear();
+    this.chapterCache.set(cacheKey, defaultRec);
+    return defaultRec;
   }
 
   /**

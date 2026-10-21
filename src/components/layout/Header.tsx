@@ -81,6 +81,38 @@ const HeaderWordCount: React.FC = React.memo(() => {
   return <strong className="text-ink dark:text-[#f3eee7] font-mono font-semibold">{characterCount}</strong>;
 });
 
+const HeaderSaveStatusBadge: React.FC = React.memo(() => {
+  const saveStatus = useNovelStore((s) => s.saveStatus);
+  return (
+    <>
+      {saveStatus === 'SAVED' && (
+        <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium text-[11px]">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400" />
+          <span>已存</span>
+        </span>
+      )}
+      {saveStatus === 'SAVING' && (
+        <span className="flex items-center gap-1 text-primary dark:text-amber-400 font-medium text-[11px] animate-pulse">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-600 dark:bg-amber-400" />
+          <span>存盘中</span>
+        </span>
+      )}
+      {saveStatus === 'DIRTY' && (
+        <span className="flex items-center gap-1 text-ink-2 dark:text-[#9e9486] text-[11px]">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-600/60" />
+          <span>待存</span>
+        </span>
+      )}
+      {saveStatus === 'ERROR' && (
+        <span className="flex items-center gap-1 text-rose-700 dark:text-rose-400 font-medium text-[11px]">
+          <AlertCircle className="w-3 h-3" />
+          <span>失败</span>
+        </span>
+      )}
+    </>
+  );
+});
+
 // 创作流程六大标准阶段定义
 interface PipelineStepItem {
   id: ActiveTab;
@@ -147,9 +179,7 @@ export const Header: React.FC = () => {
     novels,
     activeNovel,
     selectNovel,
-    chapters,
     activeChapter,
-    saveStatus,
     activeTab,
     setActiveTab,
     toggleSidebar,
@@ -168,6 +198,8 @@ export const Header: React.FC = () => {
     increaseUiScale,
     decreaseUiScale,
   } = useNovelStore();
+
+  const chaptersCount = useNovelStore((s) => s.chapters.length);
 
   const { status } = useUpdateStore();
   const openPanel = useWorkspaceStore((s) => s.openPanel);
@@ -345,9 +377,14 @@ export const Header: React.FC = () => {
         className="h-14 border-b border-line dark:border-[#2e2a27] bg-surface-2 dark:bg-[#1a1714] flex items-center justify-between pl-2.5 md:pl-3.5 pr-0 select-none shrink-0 z-30 shadow-[0_1px_3px_rgba(120,90,50,0.06)] min-w-0 w-full relative"
       >
         {/* ============================================================ */}
-        {/* ZONE 1 (LEFT): Brand & Active Project Selector              */}
+        {/* APP CONTENT REGION: Zone 1, Zone 2, Zone 3 Actions           */}
+        {/* Strictly flex-1 min-w-0: Cannot push the window controls     */}
         {/* ============================================================ */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 mr-1 sm:mr-2">
+        <div className="flex items-center justify-between flex-1 min-w-0 h-full mr-1">
+          {/* ============================================================ */}
+          {/* ZONE 1 (LEFT): Brand & Active Project Selector              */}
+          {/* ============================================================ */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 mr-1 sm:mr-2">
           {/* Toggle Chapters Sidebar */}
           <button
             onClick={toggleSidebar}
@@ -395,7 +432,7 @@ export const Header: React.FC = () => {
                   <div className="text-[10px] text-ink-2 dark:text-[#9e9486] flex items-center gap-1 leading-none mt-0.5">
                     <span className="truncate max-w-[50px] sm:max-w-[70px]">{activeNovel.genre_profile || '长篇通俗'}</span>
                     <span>·</span>
-                    <span className="font-mono">{chapters.length}章</span>
+                    <span className="font-mono">{chaptersCount}章</span>
                   </div>
                 </div>
                 <ChevronDown
@@ -662,19 +699,17 @@ export const Header: React.FC = () => {
 
                     {/* Label: 
                         - 激活项：始终展示完整 label 明确当前位置
-                        - 非激活项：仅在 3xl (>= 1920px) 超宽屏展示 2 字 shortLabel，在常规屏隐藏文字，节约 500px+ 宽度杜绝溢出
+                        - 非激活项：仅展示图标与序号数字微标，悬停有完备提示词，节约 180px+ 宽度彻底杜绝拥挤
                     */}
-                    <span
-                      className={`whitespace-nowrap transition-all duration-150 ${
-                        isActive ? 'inline font-bold' : 'hidden 3xl:inline text-[11px]'
-                      }`}
-                    >
-                      {isActive ? item.label : item.shortLabel}
-                    </span>
+                    {isActive && (
+                      <span className="whitespace-nowrap font-bold text-xs inline">
+                        {item.label}
+                      </span>
+                    )}
 
                     {/* Subtle pulse dot on active */}
                     {isActive && (
-                      <span className="hidden 3xl:inline-block w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse" />
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse ml-0.5" />
                     )}
                   </button>
 
@@ -715,30 +750,7 @@ export const Header: React.FC = () => {
 
                 <div className="w-px h-3 bg-[#d5cbb8] dark:bg-[#38332d]" />
 
-                {saveStatus === 'SAVED' && (
-                  <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium text-[11px]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400" />
-                    <span>已存</span>
-                  </span>
-                )}
-                {saveStatus === 'SAVING' && (
-                  <span className="flex items-center gap-1 text-primary dark:text-amber-400 font-medium text-[11px] animate-pulse">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600 dark:bg-amber-400" />
-                    <span>存盘中</span>
-                  </span>
-                )}
-                {saveStatus === 'DIRTY' && (
-                  <span className="flex items-center gap-1 text-ink-2 dark:text-[#9e9486] text-[11px]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600/60" />
-                    <span>待存</span>
-                  </span>
-                )}
-                {saveStatus === 'ERROR' && (
-                  <span className="flex items-center gap-1 text-rose-700 dark:text-rose-400 font-medium text-[11px]">
-                    <AlertCircle className="w-3 h-3" />
-                    <span>失败</span>
-                  </span>
-                )}
+                <HeaderSaveStatusBadge />
               </div>
             )}
 
@@ -1141,12 +1153,19 @@ export const Header: React.FC = () => {
             >
               {rightPanelOpen ? <PanelRightClose className="w-4 h-4 shrink-0" /> : <PanelRightOpen className="w-4 h-4 shrink-0" />}
             </button>
-
-            {/* Frameless Desktop Window Controls (Min, Max/Restore, Close) */}
-            <WindowControls />
           </div>
         </div>
-      </header>
+      </div>
+
+      {/* ============================================================ */}
+      {/* PERMANENT WINDOW CONTROLS ANCHOR                             */}
+      {/* Strictly isolated direct child of <header>, shrink-0,        */}
+      {/* permanently anchored to the top-right viewport corner.       */}
+      {/* ============================================================ */}
+      <div className="flex items-center shrink-0 h-full bg-surface-2 dark:bg-[#1a1714] z-50 select-none">
+        <WindowControls />
+      </div>
+    </header>
 
       {/* Floating Export Toast Message */}
       {exportMessage && (

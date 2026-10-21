@@ -41,7 +41,7 @@ const QUICK_TOOLS: { type: ToolboxActionType; label: string; icon: any }[] = [
 ];
 
 export const ToolboxPanel: React.FC = () => {
-  const { activeNovel, activeChapter, editorContent, updateEditorContent, saveCurrentChapter } =
+  const { activeNovel, activeChapter, updateEditorContent, saveCurrentChapter } =
     useNovelStore();
   const [selectedType, setSelectedType] = useState<ToolboxActionType>('name');
   const [inputText, setInputText] = useState('');
@@ -100,7 +100,8 @@ export const ToolboxPanel: React.FC = () => {
       .map((p) => `<p>${p.trim()}</p>`)
       .join('');
 
-    const newContent = (editorContent || '') + formatted;
+    const currentContent = useNovelStore.getState().editorContent || '';
+    const newContent = currentContent + formatted;
     updateEditorContent(newContent);
     await saveCurrentChapter(true, 'TOOLBOX_APPEND');
     setFeedback('已成功追加至正文！');
