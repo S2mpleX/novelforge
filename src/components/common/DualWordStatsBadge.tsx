@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { api } from '@/utils/tauriBridge';
 import { DualWordStatsEngine } from '@/features/stats/DualWordStatsEngine';
 import { Feather, Sparkles, Activity, X } from 'lucide-react';
@@ -10,7 +11,14 @@ export interface DualWordStatsBadgeProps {
 }
 
 export const DualWordStatsBadge: React.FC<DualWordStatsBadgeProps> = ({ className, modal = true }) => {
-  const { activeNovel, chapters, activeChapter, versions } = useNovelStore();
+  const { activeNovel, chapters, activeChapter, versions } = useNovelStore(
+    useShallow((s) => ({
+      activeNovel: s.activeNovel,
+      chapters: s.chapters,
+      activeChapter: s.activeChapter,
+      versions: s.versions,
+    }))
+  );
   const [showDetail, setShowDetail] = useState(false);
   const [extraVersionsMap, setExtraVersionsMap] = useState<Record<string, any[]>>({});
 

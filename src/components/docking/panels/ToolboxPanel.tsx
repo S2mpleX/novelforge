@@ -18,11 +18,13 @@ import {
   FileSearch,
   HeartPulse,
 } from 'lucide-react';
-import { NovelistToolboxModal } from '@/components/modals/NovelistToolboxModal';
-import { QuickNameModal } from '@/components/modals/QuickNameModal';
-import { DeconstructModal } from '@/components/modals/DeconstructModal';
-import { FullCheckModal } from '@/components/modals/FullCheckModal';
-import { AssetProposalModal } from '@/components/modals/AssetProposalModal';
+import { useShallow } from 'zustand/react/shallow';
+
+const NovelistToolboxModal = React.lazy(() => import('@/components/modals/NovelistToolboxModal').then(m => ({ default: m.NovelistToolboxModal })));
+const QuickNameModal = React.lazy(() => import('@/components/modals/QuickNameModal').then(m => ({ default: m.QuickNameModal })));
+const DeconstructModal = React.lazy(() => import('@/components/modals/DeconstructModal').then(m => ({ default: m.DeconstructModal })));
+const FullCheckModal = React.lazy(() => import('@/components/modals/FullCheckModal').then(m => ({ default: m.FullCheckModal })));
+const AssetProposalModal = React.lazy(() => import('@/components/modals/AssetProposalModal').then(m => ({ default: m.AssetProposalModal })));
 
 const QUICK_TOOLS: { type: ToolboxActionType; label: string; icon: any }[] = [
   { type: 'name', label: '起名灵感', icon: Wand2 },
@@ -42,7 +44,14 @@ const QUICK_TOOLS: { type: ToolboxActionType; label: string; icon: any }[] = [
 
 export const ToolboxPanel: React.FC = () => {
   const { activeNovel, activeChapter, updateEditorContent, saveCurrentChapter } =
-    useNovelStore();
+    useNovelStore(
+      useShallow((s) => ({
+        activeNovel: s.activeNovel,
+        activeChapter: s.activeChapter,
+        updateEditorContent: s.updateEditorContent,
+        saveCurrentChapter: s.saveCurrentChapter,
+      }))
+    );
   const [selectedType, setSelectedType] = useState<ToolboxActionType>('name');
   const [inputText, setInputText] = useState('');
   const [outputResult, setOutputResult] = useState('');
@@ -252,46 +261,48 @@ export const ToolboxPanel: React.FC = () => {
         />
       </div>
 
-      {/* 完整模态框 */}
-      {showFullModal && (
-        <NovelistToolboxModal
-          isOpen={showFullModal}
-          onClose={() => setShowFullModal(false)}
-          initialAction={selectedType}
-        />
-      )}
+      <React.Suspense fallback={null}>
+        {/* 完整模态框 */}
+        {showFullModal && (
+          <NovelistToolboxModal
+            isOpen={showFullModal}
+            onClose={() => setShowFullModal(false)}
+            initialAction={selectedType}
+          />
+        )}
 
-      {/* 起名灵感生成器 */}
-      {showQuickNameModal && (
-        <QuickNameModal
-          isOpen={showQuickNameModal}
-          onClose={() => setShowQuickNameModal(false)}
-        />
-      )}
+        {/* 起名灵感生成器 */}
+        {showQuickNameModal && (
+          <QuickNameModal
+            isOpen={showQuickNameModal}
+            onClose={() => setShowQuickNameModal(false)}
+          />
+        )}
 
-      {/* 拆书工坊 */}
-      {showDeconstructModal && (
-        <DeconstructModal
-          isOpen={showDeconstructModal}
-          onClose={() => setShowDeconstructModal(false)}
-        />
-      )}
+        {/* 拆书工坊 */}
+        {showDeconstructModal && (
+          <DeconstructModal
+            isOpen={showDeconstructModal}
+            onClose={() => setShowDeconstructModal(false)}
+          />
+        )}
 
-      {/* 全身因果体检 */}
-      {showFullCheckModal && (
-        <FullCheckModal
-          isOpen={showFullCheckModal}
-          onClose={() => setShowFullCheckModal(false)}
-        />
-      )}
+        {/* 全身因果体检 */}
+        {showFullCheckModal && (
+          <FullCheckModal
+            isOpen={showFullCheckModal}
+            onClose={() => setShowFullCheckModal(false)}
+          />
+        )}
 
-      {/* 资产反哺提案 */}
-      {showAssetProposalModal && (
-        <AssetProposalModal
-          isOpen={showAssetProposalModal}
-          onClose={() => setShowAssetProposalModal(false)}
-        />
-      )}
+        {/* 资产反哺提案 */}
+        {showAssetProposalModal && (
+          <AssetProposalModal
+            isOpen={showAssetProposalModal}
+            onClose={() => setShowAssetProposalModal(false)}
+          />
+        )}
+      </React.Suspense>
     </div>
 
   );

@@ -62,7 +62,7 @@ export const ToastContainer: React.FC = () => {
           <div
             key={item.id}
             onClick={() => removeToast(item.id)}
-            className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border shadow-xl backdrop-blur-md transition-all duration-200 cursor-pointer hover:scale-[1.02] active:scale-95 animate-in slide-in-from-bottom-3 fade-in ${style.bg} ${style.border}`}
+            className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border shadow-xl transition-all duration-200 cursor-pointer hover:scale-[1.02] active:scale-95 animate-in slide-in-from-bottom-3 fade-in ${style.bg} ${style.border}`}
           >
             <div className={`mt-0.5 shrink-0 ${style.iconColor}`}>
               <IconComponent className="w-4 h-4" />

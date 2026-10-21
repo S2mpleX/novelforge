@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToastStore } from '@/stores/useToastStore';
 import { api } from '@/utils/tauriBridge';
 import type {
@@ -49,11 +50,14 @@ import {
   MessageCircle,
   Sliders,
   Target,
+  Image,
+  Upload,
+  Loader2,
 } from 'lucide-react';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
-import { CollaborationModal } from '@/components/collaboration/CollaborationModal';
+const CollaborationModal = lazy(() => import('@/components/collaboration/CollaborationModal').then(m => ({ default: m.CollaborationModal })));
 import { SandboxImportBibleModal } from '@/components/modals/SandboxImportBibleModal';
-import { SettingsModal } from '@/components/modals/SettingsModal';
+const SettingsModal = lazy(() => import('@/components/modals/SettingsModal').then(m => ({ default: m.SettingsModal })));
 import {
   auditPersonaDrift,
   generatePersonaCorrectionPrompt,
@@ -191,7 +195,14 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   onClose,
   isModal = false,
 }) => {
-  const { activeNovel, activeChapter, updateEditorContent, saveCurrentChapter } = useNovelStore();
+  const { activeNovel, activeChapter, updateEditorContent, saveCurrentChapter } = useNovelStore(
+    useShallow((s) => ({
+      activeNovel: s.activeNovel,
+      activeChapter: s.activeChapter,
+      updateEditorContent: s.updateEditorContent,
+      saveCurrentChapter: s.saveCurrentChapter,
+    }))
+  );
   const { addToast } = useToastStore();
   const showToast = (title: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') =>
     addToast({ title, type });
@@ -256,6 +267,18 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   const [polishingStyle, setPolishingStyle] = useState<'CINEMATIC' | 'PSYCHOLOGICAL' | 'HARDCORE_TENSE'>('CINEMATIC');
   const [polishingRange, setPolishingRange] = useState<'ALL' | 'RECENT_3'>('ALL');
   const [customPolishingGuidance, setCustomPolishingGuidance] = useState('');
+
+  // 👗 角色立绘贴图与 AI 视觉理解弹窗状态
+  const [showActorVisualModal, setShowActorVisualModal] = useState(false);
+  const [selectedActorIndex, setSelectedActorIndex] = useState<number | null>(null);
+  const [modalAvatarUrl, setModalAvatarUrl] = useState('');
+  const [modalVisualSummary, setModalVisualSummary] = useState('');
+  const [modalGender, setModalGender] = useState('男');
+  const [isAnalyzingActorVisual, setIsAnalyzingActorVisual] = useState(false);
+  const [modalAppearanceTags, setModalAppearanceTags] = useState<string[]>([]);
+  const [syncToNovelDb, setSyncToNovelDb] = useState(true);
+  const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
+  const actorFileInputRef = useRef<HTMLInputElement>(null);
 
   // P2P 互联网协同状态
   const {
@@ -1551,6 +1574,148 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
     }
   };
 
+  // 👗 角色立绘与外貌理解交互方法
+  const openActorVisualModal = (index: number) => {
+    const actor = actors[index];
+    if (!actor) return;
+    const charObj = charactersMap.get(actor.character_id);
+    setSelectedActorIndex(index);
+    setModalAvatarUrl(charObj?.avatar_url || actor.avatar_url || '');
+    setModalVisualSummary(charObj?.visual_summary || actor.visual_summary || '');
+    setModalGender(charObj?.gender || actor.gender || '男');
+    setModalAppearanceTags([]);
+    setSyncToNovelDb(true);
+    setShowActorVisualModal(true);
+  };
+
+  const handleActorFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('请选择有效的图片文件 (PNG, JPG, WebP 等)', 'warning');
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('图片尺寸不能超过 8MB', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setModalAvatarUrl(dataUrl);
+      showToast('已载入立绘图片，可点击【👁️ AI 识图】自动理解人设外貌', 'success');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAnalyzeActorAppearance = async () => {
+    if (!modalAvatarUrl) {
+      showToast('请先上传或填入角色立绘/贴图', 'warning');
+      return;
+    }
+    if (selectedActorIndex === null) return;
+    const actor = actors[selectedActorIndex];
+    if (!actor) return;
+
+    setIsAnalyzingActorVisual(true);
+    try {
+      const result = await api.analyzeCharacterAppearance({
+        image_url: modalAvatarUrl,
+        character_name: actor.character_name,
+        gender: modalGender,
+        genre: activeNovel?.genre_profile,
+      });
+
+      setModalVisualSummary(result.visual_summary);
+      setModalAppearanceTags(result.appearance_tags || []);
+      showToast('AI 识图成功！已自动提取核心视觉特征与外貌描写', 'success');
+    } catch (err: any) {
+      console.error('AI 识图失败:', err);
+      showToast(`AI 识图分析异常: ${err?.message || err}`, 'error');
+    } finally {
+      setIsAnalyzingActorVisual(false);
+    }
+  };
+
+  const handleSaveActorVisual = async () => {
+    if (selectedActorIndex === null) return;
+    const actor = actors[selectedActorIndex];
+    if (!actor) return;
+
+    // 1. 更新当前演武场 Actor
+    const nextActors = [...actors];
+    nextActors[selectedActorIndex] = {
+      ...actor,
+      avatar_url: modalAvatarUrl.trim() || undefined,
+      visual_summary: modalVisualSummary.trim() || undefined,
+      gender: modalGender,
+    };
+    setActors(nextActors);
+
+    if (activeSession) {
+      await api.updateSandboxSession({
+        id: activeSession.id,
+        characters_config: nextActors,
+      }).catch(console.error);
+    }
+
+    // 2. 如果关联了小说人物库中的角色
+    const charObj = charactersMap.get(actor.character_id);
+    if (charObj) {
+      try {
+        await api.updateCharacter({
+          id: charObj.id,
+          name: charObj.name,
+          gender: modalGender,
+          avatar_url: modalAvatarUrl.trim() || undefined,
+          visual_summary: modalVisualSummary.trim() || undefined,
+        });
+        if (activeNovel) {
+          const updated = await api.listCharacters(activeNovel.id);
+          setCharacters(updated);
+        }
+      } catch (e) {
+        console.error('同步更新角色档案失败:', e);
+      }
+    } else if (syncToNovelDb && activeNovel) {
+      // 预设角色同步创建到小说角色库
+      try {
+        const created = await api.createCharacter({
+          novel_id: activeNovel.id,
+          name: actor.character_name,
+          gender: modalGender,
+          personality: '性格深沉果决',
+          motivation: actor.private_motivation || '在对决中谋取主动',
+          background: '演武场登场角色',
+          avatar_url: modalAvatarUrl.trim() || undefined,
+          visual_summary: modalVisualSummary.trim() || undefined,
+        });
+        nextActors[selectedActorIndex] = {
+          ...nextActors[selectedActorIndex],
+          character_id: created.id,
+        };
+        setActors(nextActors);
+        if (activeSession) {
+          await api.updateSandboxSession({
+            id: activeSession.id,
+            characters_config: nextActors,
+          }).catch(console.error);
+        }
+        const updated = await api.listCharacters(activeNovel.id);
+        setCharacters(updated);
+        showToast(`已将【${actor.character_name}】及其立绘同步收录至小说人物设定库！`, 'success');
+      } catch (e) {
+        console.error('新建角色同步失败:', e);
+      }
+    }
+
+    setShowActorVisualModal(false);
+    showToast(`已应用【${actor.character_name}】的立绘贴图与外貌特征`, 'success');
+  };
+
   // 一键反哺角色状态机到全书长期记忆
   const handleSyncToMemoryEngine = async () => {
     if (actors.length === 0 || dialogueHistory.length === 0) {
@@ -2089,34 +2254,52 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
 
               {actors.map((actor, idx) => {
                 const charObj = charactersMap.get(actor.character_id);
+                const avatarUrl = charObj?.avatar_url || actor.avatar_url;
+                const visualSummary = charObj?.visual_summary || actor.visual_summary;
+                const gender = charObj?.gender || actor.gender;
                 return (
                   <div
                     key={actor.character_id}
-                    style={{ contentVisibility: 'auto', containIntrinsicSize: '0 320px' }}
-                    className="p-3 rounded-xl bg-white dark:bg-[#141210] border border-[#e8e0ce] dark:border-[#322c27] space-y-2"
+                    style={{ contentVisibility: 'auto', containIntrinsicSize: '0 360px' }}
+                    className="p-3.5 rounded-xl bg-white dark:bg-[#141210] border border-[#e8e0ce] dark:border-[#322c27] space-y-2.5 shadow-xs"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {charObj?.avatar_url ? (
+                    {/* 🌟 角色立绘展示与元数据区 */}
+                    {avatarUrl ? (
+                      <div className="flex gap-3 items-start pb-2.5 border-b border-[#ebdcc7]/60 dark:border-[#38312a]/60">
+                        {/* 立绘大图展示区 (支持全景灯箱查看) */}
+                        <div className="relative group shrink-0">
                           <img
-                            src={charObj.avatar_url}
+                            src={avatarUrl}
                             alt={actor.character_name}
-                            className="w-6 h-6 rounded-lg object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2"
+                            onClick={() => setLightboxImageUrl(avatarUrl)}
+                            className="w-16 h-20 sm:w-20 sm:h-24 rounded-xl object-cover border-2 border-amber-600/35 shadow-md group-hover:border-amber-600 transition-all cursor-zoom-in bg-surface-2"
+                            title="点击放大查看高清立绘"
                           />
-                        ) : (
-                          <span className="w-5 h-5 rounded-full bg-amber-600/10 text-amber-700 dark:text-amber-400 font-serif font-bold text-xs flex items-center justify-center shrink-0">
-                            {String.fromCharCode(65 + idx)}
-                          </span>
-                        )}
-                        <span className="font-serif font-bold text-xs text-[#2c2621] dark:text-[#e8e2d8]">
-                          {actor.character_name}
-                        </span>
+                          <div
+                            onClick={() => setLightboxImageUrl(avatarUrl)}
+                            className="absolute inset-0 bg-black/35 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px] cursor-zoom-in font-sans pointer-events-auto"
+                          >
+                            <span>🔍 大图</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openActorVisualModal(idx)}
+                            className="absolute -bottom-1 -right-1 px-1.5 py-0.2 rounded-full bg-amber-800 text-white text-[9px] font-sans shadow-md hover:bg-amber-700 transition-colors cursor-pointer border border-white/20"
+                            title="更换立绘或编辑外貌特征"
+                          >
+                            换图
+                          </button>
+                        </div>
 
-                        {/* 性别徽章与快捷设置 (O(1) Map 缓存查找) */}
-                        {(() => {
-                          const gender = charObj?.gender;
-                          return (
-                            <div className="flex items-center gap-1">
+                        {/* 角色姓名、属性与外貌摘要 */}
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center justify-between gap-1 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-serif font-bold text-sm text-[#2c2621] dark:text-[#f0eae0]">
+                                {actor.character_name}
+                              </span>
+
+                              {/* 性别徽章 */}
                               {gender ? (
                                 <span
                                   className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
@@ -2135,15 +2318,15 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                                   value=""
                                   onChange={async (e) => {
                                     const val = e.target.value;
-                                    if (!val || !charObj) return;
-                                    await api.updateCharacter({
-                                      id: charObj.id,
-                                      name: charObj.name,
-                                      gender: val,
-                                    });
-                                    const updated = await api.listCharacters(activeNovel!.id);
-                                    setCharacters(updated);
-                                    showToast(`已设置【${charObj.name}】性别为“${val}”`, 'success');
+                                    if (!val) return;
+                                    if (charObj) {
+                                      await api.updateCharacter({ id: charObj.id, name: charObj.name, gender: val });
+                                      const updated = await api.listCharacters(activeNovel!.id);
+                                      setCharacters(updated);
+                                    } else {
+                                      updateActorField(idx, 'gender' as any, val);
+                                    }
+                                    showToast(`已设置【${actor.character_name}】性别为“${val}”`, 'success');
                                   }}
                                   className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1 py-0.2 outline-none cursor-pointer"
                                   title="点击为该角色设定性别"
@@ -2155,37 +2338,164 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                                 </select>
                               )}
 
-                              {/* AI 立绘外貌载入标识 */}
-                              {charObj?.visual_summary && (
-                                <span
-                                  className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-mono font-medium cursor-help"
-                                  title={`【AI 已理解人设外貌】：${charObj.visual_summary}`}
-                                >
-                                  👗 立绘外貌
+                              {idx === 0 && (
+                                <span className="text-[10px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-600 font-mono">
+                                  先手方
                                 </span>
                               )}
                             </div>
-                          );
-                        })()}
 
-                        {idx === 0 && (
-                          <span className="text-[10px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-600 font-mono">
-                            先手方
-                          </span>
-                        )}
+                            <div className="flex items-center gap-1">
+                              {actors.length > 2 && (
+                                <button
+                                  onClick={() => handleRemoveActor(idx)}
+                                  className="p-1 text-[#a39788] hover:text-rose-600 transition-colors cursor-pointer"
+                                  title="移出此角色"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 快捷操作胶囊 */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => openActorVisualModal(idx)}
+                              className="text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-medium flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                              title="点击查看/编辑 AI 理解的外貌特征"
+                            >
+                              <span>👗</span>
+                              <span>立绘外貌与AI识图</span>
+                              {visualSummary && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setLightboxImageUrl(avatarUrl)}
+                              className="text-[10px] px-2 py-0.5 rounded-full border border-stone-300 dark:border-stone-700 hover:bg-black/5 dark:hover:bg-white/5 text-stone-600 dark:text-stone-300 flex items-center gap-1 cursor-pointer transition-colors"
+                              title="全屏放大查看立绘"
+                            >
+                              <span>🔍</span>
+                              <span>大图</span>
+                            </button>
+                          </div>
+
+                          {/* 外貌速览卡片 */}
+                          {visualSummary ? (
+                            <p
+                              onClick={() => openActorVisualModal(idx)}
+                              className="text-[10px] text-stone-600 dark:text-stone-300 line-clamp-2 leading-relaxed bg-[#fbf8f2] dark:bg-[#1a1714] p-1.5 rounded-lg border border-[#ede5d4] dark:border-[#2f2924] cursor-pointer hover:border-amber-600/40 transition-colors"
+                              title="点击查看/修改完整外貌描摹"
+                            >
+                              <span className="text-amber-700 dark:text-amber-400 font-semibold mr-1">【视觉外貌】</span>
+                              {visualSummary}
+                            </p>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openActorVisualModal(idx)}
+                              className="text-[10px] text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              <span>点击运行【AI 识图】，自动生成外貌描写</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
+                    ) : (
+                      /* 未配置立绘时的紧凑行 */
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => openActorVisualModal(idx)}
+                            className="relative group cursor-pointer shrink-0 transition-transform active:scale-95"
+                            title="点击上传角色立绘贴图，支持AI识图理解外貌"
+                          >
+                            <div className="w-8 h-8 rounded-lg border border-dashed border-amber-600/40 hover:border-amber-600 bg-amber-500/5 hover:bg-amber-500/15 flex items-center justify-center text-amber-800 dark:text-amber-300 transition-all font-serif font-bold text-xs relative">
+                              <span>{String.fromCharCode(65 + idx)}</span>
+                              <span className="absolute -bottom-1 -right-1 text-[8px] leading-none bg-amber-600 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-xs">
+                                +
+                              </span>
+                            </div>
+                          </button>
 
-                    <div className="flex items-center gap-1">
-                      {actors.length > 2 && (
-                        <button
-                          onClick={() => handleRemoveActor(idx)}
-                          className="p-1 text-[#a39788] hover:text-rose-600 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                          <span className="font-serif font-bold text-xs text-[#2c2621] dark:text-[#e8e2d8]">
+                            {actor.character_name}
+                          </span>
+
+                          {/* 性别徽章与快捷设置 */}
+                          <div className="flex items-center gap-1">
+                            {gender ? (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
+                                  gender === '男'
+                                    ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20'
+                                    : gender === '女'
+                                    ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20'
+                                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20'
+                                }`}
+                                title="角色生理与称谓性别"
+                              >
+                                {gender === '男' ? '♂ 男' : gender === '女' ? '♀ 女' : gender}
+                              </span>
+                            ) : (
+                              <select
+                                value=""
+                                onChange={async (e) => {
+                                  const val = e.target.value;
+                                  if (!val) return;
+                                  if (charObj) {
+                                    await api.updateCharacter({ id: charObj.id, name: charObj.name, gender: val });
+                                    const updated = await api.listCharacters(activeNovel!.id);
+                                    setCharacters(updated);
+                                  } else {
+                                    updateActorField(idx, 'gender' as any, val);
+                                  }
+                                  showToast(`已设置【${actor.character_name}】性别为“${val}”`, 'success');
+                                }}
+                                className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1 py-0.2 outline-none cursor-pointer"
+                                title="点击为该角色设定性别"
+                              >
+                                <option value="" disabled>+ 设性别</option>
+                                <option value="男">♂ 男</option>
+                                <option value="女">♀ 女</option>
+                                <option value="其他">⚧ 其他</option>
+                              </select>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => openActorVisualModal(idx)}
+                              className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                              title="点击上传立绘贴图，AI 自动理解人设外貌"
+                            >
+                              <span className="text-xs">🖼️</span>
+                              <span className="font-medium">+ 传立绘</span>
+                            </button>
+                          </div>
+
+                          {idx === 0 && (
+                            <span className="text-[10px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-600 font-mono">
+                              先手方
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {actors.length > 2 && (
+                            <button
+                              onClick={() => handleRemoveActor(idx)}
+                              className="p-1 text-[#a39788] hover:text-rose-600 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                   {/* 扮演模式选择：AI 子代理 vs 作者亲演 */}
                   <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[#efe9dc] dark:bg-[#201c18] border border-[#e0d6c2] dark:border-[#38312a] text-[10px]">
@@ -2410,6 +2720,8 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 const tension = calculateDialogueTension(round);
                 const isLastRound = idx === dialogueHistory.length - 1;
                 const speakerChar = charactersMap.get(round.speaker_id);
+                const actorForSpeaker = actors.find((a) => a.character_id === round.speaker_id || a.character_name === round.speaker_name);
+                const speakerAvatarUrl = speakerChar?.avatar_url || actorForSpeaker?.avatar_url;
 
                 return (
                   <div
@@ -2420,9 +2732,9 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                     }`}
                   >
                     <div className={`flex items-center gap-2 mb-1 px-1 ${isEven ? 'flex-row' : 'flex-row-reverse'}`}>
-                      {speakerChar?.avatar_url ? (
+                      {speakerAvatarUrl ? (
                         <img
-                          src={speakerChar.avatar_url}
+                          src={speakerAvatarUrl}
                           alt={round.speaker_name}
                           className="w-5 h-5 rounded-full object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2"
                         />
@@ -3361,11 +3673,247 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
         </div>
       )}
 
+      {/* 👗 角色立绘贴图与 AI 视觉外貌管理弹窗 */}
+      {showActorVisualModal && selectedActorIndex !== null && actors[selectedActorIndex] && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="relative w-full max-w-lg rounded-2xl shadow-2xl border border-[#ded5c2] dark:border-[#38322c] bg-[#fbf9f5] dark:bg-[#1a1715] p-5 flex flex-col max-h-[90vh] overflow-hidden">
+            {/* 顶栏 */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#e6decc] dark:border-[#2d2824] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-600/15 text-amber-700 dark:text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <Image className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-serif font-bold text-sm text-[#2c2621] dark:text-[#f0eae0] flex items-center gap-2">
+                    <span>【{actors[selectedActorIndex].character_name}】角色立绘与外貌理解</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 font-mono">
+                      {modalGender}
+                    </span>
+                  </h4>
+                  <p className="text-[10px] text-[#857767]">
+                    上传立绘贴图，AI 视觉大模型深度理解衣着神态，并注入对戏微动作与正文推演
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowActorVisualModal(false)}
+                className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-[#857767]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 内容区 */}
+            <div className="flex-1 overflow-y-auto py-3 space-y-3.5 min-h-0 text-xs">
+              {/* 立绘上传与预览区 */}
+              <div>
+                <label className="block text-[11px] font-serif font-bold text-[#443b33] dark:text-[#d5ccbe] mb-1.5">
+                  角色立绘 / 形象贴图
+                </label>
+
+                {modalAvatarUrl ? (
+                  <div className="relative rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex flex-col sm:flex-row items-center gap-4">
+                    <div className="relative group shrink-0">
+                      <img
+                        src={modalAvatarUrl}
+                        alt="立绘预览"
+                        onClick={() => setLightboxImageUrl(modalAvatarUrl)}
+                        className="w-32 h-40 sm:w-36 sm:h-44 rounded-xl object-cover border-2 border-amber-600/40 shadow-md cursor-zoom-in bg-surface-2 transition-transform hover:scale-[1.02]"
+                        title="点击查看高清全景大图"
+                      />
+                      <div
+                        onClick={() => setLightboxImageUrl(modalAvatarUrl)}
+                        className="absolute inset-0 bg-black/35 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px] cursor-zoom-in font-sans"
+                      >
+                        <span>🔍 放大查看</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-2 text-center sm:text-left">
+                      <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center justify-center sm:justify-start gap-1">
+                        <Check className="w-4 h-4" /> 立绘图片已载入
+                      </div>
+                      <p className="text-[10px] text-stone-500 leading-relaxed truncate max-w-xs">
+                        {modalAvatarUrl.startsWith('data:') ? '已载入本地立绘文件 (Base64)' : modalAvatarUrl}
+                      </p>
+                      <div className="flex items-center justify-center sm:justify-start gap-2 pt-1 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setLightboxImageUrl(modalAvatarUrl)}
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-serif border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <span>🔍 查看全景大图</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => actorFileInputRef.current?.click()}
+                          className="px-2.5 py-1 rounded text-[10px] border border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 transition-colors cursor-pointer"
+                        >
+                          更换图片
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModalAvatarUrl('')}
+                          className="px-2.5 py-1 rounded text-[10px] text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                        >
+                          清除立绘
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-[#d8cdb8] dark:border-[#3d3630] rounded-xl p-4 text-center bg-[#fdfbf7] dark:bg-[#151311] space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-amber-600/10 text-amber-700 dark:text-amber-400 flex items-center justify-center mx-auto">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <div className="text-[11px] text-stone-600 dark:text-stone-300 font-serif">
+                      选择角色本地立绘插画或粘贴图片直链
+                    </div>
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => actorFileInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-lg text-[11px] font-serif font-bold bg-amber-700 hover:bg-amber-800 text-white shadow-2xs transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>选择本地图片</span>
+                      </button>
+                    </div>
+                    <div className="pt-2">
+                      <input
+                        type="text"
+                        value={modalAvatarUrl}
+                        onChange={(e) => setModalAvatarUrl(e.target.value)}
+                        placeholder="或粘贴网络图片直链 (https://...)"
+                        className="w-full text-[10px] px-2.5 py-1.5 rounded-lg border border-[#e0d6c2] dark:border-[#38312a] bg-white dark:bg-[#201c18] outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+                <input
+                  ref={actorFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleActorFileChange}
+                  className="hidden"
+                />
+              </div>
+
+              {/* 👁️ AI 识图操作按钮 */}
+              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-500/25 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-serif font-bold text-xs text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                    <span>多模态 AI 识图理解</span>
+                  </div>
+                  <p className="text-[10px] text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+                    自动识别发型发色、五官神态、服饰配饰与手持武器，生成文学级外貌描写
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAnalyzeActorAppearance}
+                  disabled={!modalAvatarUrl || isAnalyzingActorVisual}
+                  className="px-3 py-1.5 rounded-lg text-xs font-serif font-bold bg-amber-700 hover:bg-amber-800 disabled:opacity-40 text-white flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
+                >
+                  {isAnalyzingActorVisual ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>识图中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>👁️ AI 识图</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* 识别出的外貌标签 */}
+              {modalAppearanceTags.length > 0 && (
+                <div>
+                  <label className="block text-[10px] font-serif text-[#857767] mb-1">
+                    AI 提取的特征标签
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {modalAppearanceTags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/20 font-mono"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 人设外貌与视觉特征描摹 */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-serif font-bold text-[#443b33] dark:text-[#d5ccbe]">
+                    人设外貌描摹（注入推演与小说正文）
+                  </label>
+                  <span className="text-[10px] text-stone-400">
+                    可手动润色调整
+                  </span>
+                </div>
+                <textarea
+                  value={modalVisualSummary}
+                  onChange={(e) => setModalVisualSummary(e.target.value)}
+                  rows={4}
+                  placeholder="例：墨发高束，身披玄黑金纹劲装，眉如寒星，眸光深邃而带着不可轻犯的锋芒。腰间悬挂一柄乌木长剑，举手投足间带着冷峻的肃杀之气..."
+                  className="w-full text-xs p-2.5 rounded-xl border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#141210] text-[#2c2621] dark:text-[#e8e2d8] focus:border-amber-600 outline-none resize-none leading-relaxed"
+                />
+                <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">
+                  💡 <strong>强因果约束</strong>：此处描写的衣着佩饰（如长剑、步摇、长袍）将强制成为该角色发言时微动作与对手戏的基准。
+                </p>
+              </div>
+
+              {/* 同步保存至角色库选项 */}
+              <div className="pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-[#554b3f] dark:text-[#c4baa8]">
+                  <input
+                    type="checkbox"
+                    checked={syncToNovelDb}
+                    onChange={(e) => setSyncToNovelDb(e.target.checked)}
+                    className="rounded border-[#ded5c2] text-amber-700 focus:ring-0 cursor-pointer"
+                  />
+                  <span>同步更新/收录至当前小说的【人物设定】库</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 底栏按钮 */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#e6decc] dark:border-[#2d2824] shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowActorVisualModal(false)}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-serif text-[#7a6f62] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveActorVisual}
+                className="px-4 py-1.5 rounded-lg text-xs font-serif font-bold bg-amber-700 hover:bg-amber-800 text-white shadow-2xs transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>应用外貌设定</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 互联网 P2P 联机创作弹窗 */}
-      <CollaborationModal
-        isOpen={showCollabModal}
-        onClose={() => setShowCollabModal(false)}
-      />
+      <Suspense fallback={null}>
+        {showCollabModal && (
+          <CollaborationModal
+            isOpen={showCollabModal}
+            onClose={() => setShowCollabModal(false)}
+          />
+        )}
+      </Suspense>
 
       {/* 📚 导入书本与设定弹窗 */}
       <SandboxImportBibleModal
@@ -3377,11 +3925,52 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
       />
 
       {/* 🔌 服务商与 API 管理弹窗 */}
-      {showSettingsModal && (
-        <SettingsModal
-          onClose={handleCloseSettingsModal}
-          initialTab="MODEL"
-        />
+      <Suspense fallback={null}>
+        {showSettingsModal && (
+          <SettingsModal
+            onClose={handleCloseSettingsModal}
+            initialTab="MODEL"
+          />
+        )}
+      </Suspense>
+
+      {/* 🔍 高清立绘全景大图灯箱模态框 */}
+      {lightboxImageUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-black/90 animate-in fade-in duration-150 cursor-zoom-out"
+          onClick={() => setLightboxImageUrl(null)}
+        >
+          <div
+            className="relative max-w-5xl max-h-[92vh] flex flex-col items-center select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={lightboxImageUrl}
+              alt="立绘全景大图"
+              className="max-h-[85vh] max-w-[92vw] object-contain rounded-2xl shadow-2xl border border-white/15"
+            />
+            <div className="mt-3 flex items-center gap-3">
+              <span className="text-xs text-white/80 font-serif">
+                立绘全景大图预览 · 点击遮罩或按右上角关闭
+              </span>
+              <button
+                type="button"
+                onClick={() => setLightboxImageUrl(null)}
+                className="px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 text-white text-xs font-serif transition-colors cursor-pointer"
+              >
+                关闭大图
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLightboxImageUrl(null)}
+              className="absolute -top-3.5 -right-3.5 p-2 rounded-full bg-black/80 hover:bg-black text-white shadow-xl cursor-pointer transition-transform hover:scale-110 border border-white/25"
+              title="关闭大图"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

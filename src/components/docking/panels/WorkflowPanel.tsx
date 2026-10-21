@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { api } from '@/utils/tauriBridge';
 import type { WorkflowTemplate, WorkflowRunDetails } from '@/types';
 import {
@@ -8,10 +9,16 @@ import {
   Maximize2,
   Plus,
 } from 'lucide-react';
-import { WorkflowRunnerModal } from '@/components/modals/WorkflowRunnerModal';
+
+const WorkflowRunnerModal = lazy(() => import('@/components/modals/WorkflowRunnerModal').then(m => ({ default: m.WorkflowRunnerModal })));
 
 export const WorkflowPanel: React.FC = () => {
-  const { activeNovel, activeChapter } = useNovelStore();
+  const { activeNovel, activeChapter } = useNovelStore(
+    useShallow((s) => ({
+      activeNovel: s.activeNovel,
+      activeChapter: s.activeChapter,
+    }))
+  );
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [currentRunDetails, setCurrentRunDetails] = useState<WorkflowRunDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -189,12 +196,14 @@ export const WorkflowPanel: React.FC = () => {
       )}
 
       {/* 完整模态框 */}
-      {showFullModal && (
-        <WorkflowRunnerModal
-          isOpen={showFullModal}
-          onClose={() => setShowFullModal(false)}
-        />
-      )}
+      <Suspense fallback={null}>
+        {showFullModal && (
+          <WorkflowRunnerModal
+            isOpen={showFullModal}
+            onClose={() => setShowFullModal(false)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

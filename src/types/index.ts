@@ -979,6 +979,9 @@ export interface CharacterActorConfig {
   voice_quirks?: string;
   order_index: number;
   is_human?: boolean;
+  avatar_url?: string;
+  visual_summary?: string;
+  gender?: string;
 }
 
 export interface DialogueRoundRecord {

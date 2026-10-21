@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { api } from '@/utils/tauriBridge';
 import {
   BookOpen,
@@ -120,7 +121,19 @@ export const WritersDeskModal: React.FC<Props> = ({
     createNovel,
     createChapter,
     setActiveTab,
-  } = useNovelStore();
+  } = useNovelStore(
+    useShallow((s) => ({
+      novels: s.novels,
+      activeNovel: s.activeNovel,
+      chapters: s.chapters,
+      activeChapter: s.activeChapter,
+      selectNovel: s.selectNovel,
+      selectChapter: s.selectChapter,
+      createNovel: s.createNovel,
+      createChapter: s.createChapter,
+      setActiveTab: s.setActiveTab,
+    }))
+  );
 
   const [mode, setMode] = useState<'desk' | 'wizard'>(
     !activeNovel || novels.length === 0 ? 'wizard' : initialMode
@@ -356,7 +369,7 @@ export const WritersDeskModal: React.FC<Props> = ({
   const totalNovelWords = chapters.reduce((sum, ch) => sum + (ch.word_count || 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150 select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-150 select-none">
       <div className="w-full max-w-4xl bg-surface dark:bg-[#1c1815] border border-line dark:border-[#3a332c] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header Bar */}
         <div className="px-6 py-3.5 border-b border-line dark:border-[#322c26] bg-surface-2 dark:bg-[#221e1a] flex items-center justify-between shrink-0">

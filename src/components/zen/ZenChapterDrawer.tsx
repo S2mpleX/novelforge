@@ -125,7 +125,7 @@ export const ZenChapterDrawer: React.FC<Props> = ({ isOpen, onClose, onToggle })
         <button
           type="button"
           onClick={onToggle}
-          className="fixed left-0 top-1/2 -translate-y-1/2 z-30 px-1 py-3.5 rounded-r-xl bg-surface-2/90 hover:bg-surface-2 dark:bg-[#1f1c19]/90 dark:hover:bg-[#282420] border-y border-r border-line dark:border-[#3d362e] shadow-xl text-ink-2 hover:text-primary dark:hover:text-amber-300 transition-all group flex flex-col items-center gap-1.5 cursor-pointer backdrop-blur-md"
+          className="fixed left-0 top-1/2 -translate-y-1/2 z-30 px-1 py-3.5 rounded-r-xl bg-surface-2 hover:bg-surface-2 dark:bg-[#1f1c19] dark:hover:bg-[#282420] border-y border-r border-line dark:border-[#3d362e] shadow-xl text-ink-2 hover:text-primary dark:hover:text-amber-300 transition-all group flex flex-col items-center gap-1.5 cursor-pointer"
           title="展开章节目录 (快速切章 / 查看全卷)"
         >
           <BookOpen className="w-3.5 h-3.5 text-primary dark:text-amber-400 group-hover:scale-110 transition-transform" />
@@ -142,14 +142,14 @@ export const ZenChapterDrawer: React.FC<Props> = ({ isOpen, onClose, onToggle })
       {/* 抽屉背衬遮罩 (点击空白关闭) */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-xs z-40 transition-opacity animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/40 z-40 transition-opacity animate-in fade-in duration-200"
           onClick={onClose}
         />
       )}
 
       {/* 侧滑抽屉面板 */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-surface/95 dark:bg-[#1a1714]/95 backdrop-blur-md border-r border-line dark:border-[#38332d] z-50 shadow-2xl flex flex-col transition-transform duration-300 ease-out font-sans ${
+        className={`fixed top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-surface dark:bg-[#1a1714] border-r border-line dark:border-[#38332d] z-50 shadow-2xl flex flex-col transition-transform duration-300 ease-out font-sans ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

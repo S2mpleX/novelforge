@@ -300,7 +300,7 @@ export const SandboxImportBibleModal: React.FC<SandboxImportBibleModalProps> = (
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 select-none">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-5 select-none">
       <div className="w-full max-w-3xl bg-surface border border-line rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="px-5 py-3.5 border-b border-line bg-surface-2 flex items-center justify-between shrink-0">

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   ChevronDown,
   Plus,
@@ -24,7 +25,15 @@ export const NovelSelectorDropdown: React.FC<NovelSelectorDropdownProps> = ({
   onOpenWordImport,
   compact = false,
 }) => {
-  const { novels, activeNovel, selectNovel, deleteNovel, chapters } = useNovelStore();
+  const { novels, activeNovel, selectNovel, deleteNovel, chapters } = useNovelStore(
+    useShallow((s) => ({
+      novels: s.novels,
+      activeNovel: s.activeNovel,
+      selectNovel: s.selectNovel,
+      deleteNovel: s.deleteNovel,
+      chapters: s.chapters,
+    }))
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -152,7 +161,7 @@ export const NovelSelectorDropdown: React.FC<NovelSelectorDropdownProps> = ({
 
       {/* 自定义书架下拉菜单卡片 (Custom Popover) */}
       {isOpen && (
-        <div className="absolute left-0 top-[calc(100%+6px)] w-full z-50 rounded-xl bg-[#faf6ee] dark:bg-[#1f1c19] border border-line dark:border-[#38332d] shadow-2xl backdrop-blur-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute left-0 top-[calc(100%+6px)] w-full z-50 rounded-xl bg-[#faf6ee] dark:bg-[#1f1c19] border border-line dark:border-[#38332d] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           {/* 下拉面板顶部：搜索框与作品总数 */}
           <div className="p-2.5 border-b border-line dark:border-[#332e29] bg-[#f2ebd9]/70 dark:bg-[#181614]/70 space-y-2">
             <div className="flex items-center justify-between text-[11px] text-ink-2 dark:text-[#a89d8f]">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { api } from '@/utils/tauriBridge';
 import {
   BookOpen,
@@ -197,7 +198,31 @@ export const Header: React.FC = () => {
     setUiScale,
     increaseUiScale,
     decreaseUiScale,
-  } = useNovelStore();
+  } = useNovelStore(
+    useShallow((s) => ({
+      novels: s.novels,
+      activeNovel: s.activeNovel,
+      selectNovel: s.selectNovel,
+      activeChapter: s.activeChapter,
+      activeTab: s.activeTab,
+      setActiveTab: s.setActiveTab,
+      toggleSidebar: s.toggleSidebar,
+      toggleRightPanel: s.toggleRightPanel,
+      rightPanelOpen: s.rightPanelOpen,
+      activeProvider: s.activeProvider,
+      activeModel: s.activeModel,
+      zenMode: s.zenMode,
+      toggleZenMode: s.toggleZenMode,
+      enterZenMode: s.enterZenMode,
+      exitZenMode: s.exitZenMode,
+      themeMode: s.themeMode,
+      toggleThemeMode: s.toggleThemeMode,
+      uiScale: s.uiScale,
+      setUiScale: s.setUiScale,
+      increaseUiScale: s.increaseUiScale,
+      decreaseUiScale: s.decreaseUiScale,
+    }))
+  );
 
   const chaptersCount = useNovelStore((s) => s.chapters.length);
 

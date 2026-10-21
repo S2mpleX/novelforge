@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { api } from '@/utils/tauriBridge';
 import { confirmDialog } from '@/utils/dialog';
 import type { PlotThread } from '@/types';
@@ -24,7 +25,12 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = 
 };
 
 export const PlotThreadsPanel: React.FC = () => {
-  const { activeNovel, chapters } = useNovelStore();
+  const { activeNovel, chapters } = useNovelStore(
+    useShallow((s) => ({
+      activeNovel: s.activeNovel,
+      chapters: s.chapters,
+    }))
+  );
   const [threads, setThreads] = useState<PlotThread[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');

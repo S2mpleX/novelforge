@@ -50,7 +50,7 @@ const sanitizeFtsSnippet = (raw: string): string => {
 };
 
 export const MemoryEngineView: React.FC<MemoryEngineViewProps> = ({ novelId: propNovelId }) => {
-  const { activeNovel } = useNovelStore();
+  const activeNovel = useNovelStore((s) => s.activeNovel);
   const novelId = propNovelId || activeNovel?.id || '';
   const [activeTab, setActiveTab] = useState<'CANON_FACTS' | 'CHARACTER_STATES' | 'FTS_SEARCH' | 'CURATOR'>('CANON_FACTS');
 

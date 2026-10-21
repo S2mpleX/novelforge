@@ -28,7 +28,7 @@ import {
 import { CharacterFlowView } from './CharacterFlowView';
 
 export const CharactersView: React.FC = () => {
-  const { activeNovel } = useNovelStore();
+  const activeNovel = useNovelStore((s) => s.activeNovel);
 
   const [subTab, setSubTab] = useState<'LIST' | 'RELATIONSHIPS'>('LIST');
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -296,10 +296,10 @@ export const CharactersView: React.FC = () => {
                           <img
                             src={c.avatar_url}
                             alt={c.name}
-                            className="w-11 h-11 rounded-xl object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2"
+                            className="w-14 h-18 rounded-xl object-cover border-2 border-amber-800/30 shadow-xs shrink-0 bg-surface-2 transition-transform hover:scale-[1.03]"
                           />
                         ) : (
-                          <div className="w-11 h-11 rounded-xl bg-amber-800/10 text-primary flex items-center justify-center font-bold text-sm font-serif border border-dashed border-amber-800/25 shrink-0">
+                          <div className="w-14 h-18 rounded-xl bg-amber-800/10 text-primary flex items-center justify-center font-bold text-base font-serif border border-dashed border-amber-800/25 shrink-0">
                             {c.name.slice(0, 1)}
                           </div>
                         )}
@@ -420,25 +420,25 @@ export const CharactersView: React.FC = () => {
                         <img
                           src={charAvatarUrl}
                           alt="角色立绘"
-                          className="w-16 h-16 rounded-xl object-cover border-2 border-amber-800/40 shadow-xs bg-surface"
+                          className="w-24 h-28 rounded-xl object-cover border-2 border-amber-800/40 shadow-sm bg-surface"
                         />
                         <button
                           type="button"
                           onClick={() => setCharAvatarUrl('')}
-                          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs hover:bg-red-700 transition cursor-pointer"
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs hover:bg-red-700 transition cursor-pointer"
                           title="移除立绘"
                         >
-                          <X className="w-2.5 h-2.5" />
+                          <X className="w-3 h-3" />
                         </button>
                       </div>
                     ) : (
                       <div
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-16 h-16 rounded-xl border-2 border-dashed border-line hover:border-amber-700 flex flex-col items-center justify-center text-ink-2 hover:text-amber-800 transition cursor-pointer bg-surface/50"
+                        className="w-24 h-28 rounded-xl border-2 border-dashed border-line hover:border-amber-700 flex flex-col items-center justify-center text-ink-2 hover:text-amber-800 transition cursor-pointer bg-surface/50"
                         title="点击选择本地立绘"
                       >
-                        <Upload className="w-4 h-4 mb-0.5" />
-                        <span className="text-[9px]">上传立绘</span>
+                        <Upload className="w-5 h-5 mb-1" />
+                        <span className="text-[10px]">选择本地立绘</span>
                       </div>
                     )}
                   </div>

@@ -96,7 +96,7 @@ export const ZenCollapsedButton: React.FC<{ onExpand: () => void }> = React.memo
     <button
       type="button"
       onClick={onExpand}
-      className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 px-3 py-1 rounded-full bg-surface-2/90 dark:bg-[#1f1c19]/90 backdrop-blur-md border border-line dark:border-[#3d362e] shadow-lg text-[11px] text-ink-2 hover:text-primary dark:hover:text-amber-300 font-serif flex items-center gap-1.5 transition-all cursor-pointer opacity-70 hover:opacity-100 hover:scale-105"
+      className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 px-3 py-1 rounded-full bg-surface-2 dark:bg-[#1f1c19] border border-line dark:border-[#3d362e] shadow-lg text-[11px] text-ink-2 hover:text-primary dark:hover:text-amber-300 font-serif flex items-center gap-1.5 transition-all cursor-pointer opacity-70 hover:opacity-100 hover:scale-105"
       title="展开案头浮岛"
     >
       <ChevronUp className="w-3.5 h-3.5" />
@@ -191,7 +191,7 @@ export const ZenFloatingIsland: React.FC<Props> = ({ onOpenChapterDrawer }) => {
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 max-w-[95vw] transition-all duration-200">
-      <div className="bg-surface/90 dark:bg-[#1a1714]/90 backdrop-blur-md border border-line dark:border-[#38332d] shadow-2xl rounded-full px-3.5 py-1.5 flex items-center gap-2 sm:gap-3 text-xs text-ink font-sans">
+      <div className="bg-surface dark:bg-[#1a1714] border border-line dark:border-[#38332d] shadow-2xl rounded-full px-3.5 py-1.5 flex items-center gap-2 sm:gap-3 text-xs text-ink font-sans">
         {/* 1. 章节快速穿梭器 */}
         <div className="flex items-center gap-1 shrink-0">
           <button

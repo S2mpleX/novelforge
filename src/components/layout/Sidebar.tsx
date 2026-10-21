@@ -23,15 +23,17 @@ import {
   X,
   ArrowUpDown,
 } from 'lucide-react';
-import { CreateNovelModal } from '@/components/modals/CreateNovelModal';
-import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
-import { CreateVolumeModal } from '@/components/modals/CreateVolumeModal';
-import { VersionDrawer } from '@/components/modals/VersionDrawer';
-import { WordImportModal } from '@/components/modals/WordImportModal';
+import { useShallow } from 'zustand/react/shallow';
 import { NovelSelectorDropdown } from '@/components/layout/NovelSelectorDropdown';
 import { cleanTitlePrefix, formatNodeDisplayTitle } from '@/utils/titleFormatter';
 import type { ContentTreeNode } from '@/types';
 import { confirmDialog, alertDialog, promptDialog } from '@/utils/dialog';
+
+const CreateNovelModal = React.lazy(() => import('@/components/modals/CreateNovelModal').then(m => ({ default: m.CreateNovelModal })));
+const CreateChapterModal = React.lazy(() => import('@/components/modals/CreateChapterModal').then(m => ({ default: m.CreateChapterModal })));
+const CreateVolumeModal = React.lazy(() => import('@/components/modals/CreateVolumeModal').then(m => ({ default: m.CreateVolumeModal })));
+const VersionDrawer = React.lazy(() => import('@/components/modals/VersionDrawer').then(m => ({ default: m.VersionDrawer })));
+const WordImportModal = React.lazy(() => import('@/components/modals/WordImportModal').then(m => ({ default: m.WordImportModal })));
 
 export const Sidebar: React.FC = () => {
   const {
@@ -53,7 +55,28 @@ export const Sidebar: React.FC = () => {
     splitChapter,
     mergeChapters,
     renumberHierarchy,
-  } = useNovelStore();
+  } = useNovelStore(
+    useShallow((s) => ({
+      novels: s.novels,
+      activeNovel: s.activeNovel,
+      deleteNovel: s.deleteNovel,
+      chapters: s.chapters,
+      activeChapter: s.activeChapter,
+      selectChapter: s.selectChapter,
+      deleteChapter: s.deleteChapter,
+      updateChapterTitle: s.updateChapterTitle,
+      deleteVolume: s.deleteVolume,
+      updateVolume: s.updateVolume,
+      sidebarCollapsed: s.sidebarCollapsed,
+      contentTree: s.contentTree,
+      scenes: s.scenes,
+      activeScene: s.activeScene,
+      selectScene: s.selectScene,
+      splitChapter: s.splitChapter,
+      mergeChapters: s.mergeChapters,
+      renumberHierarchy: s.renumberHierarchy,
+    }))
+  );
 
   const [viewMode, setViewMode] = useState<'LIST' | 'TREE'>('TREE');
   const [listSortOrder, setListSortOrder] = useState<'DEFAULT' | 'WORD_DESC' | 'WORD_ASC'>('DEFAULT');
@@ -1050,19 +1073,21 @@ export const Sidebar: React.FC = () => {
         </div>
       )}
 
-      {showCreateNovel && <CreateNovelModal onClose={() => setShowCreateNovel(false)} />}
-      {showCreateChapter && (
-        <CreateChapterModal
-          defaultVolumeId={selectedVolumeIdForNewChapter}
-          onClose={() => {
-            setShowCreateChapter(false);
-            setSelectedVolumeIdForNewChapter(undefined);
-          }}
-        />
-      )}
-      {showVersions && <VersionDrawer onClose={() => setShowVersions(false)} />}
-      {showWordImportModal && <WordImportModal isOpen={showWordImportModal} onClose={() => setShowWordImportModal(false)} />}
-      {showCreateVolume && <CreateVolumeModal onClose={() => setShowCreateVolume(false)} />}
+      <React.Suspense fallback={null}>
+        {showCreateNovel && <CreateNovelModal onClose={() => setShowCreateNovel(false)} />}
+        {showCreateChapter && (
+          <CreateChapterModal
+            defaultVolumeId={selectedVolumeIdForNewChapter}
+            onClose={() => {
+              setShowCreateChapter(false);
+              setSelectedVolumeIdForNewChapter(undefined);
+            }}
+          />
+        )}
+        {showVersions && <VersionDrawer onClose={() => setShowVersions(false)} />}
+        {showWordImportModal && <WordImportModal isOpen={showWordImportModal} onClose={() => setShowWordImportModal(false)} />}
+        {showCreateVolume && <CreateVolumeModal onClose={() => setShowCreateVolume(false)} />}
+      </React.Suspense>
     </>
   );
 };

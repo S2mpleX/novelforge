@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { ChapterVersion } from '@/types';
 import { confirmDialog } from '@/utils/dialog';
 import {
@@ -12,7 +13,14 @@ import {
 } from 'lucide-react';
 
 export const VersionHistoryPanel: React.FC = () => {
-  const { versions, activeChapter, restoreVersion, acceptProposal } = useNovelStore();
+  const { versions, activeChapter, restoreVersion, acceptProposal } = useNovelStore(
+    useShallow((s) => ({
+      versions: s.versions,
+      activeChapter: s.activeChapter,
+      restoreVersion: s.restoreVersion,
+      acceptProposal: s.acceptProposal,
+    }))
+  );
   const [selectedVersion, setSelectedVersion] = useState<ChapterVersion | null>(
     versions.length > 0 ? versions[0] : null
   );

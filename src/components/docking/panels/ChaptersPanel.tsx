@@ -15,11 +15,13 @@ import {
   X,
   ArrowUpDown,
 } from 'lucide-react';
-import { CreateNovelModal } from '@/components/modals/CreateNovelModal';
-import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
+import { useShallow } from 'zustand/react/shallow';
 import { NovelSelectorDropdown } from '@/components/layout/NovelSelectorDropdown';
 import { cleanTitlePrefix } from '@/utils/titleFormatter';
 import { confirmDialog, alertDialog, promptDialog } from '@/utils/dialog';
+
+const CreateNovelModal = React.lazy(() => import('@/components/modals/CreateNovelModal').then(m => ({ default: m.CreateNovelModal })));
+const CreateChapterModal = React.lazy(() => import('@/components/modals/CreateChapterModal').then(m => ({ default: m.CreateChapterModal })));
 
 export const ChaptersPanel: React.FC = () => {
   const {
@@ -31,7 +33,18 @@ export const ChaptersPanel: React.FC = () => {
     selectChapter,
     deleteChapter,
     updateChapterTitle,
-  } = useNovelStore();
+  } = useNovelStore(
+    useShallow((s) => ({
+      novels: s.novels,
+      activeNovel: s.activeNovel,
+      deleteNovel: s.deleteNovel,
+      chapters: s.chapters,
+      activeChapter: s.activeChapter,
+      selectChapter: s.selectChapter,
+      deleteChapter: s.deleteChapter,
+      updateChapterTitle: s.updateChapterTitle,
+    }))
+  );
   const { openPanel } = useWorkspaceStore();
 
   const [showCreateNovel, setShowCreateNovel] = useState(false);
@@ -344,8 +357,10 @@ export const ChaptersPanel: React.FC = () => {
         )}
       </div>
 
-      {showCreateNovel && <CreateNovelModal onClose={() => setShowCreateNovel(false)} />}
-      {showCreateChapter && <CreateChapterModal onClose={() => setShowCreateChapter(false)} />}
+      <React.Suspense fallback={null}>
+        {showCreateNovel && <CreateNovelModal onClose={() => setShowCreateNovel(false)} />}
+        {showCreateChapter && <CreateChapterModal onClose={() => setShowCreateChapter(false)} />}
+      </React.Suspense>
     </div>
   );
 };

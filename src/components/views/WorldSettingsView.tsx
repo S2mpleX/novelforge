@@ -20,7 +20,7 @@ interface WorldSettingsViewProps {
 }
 
 export const WorldSettingsView: React.FC<WorldSettingsViewProps> = ({ initialTab = 'RULES' }) => {
-  const { activeNovel } = useNovelStore();
+  const activeNovel = useNovelStore((s) => s.activeNovel);
 
   const [subTab, setSubTab] = useState<'RULES' | 'PLOT_ARCS' | 'PLOTS'>(initialTab);
   const [rules, setRules] = useState<WorldRule[]>([]);

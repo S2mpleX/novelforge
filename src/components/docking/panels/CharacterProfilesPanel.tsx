@@ -96,7 +96,7 @@ const STATUS_CONFIG: Record<
 };
 
 export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
-  const { activeNovel } = useNovelStore();
+  const activeNovel = useNovelStore((s) => s.activeNovel);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'profiles' | 'tracking'>('tracking');
@@ -480,10 +480,10 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                           <img
                             src={char.avatar_url}
                             alt={char.name}
-                            className="w-8 h-8 rounded-lg object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2"
+                            className="w-12 h-14 rounded-xl object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2 transition-transform hover:scale-[1.03]"
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded-lg bg-amber-800/10 text-primary flex items-center justify-center font-bold text-xs font-serif shrink-0 border border-dashed border-amber-800/20">
+                          <div className="w-12 h-14 rounded-xl bg-amber-800/10 text-primary flex items-center justify-center font-bold text-sm font-serif shrink-0 border border-dashed border-amber-800/20">
                             {char.name.slice(0, 1)}
                           </div>
                         )}
@@ -601,10 +601,10 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                           <img
                             src={char.avatar_url}
                             alt={char.name}
-                            className="w-8 h-8 rounded-lg object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2"
+                            className="w-12 h-14 rounded-xl object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2 transition-transform hover:scale-[1.03]"
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded-lg bg-amber-800/10 text-primary flex items-center justify-center font-bold text-xs font-serif shrink-0 border border-dashed border-amber-800/20">
+                          <div className="w-12 h-14 rounded-xl bg-amber-800/10 text-primary flex items-center justify-center font-bold text-sm font-serif shrink-0 border border-dashed border-amber-800/20">
                             {char.name.slice(0, 1)}
                           </div>
                         )}
@@ -719,12 +719,12 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                       <img
                         src={charAvatarUrl}
                         alt="立绘"
-                        className="w-12 h-12 rounded-lg object-cover border border-amber-800/40 shadow-2xs"
+                        className="w-20 h-24 rounded-xl object-cover border border-amber-800/40 shadow-xs"
                       />
                       <button
                         type="button"
                         onClick={() => setCharAvatarUrl('')}
-                        className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-600 text-white flex items-center justify-center text-[9px] hover:bg-red-700"
+                        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 text-white flex items-center justify-center text-xs hover:bg-red-700"
                         title="移除立绘"
                       >
                         ×
@@ -733,10 +733,10 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                   ) : (
                     <div
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-12 h-12 rounded-lg border border-dashed border-line hover:border-amber-700 flex flex-col items-center justify-center text-ink-2 hover:text-amber-800 transition cursor-pointer bg-surface/50 shrink-0"
+                      className="w-20 h-24 rounded-xl border-2 border-dashed border-line hover:border-amber-700 flex flex-col items-center justify-center text-ink-2 hover:text-amber-800 transition cursor-pointer bg-surface/50 shrink-0"
                     >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span className="text-[8px] mt-0.5">立绘</span>
+                      <Upload className="w-4 h-4" />
+                      <span className="text-[10px] mt-1">上传立绘</span>
                     </div>
                   )}
 

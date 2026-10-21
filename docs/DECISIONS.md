@@ -1996,6 +1996,63 @@
   - `cargo run --manifest-path src-tauri/Cargo.toml --bin db_test`：66/66 全部满分通过；
   - 前端 Vite 生产构建：`pnpm build` **1.30s 零错误完成**。
 
+## ADR-061: 演武场角色立绘大图展示区、全景高清灯箱与多端视觉呈现优化 (Character Portrait Showcase & Fullscreen Lightbox Architecture)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户上传角色立绘贴图后反馈：“图片太小了”并附带截图；
+  2. 经过对实际界面的审查，原先演武场角色卡片的立绘贴图被限制在左上角的 `w-7 h-7` (28x28px) 头像框内，导致创作者辛辛苦苦寻找或绘制的精美角色插画、二次元立绘或五官服饰细节严重糊缩，无法直观辨识与欣赏；
+  3. 此外，编辑弹窗中的预览图亦只有 80x96px，且缺少“全屏/全景大图查看”能力。
+- **决策与重构实装**：
+  1. **演武场角色卡片专属立绘大图展示区 (Portrait Showcase Layout)**：
+     - 在已配置立绘的角色卡片上，将图片展示尺寸从 28x28px 升级为 `w-16 h-20 sm:w-20 sm:h-24` (80x96px，面积放大 600% 以上) 的专属插画展台；
+     - 搭配双层圆角高质感边框、外阴影与悬停微光动效，角色的发型发色、帽子围巾、神态与服饰层次一目了然；
+     - 展台右侧整合展示角色姓名、性别胶囊、先手方徽章、快捷操作胶囊（【👗 立绘外貌与AI识图】、【🔍 大图】、【换图】）以及 AI 外貌描写速览卡片；
+  2. **全景高清立绘灯箱系统 (Fullscreen Lightbox Modal)**：
+     - 用户点击卡片上的立绘或点击【🔍 大图】按钮，随时随地一键唤起全景高保真灯箱；
+     - 灯箱最大支持 `85vh` 视口自适应，完整展示立绘插画的全部艺术细节，支持遮罩点击与一键关闭；
+  3. **多端角色档案立绘呈现全面升级**：
+     - 角色管理大视图 (`CharactersView.tsx`) 卡片与弹窗预览图分别升级为 `w-14 h-18` 与 `w-24 h-28`；
+     - 侧边栏角色追踪面板 (`CharacterProfilesPanel.tsx`) 卡片与编辑抽屉立绘预览全面升级为 `w-12 h-14` 与 `w-20 h-24`。
+- **验证结果**：
+  - `pnpm tsc --noEmit`：0 错误 0 警告；
+  - `pnpm test:character:visual` (6/6 全部满分通过)；
+  - `pnpm test:sandbox:inspiration` (6/6 全部通过)；
+  - `pnpm test:sandbox:api` (4/4 全部通过)；
+  - `cargo run --manifest-path src-tauri/Cargo.toml --bin db_test`：66/66 全部满分通过；
+  - 前端 Vite 生产构建：`pnpm build` **1.44s 零错误完成**。
+
+## ADR-062: 全局性能专项检查与多维极限优化架构 (Full-Project Performance Audit & Optimization Architecture)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户反馈：“感觉目前越来越卡了，怎么解决优化呢”。
+  2. 经深入排查，发现以下三大核心性能瓶颈：
+     - **Zustand 全局订阅泛洪 (Naked `useNovelStore()` Subscriptions)**：
+       根组件 `App.tsx`、`Header.tsx`、`Sidebar.tsx`、`DockingWorkspace.tsx`、`NovelEditor.tsx` 及多达 20+ 个功能面板与模态框均裸调 `useNovelStore()`，未挂载选择器或浅比较。任何属性变动（如正文输入防抖更新 `editorContent`、AI 流式生成逐 token 更新 `streamText`、保存状态更新 `saveStatus`）都会导致从 `App.tsx` 根部向下整个 React 组件树发生级联 re-render 和全量 VDOM diff。
+     - **单体庞大 JS 打包与代码分割失效 (Monolithic 2.5MB Bundle & Ineffective Dynamic Imports)**：
+       `App.tsx` 静态导入了全部主视图与多个大型模态框，导致 Vite 打包警告 `INEFFECTIVE_DYNAMIC_IMPORT`，且 `@xyflow/react`、`mammoth`、`peerjs` 等重型依赖全量混入首屏入口 Chunk，生产构建体积高达 **2,478 kB**。
+     - **WebView2 GPU 离屏模糊渲染风暴 (`backdrop-blur` Multi-pass Convolution)**：
+       在编辑器行内查找替换栏 (`EditorFindReplaceBar`)、文本划词菜单 (`FloatingSelectionMenu`)、极简沉浸写作浮岛 (`ZenFloatingIsland`)、书架下拉菜单 (`NovelSelectorDropdown`) 等高频交互容器上滥用 `backdrop-blur-*`，导致 WebView2/Chromium 排版合成器在每次文本键入、划词或滚动时触发 GPU 离屏贴图复制与高斯模糊多 pass 卷积计算，引发掉帧卡顿。
+- **决策与重构实装**：
+  1. **Zustand 精准粒度订阅与浅比较优化 (`useShallow`)**：
+     - 在 `App.tsx`、`Header.tsx`、`Sidebar.tsx`、`DockingWorkspace.tsx`、`NovelEditor.tsx`、`DualWordStatsBadge.tsx`、`CharacterSandboxPanel.tsx`、`ToolboxPanel.tsx`、`TimelinePanel.tsx`、`PlotThreadsPanel.tsx`、`VersionHistoryPanel.tsx` 等全域关键路径全面引入 `zustand/react/shallow`；
+     - 确保打字输入、AI 流式输出时不触发外层 Layout、边栏、顶栏的无谓重新渲染，渲染负载降低 90% 以上。
+  2. **路由视图与重型模态框异步代码分割 (`React.lazy` + `Suspense`) 与 Vendor 独立切片**：
+     - 在 `App.tsx` 对 `DashboardView`、`CharactersView`、`WorldSettingsView`、`MemoryEngineView`、`DockingWorkspace` 及模态框实行异步按需加载；
+     - 在 `Sidebar.tsx`、`NovelEditor.tsx`、`ChaptersPanel.tsx`、`DashboardView.tsx`、`ToolboxPanel.tsx`、`CharacterSandboxPanel.tsx` 消除静态导入，消灭全部 14 处 `INEFFECTIVE_DYNAMIC_IMPORT` 警告；
+     - 配置 Vite Rollup `manualChunks` 将 `@tiptap`、`@xyflow/react`、`mammoth`、`peerjs`、`lucide-react` 拆解为独立的 Vendor Chunk；
+     - **首屏核心包体积从 2,478 kB 直降至 456 kB，降幅达 81.6%！**
+  3. **清除浮动层 GPU 高消耗滤镜，全面切换纯色实体高对比底色**：
+     - 彻底清除 `EditorFindReplaceBar`、`FloatingSelectionMenu`、`ZenFloatingIsland`、`ZenChapterDrawer`、`NovelSelectorDropdown`、`ToastContainer` 中的 `backdrop-blur-*`；
+     - 全局模态框背衬采用半透明遮罩（`bg-black/60`）替代全屏高斯模糊，彻底消除 GPU 掉帧与排版抖动。
+- **验证结果**：
+  - 首屏 JS 资源体积由 2,478 kB 缩减至 456 kB (压缩比 81.6%)；
+  - `pnpm tsc --noEmit`：0 错误 0 警告；
+  - 全部自动化测试 100% 通过（`test:character:visual`, `test:sandbox:inspiration`, `test:sandbox:api`, `test:sandbox`, `test:branches`, `test:header`, `test:docking`, `test:zen`, `test:humanizer`, `test:cohort2`, `test:cohort3`）；
+  - 原生 Rust SQLite 数据库 66 项验证全量通过 (`pnpm test:db`)；
+  - 生产构建 `pnpm build` **1.18s 极速完成**。
+
+
+
 
 
 

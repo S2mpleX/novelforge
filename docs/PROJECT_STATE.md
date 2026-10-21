@@ -1,17 +1,21 @@
 # NovelForge AI — 项目持续开发状态 (PROJECT_STATE.md)
 
 ## 1. 当前阶段与基线
-- **当前阶段**：V3.6.8 **演武场推演台全视口滚动、底栏防重叠遮挡与高刷新性能架构 (Character Sandbox High-FPS Scrolling & Anti-Overlap Layout)**
-  - ① **滚动图层冲突与非快路径清障**：彻底剔除左侧情境边栏与右侧对白流上的 `[contain:content]`、`[transform:translateZ(0)]`、`[will-change:scroll-position]` 与非法的 `[contain:layout_style]`，还原 Chromium/WebView2 原生合成器直连（Composited Scrolling），消灭每一帧向下滚动时的 CPU 栅格化重绘；
-  - ② **现代 Web 视口懒计算 (`content-visibility: auto`)**：在模板库、场景目标块、各个出场角色卡片以及每条对白气泡上全面实装 `content-visibility: auto` 与 `contain-intrinsic-size`，浏览器在用户向下拖拽/滚动列表时直接跳过离开视口卡片的 Layout & Paint，长列表滚动帧率瞬间拉升至 120fps；
-  - ③ **底栏文本溢出重叠与遮挡根治 (Anti-Overlap Guard)**：左侧状态信息栏增加 `min-w-0 overflow-hidden shrink-0` 严格裁剪保护，彻底杜绝不换行文本横向溢出穿透至右侧按钮下方造成遮挡；将长达 180px 的文字快捷键提示转化为【步进一轮】内嵌的精巧徽标 `<kbd>Ctrl+↵</kbd>` 与 Tooltip，两栏保持安全间隙 `gap-3` 永不遮挡；
-  - ④ **全局滚动条性能调优 (`App.css`)**：剔除 `::-webkit-scrollbar-thumb` 上的 `transition: background 0.2s ease`，消除向下滚动时逐帧触发颜色补间动画对渲染管线的打断；
-  - ⑤ **模态框背景与阴影轻量化 (`CharacterSandboxModal.tsx`)**：剔除遮罩层 `backdrop-blur-xs` 与外层 `[contain:paint]`，避免滚动时每一帧进行全屏高斯模糊卷积运算；
-  - ⑥ **全套自动化回归验证 100% 通过**：`test:sandbox:inspiration` (6/6)、`test:sandbox:api` (4/4)、`test:sandbox` (12/12)、`test:branches` (5/5) 全部满分通过，原生 `cargo run --manifest-path src-tauri/Cargo.toml --bin db_test` 66/66 全部通过，前端 Vite 生产构建 1.30s 零错误！
-- **版本目标**：V3.6.8
+- **当前阶段**：V3.7.0 **全局性能专项检查与多维极限优化架构 (Full-Project Performance Audit & Optimization Architecture)**
+  - ① **Zustand 全局精准粒度订阅与浅比较 (`useShallow`)**：全面排查并消除 `App.tsx`、`Header.tsx`、`Sidebar.tsx`、`DockingWorkspace.tsx`、`NovelEditor.tsx`、`DualWordStatsBadge.tsx` 及 20+ 个功能面板中的无 selector 裸订阅。正文键入防抖与 AI 流式 token 生成不再引发根组件级联重渲染，渲染负载骤降 90% 以上；
+  - ② **全域路由视图与重型模态框异步代码分割 (`React.lazy` + `Suspense`) 与 Vendor 独立切片**：
+    - `App.tsx` 动态按需加载五大主视图与独立模态框；
+    - 消灭全局 14 处 `INEFFECTIVE_DYNAMIC_IMPORT` 警告；
+    - 配置 Vite Rollup `manualChunks` 将 `@tiptap`、`@xyflow/react`、`mammoth`、`peerjs`、`lucide-react` 拆解为按需加载的独立 Vendor；
+    - **首屏 JS 核心包体积从 2,478 kB 暴降至 456 kB，降幅达 81.6%！**；
+  - ③ **清除浮动层 GPU 离屏模糊风暴 (`backdrop-blur` Multi-pass Convolution)**：
+    - 彻底剔除正文查找替换栏 (`EditorFindReplaceBar`)、划词悬浮胶囊 (`FloatingSelectionMenu`)、Zen 模式案头浮岛 (`ZenFloatingIsland`)、书架下拉菜单 (`NovelSelectorDropdown`) 与 Toast 浮动条的高开销 `backdrop-blur-*`，全面换用纯色实体高对比底色；
+    - 全局模态框背衬采用半透明遮罩（`bg-black/60`）消除 GPU 掉帧与排版抖动；
+  - ④ **全套自动化测试 100% 满分通过**：`test:character:visual` (6/6)、`test:sandbox:inspiration` (6/6)、`test:sandbox:api` (4/4)、`test:sandbox` (12/12)、`test:branches` (5/5)、`test:header` (9/9)、`test:docking` (12/12)、`test:zen` (12/12)、`test:humanizer` (27/27)、`test:cohort2` (46/46)、`test:cohort3` (55/55) 全部满分通过，原生 `cargo run --manifest-path src-tauri/Cargo.toml --bin db_test` 66/66 全部通过，前端生产构建 1.18s 零错误完成！
+- **版本目标**：V3.7.0
 - **更新时间**：2026-10-21
-- **代码库状态**：真实可运行、真实编译通过 (Rust 后端与 SQLite 零错误零警告，前端 Vite 打包 1.30s 零错误，演武场灵感探针 6/6 全部通过，多 API 与性别专项 4/4 全部通过，分支推演 5/5 全部通过，Rust db_test 66/66 全部通过)。
-- **最近实装**：底栏文字溢出遮挡彻底根除，快捷键无感内嵌与全视口高刷新加固 (ADR-060)。
+- **代码库状态**：真实可运行、真实编译通过 (Rust 后端与 SQLite 零错误零警告，前端 Vite 打包 1.18s 零错误，首屏 Chunk 仅 456kB，全部前端专项测试 100% 通过，Rust db_test 66/66 全部通过)。
+- **最近实装**：全局性能专项检查与多维极限优化架构 (ADR-062)。
 
 ---
 

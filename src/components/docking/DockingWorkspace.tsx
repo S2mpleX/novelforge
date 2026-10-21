@@ -38,11 +38,12 @@ export const DockingWorkspace: React.FC = () => {
     loadWorkspace,
     toggleMaximizePanel,
   } = useWorkspaceStore();
-  const { activeNovel, zenMode } = useNovelStore();
+  const activeNovelId = useNovelStore((s) => s.activeNovel?.id);
+  const zenMode = useNovelStore((s) => s.zenMode);
 
   useEffect(() => {
-    loadWorkspace(activeNovel?.id);
-  }, [activeNovel?.id]);
+    loadWorkspace(activeNovelId);
+  }, [activeNovelId]);
 
   // Global Keyboard Shortcuts
   useEffect(() => {

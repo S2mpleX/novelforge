@@ -1361,6 +1361,12 @@ pub struct CharacterActorConfig {
     pub order_index: i64,
     #[serde(default)]
     pub is_human: Option<bool>,
+    #[serde(default)]
+    pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub visual_summary: Option<String>,
+    #[serde(default)]
+    pub gender: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

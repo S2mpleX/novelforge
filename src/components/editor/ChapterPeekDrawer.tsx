@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { api } from '@/utils/tauriBridge';
 import type { Chapter } from '@/types';
 import {
@@ -18,7 +19,13 @@ interface Props {
 }
 
 export const ChapterPeekDrawer: React.FC<Props> = ({ isOpen, onClose }) => {
-  const { activeChapter, chapters, selectChapter } = useNovelStore();
+  const { activeChapter, chapters, selectChapter } = useNovelStore(
+    useShallow((s) => ({
+      activeChapter: s.activeChapter,
+      chapters: s.chapters,
+      selectChapter: s.selectChapter,
+    }))
+  );
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [peekChapter, setPeekChapter] = useState<Chapter | null>(null);
   const [copied, setCopied] = useState(false);
@@ -101,7 +108,7 @@ export const ChapterPeekDrawer: React.FC<Props> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex justify-end select-none font-sans">
+    <div className="fixed inset-0 z-50 bg-black/50 flex justify-end select-none font-sans">
       <div className="w-full max-w-xl h-full bg-surface dark:bg-[#1a1714] border-l border-line dark:border-[#2e2a27] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
         {/* 顶部标题栏 */}
         <div className="p-3.5 border-b border-line dark:border-[#2e2a27] bg-surface-2 dark:bg-[#231f1b] flex items-center justify-between shrink-0">

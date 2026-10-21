@@ -95,7 +95,7 @@ const DRAMA_TEMPLATES: DramaStructureTemplate[] = [
 ];
 
 export const PlotOutlinePanel: React.FC = () => {
-  const { activeNovel } = useNovelStore();
+  const activeNovel = useNovelStore((s) => s.activeNovel);
   const [phases, setPhases] = useState<StoryPhase[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPhase, setEditingPhase] = useState<StoryPhase | null>(null);

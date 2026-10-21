@@ -19,16 +19,26 @@ import {
   SlidersHorizontal,
   PenTool,
 } from 'lucide-react';
-import { CreationWorkflowModal } from '@/components/modals/CreationWorkflowModal';
+import { useShallow } from 'zustand/react/shallow';
 import { BookCoverView } from '@/components/common/BookCoverView';
-import { BookCoverModal } from '@/components/modals/BookCoverModal';
 import { DualWordStatsBadge } from '@/components/common/DualWordStatsBadge';
-import { BatchReviseModal } from '@/components/modals/BatchReviseModal';
-import { MapModal } from '@/components/modals/MapModal';
 import type { ActiveTab } from '@/stores/useNovelStore';
 
+const CreationWorkflowModal = React.lazy(() => import('@/components/modals/CreationWorkflowModal').then(m => ({ default: m.CreationWorkflowModal })));
+const BookCoverModal = React.lazy(() => import('@/components/modals/BookCoverModal').then(m => ({ default: m.BookCoverModal })));
+const BatchReviseModal = React.lazy(() => import('@/components/modals/BatchReviseModal').then(m => ({ default: m.BatchReviseModal })));
+const MapModal = React.lazy(() => import('@/components/modals/MapModal').then(m => ({ default: m.MapModal })));
+
 export const DashboardView: React.FC = () => {
-  const { activeNovel, chapters, activeChapter, setActiveTab, selectChapter } = useNovelStore();
+  const { activeNovel, chapters, activeChapter, setActiveTab, selectChapter } = useNovelStore(
+    useShallow((s) => ({
+      activeNovel: s.activeNovel,
+      chapters: s.chapters,
+      activeChapter: s.activeChapter,
+      setActiveTab: s.setActiveTab,
+      selectChapter: s.selectChapter,
+    }))
+  );
   const [showWorkflowGuide, setShowWorkflowGuide] = useState(false);
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [showBatchReviseModal, setShowBatchReviseModal] = useState(false);
@@ -516,28 +526,38 @@ export const DashboardView: React.FC = () => {
       </div>
 
       {/* Creation Workflow Modal */}
-      <CreationWorkflowModal
-        isOpen={showWorkflowGuide}
-        onClose={() => setShowWorkflowGuide(false)}
-      />
+      <React.Suspense fallback={null}>
+        {showWorkflowGuide && (
+          <CreationWorkflowModal
+            isOpen={showWorkflowGuide}
+            onClose={() => setShowWorkflowGuide(false)}
+          />
+        )}
 
-      {/* Book Cover Design Studio Modal */}
-      <BookCoverModal
-        isOpen={showCoverModal}
-        onClose={() => setShowCoverModal(false)}
-      />
+        {/* Book Cover Design Studio Modal */}
+        {showCoverModal && (
+          <BookCoverModal
+            isOpen={showCoverModal}
+            onClose={() => setShowCoverModal(false)}
+          />
+        )}
 
-      {/* Batch Revise Studio Modal */}
-      <BatchReviseModal
-        isOpen={showBatchReviseModal}
-        onClose={() => setShowBatchReviseModal(false)}
-      />
+        {/* Batch Revise Studio Modal */}
+        {showBatchReviseModal && (
+          <BatchReviseModal
+            isOpen={showBatchReviseModal}
+            onClose={() => setShowBatchReviseModal(false)}
+          />
+        )}
 
-      {/* World Map Sandbox Modal */}
-      <MapModal
-        isOpen={showMapModal}
-        onClose={() => setShowMapModal(false)}
-      />
+        {/* World Map Sandbox Modal */}
+        {showMapModal && (
+          <MapModal
+            isOpen={showMapModal}
+            onClose={() => setShowMapModal(false)}
+          />
+        )}
+      </React.Suspense>
     </div>
   );
 };

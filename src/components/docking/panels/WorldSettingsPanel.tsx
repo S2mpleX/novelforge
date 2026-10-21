@@ -74,7 +74,7 @@ const GENRE_RULE_TEMPLATES: RuleTemplateItem[] = [
 ];
 
 export const WorldSettingsPanel: React.FC = () => {
-  const { activeNovel } = useNovelStore();
+  const activeNovel = useNovelStore((s) => s.activeNovel);
   const [rules, setRules] = useState<WorldRule[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);

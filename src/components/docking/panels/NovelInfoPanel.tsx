@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { api } from '@/utils/tauriBridge';
 import {
   BookOpen,
@@ -10,13 +11,20 @@ import {
   X,
   Palette,
 } from 'lucide-react';
-import { PublishingModal } from '@/components/modals/PublishingModal';
 import { BookCoverView } from '@/components/common/BookCoverView';
-import { BookCoverModal } from '@/components/modals/BookCoverModal';
 import { alertDialog } from '@/utils/dialog';
 
+const PublishingModal = React.lazy(() => import('@/components/modals/PublishingModal').then(m => ({ default: m.PublishingModal })));
+const BookCoverModal = React.lazy(() => import('@/components/modals/BookCoverModal').then(m => ({ default: m.BookCoverModal })));
+
 export const NovelInfoPanel: React.FC = () => {
-  const { activeNovel, chapters, updateNovel } = useNovelStore();
+  const { activeNovel, chapters, updateNovel } = useNovelStore(
+    useShallow((s) => ({
+      activeNovel: s.activeNovel,
+      chapters: s.chapters,
+      updateNovel: s.updateNovel,
+    }))
+  );
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -279,8 +287,10 @@ export const NovelInfoPanel: React.FC = () => {
         </div>
       )}
 
-      {showPublishModal && <PublishingModal onClose={() => setShowPublishModal(false)} />}
-      <BookCoverModal isOpen={showCoverModal} onClose={() => setShowCoverModal(false)} />
+      <React.Suspense fallback={null}>
+        {showPublishModal && <PublishingModal onClose={() => setShowPublishModal(false)} />}
+        {showCoverModal && <BookCoverModal isOpen={showCoverModal} onClose={() => setShowCoverModal(false)} />}
+      </React.Suspense>
     </div>
   );
 };

@@ -277,7 +277,7 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
     >
       {/* 紧凑悬浮胶囊条 */}
       {!activeAction ? (
-        <div className="flex items-center gap-0.5 p-1 rounded-xl bg-[#231f1a]/90 dark:bg-[#1a1714]/95 text-white shadow-2xl backdrop-blur-md border border-amber-600/30 text-xs">
+        <div className="flex items-center gap-0.5 p-1 rounded-xl bg-[#231f1a] dark:bg-[#1a1714] text-white shadow-2xl border border-amber-600/40 text-xs">
           <button
             type="button"
             onClick={() => handleTriggerAction('humanize')}

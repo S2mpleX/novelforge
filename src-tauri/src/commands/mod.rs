@@ -2597,15 +2597,27 @@ pub async fn execute_character_sandbox_step(
     // 3. 读取该角色的底层设定档案（若被用户在后台删除则优雅降级，保障会话不崩溃）
     let (char_name, char_aliases, char_gender, char_personality, char_background, char_motivation, char_visual) =
         match db.get_character(&current_actor.character_id) {
-            Ok(p) => (p.name, p.aliases, p.gender, p.personality, p.background, p.motivation, p.visual_summary),
+            Ok(p) => {
+                let gender = if !p.gender.trim().is_empty() {
+                    p.gender
+                } else {
+                    current_actor.gender.clone().unwrap_or_default()
+                };
+                let visual = if !p.visual_summary.trim().is_empty() {
+                    p.visual_summary
+                } else {
+                    current_actor.visual_summary.clone().unwrap_or_default()
+                };
+                (p.name, p.aliases, gender, p.personality, p.background, p.motivation, visual)
+            },
             Err(_) => (
                 current_actor.character_name.clone(),
                 "".to_string(),
-                "".to_string(),
+                current_actor.gender.clone().unwrap_or_default(),
                 "性格深沉未明".to_string(),
                 "生平背景不详".to_string(),
                 current_actor.private_motivation.clone(),
-                "".to_string(),
+                current_actor.visual_summary.clone().unwrap_or_default(),
             ),
         };
 
@@ -2856,12 +2868,19 @@ pub async fn probe_character_next_actions(
 
     let (char_name, char_personality, char_motivation, char_visual) =
         match db.get_character(&current_actor.character_id) {
-            Ok(p) => (p.name, p.personality, p.motivation, p.visual_summary),
+            Ok(p) => {
+                let visual = if !p.visual_summary.trim().is_empty() {
+                    p.visual_summary
+                } else {
+                    current_actor.visual_summary.clone().unwrap_or_default()
+                };
+                (p.name, p.personality, p.motivation, visual)
+            },
             Err(_) => (
                 current_actor.character_name.clone(),
                 "性格深沉".to_string(),
                 current_actor.private_motivation.clone(),
-                "".to_string(),
+                current_actor.visual_summary.clone().unwrap_or_default(),
             ),
         };
 

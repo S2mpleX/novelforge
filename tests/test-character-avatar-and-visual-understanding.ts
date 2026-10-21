@@ -126,10 +126,51 @@ async function runTests() {
   assert.ok(stepRes.round.speaker_name, '发言人就绪');
   console.log(`  ✅ PASS: 演武场单步推演联动顺利，发言人: 【${stepRes.round.speaker_name}】`);
 
-  console.log('\n▶ [测试 5] 角色清理与级联释放安全断言');
+  console.log('\n▶ [测试 5] 演武场临时/预设角色直接携带立绘贴图与外貌断言 (Actor-level Avatar)');
+  const presetActorSession = await api.createSandboxSession({
+    novel_id: testNovelId,
+    title: '预设演武场快速对戏',
+    scene_setting: '昏暗内室',
+    scene_goal: '试探解药',
+    characters_config: [
+      {
+        character_id: 'preset_linke',
+        character_name: '林恪',
+        gender: '男',
+        avatar_url: 'data:image/png;base64,sample_linke_avatar',
+        visual_summary: '墨发高束，身披玄黑金纹劲装，腰悬古剑。',
+        private_motivation: '不可泄露内伤',
+        private_secret: '解药在袖中夹层',
+        order_index: 0,
+        is_human: false,
+      },
+      {
+        character_id: 'preset_suheng',
+        character_name: '苏衡',
+        gender: '男',
+        avatar_url: 'https://example.com/suheng.png',
+        visual_summary: '长衫素雅，折扇轻摇，看似温润文雅，眸底却满是算计。',
+        private_motivation: '迫使对方交出解药',
+        private_secret: '门外其实无援兵',
+        order_index: 1,
+        is_human: false,
+      },
+    ],
+  });
+
+  assert.ok(presetActorSession.characters_config_json, '必须具备角色配置 JSON');
+  const parsedConfigs = JSON.parse(presetActorSession.characters_config_json || '[]');
+  assert.strictEqual(parsedConfigs.length, 2);
+  assert.strictEqual(parsedConfigs[0].avatar_url, 'data:image/png;base64,sample_linke_avatar');
+  assert.strictEqual(parsedConfigs[0].visual_summary, '墨发高束，身披玄黑金纹劲装，腰悬古剑。');
+  assert.strictEqual(parsedConfigs[1].avatar_url, 'https://example.com/suheng.png');
+  console.log('  ✅ PASS: 演武场预设角色完整支持立绘贴图、外貌特征与性别配置');
+
+  console.log('\n▶ [测试 6] 角色清理与级联释放安全断言');
   await api.deleteCharacter(char1.id);
   await api.deleteCharacter(rivalChar.id);
   await api.deleteSandboxSession(session.id);
+  await api.deleteSandboxSession(presetActorSession.id);
 
   const finalChars = await api.listCharacters(testNovelId);
   assert.strictEqual(finalChars.filter((c) => c.id === char1.id || c.id === rivalChar.id).length, 0);

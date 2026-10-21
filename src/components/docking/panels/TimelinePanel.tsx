@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { api } from '@/utils/tauriBridge';
 import type { StoryEvent } from '@/types';
 import {
@@ -12,7 +13,12 @@ import {
 } from 'lucide-react';
 
 export const TimelinePanel: React.FC = () => {
-  const { activeNovel, chapters } = useNovelStore();
+  const { activeNovel, chapters } = useNovelStore(
+    useShallow((s) => ({
+      activeNovel: s.activeNovel,
+      chapters: s.chapters,
+    }))
+  );
   const [events, setEvents] = useState<StoryEvent[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);

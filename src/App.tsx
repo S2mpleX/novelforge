@@ -1,23 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { DashboardView } from '@/components/views/DashboardView';
-import { CharactersView } from '@/components/views/CharactersView';
-import { WorldSettingsView } from '@/components/views/WorldSettingsView';
-import { MemoryEngineView } from '@/components/views/MemoryEngineView';
-import { DockingWorkspace } from '@/components/docking/DockingWorkspace';
 import { useUpdateStore } from '@/features/updater/stores/useUpdateStore';
-import { SettingsModal } from '@/components/modals/SettingsModal';
 import { ToastContainer } from '@/components/common/ToastContainer';
 import { DialogHost } from '@/components/common/DialogHost';
-import { ShortcutHelpModal } from '@/components/modals/ShortcutHelpModal';
-import { WritersDeskModal } from '@/components/desk/WritersDeskModal';
-import { WordImportModal } from '@/components/modals/WordImportModal';
-import { MapModal } from '@/components/modals/MapModal';
 import { toast } from '@/stores/useToastStore';
 import { isTauri } from '@/utils/tauriBridge';
 import { Sparkles, ArrowRight, Info, X } from 'lucide-react';
+
+// Lazy-loaded Views and Heavy Modals for Code Splitting & Instant Startup
+const DashboardView = lazy(() => import('@/components/views/DashboardView').then(m => ({ default: m.DashboardView })));
+const CharactersView = lazy(() => import('@/components/views/CharactersView').then(m => ({ default: m.CharactersView })));
+const WorldSettingsView = lazy(() => import('@/components/views/WorldSettingsView').then(m => ({ default: m.WorldSettingsView })));
+const MemoryEngineView = lazy(() => import('@/components/views/MemoryEngineView').then(m => ({ default: m.MemoryEngineView })));
+const DockingWorkspace = lazy(() => import('@/components/docking/DockingWorkspace').then(m => ({ default: m.DockingWorkspace })));
+
+const SettingsModal = lazy(() => import('@/components/modals/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const ShortcutHelpModal = lazy(() => import('@/components/modals/ShortcutHelpModal').then(m => ({ default: m.ShortcutHelpModal })));
+const WritersDeskModal = lazy(() => import('@/components/desk/WritersDeskModal').then(m => ({ default: m.WritersDeskModal })));
+const WordImportModal = lazy(() => import('@/components/modals/WordImportModal').then(m => ({ default: m.WordImportModal })));
+const MapModal = lazy(() => import('@/components/modals/MapModal').then(m => ({ default: m.MapModal })));
 
 export const App: React.FC = () => {
   const {
@@ -30,7 +34,19 @@ export const App: React.FC = () => {
     themeMode,
     exitZenMode,
     toggleZenMode,
-  } = useNovelStore();
+  } = useNovelStore(
+    useShallow((s) => ({
+      loadNovels: s.loadNovels,
+      loadProviders: s.loadProviders,
+      activeTab: s.activeTab,
+      setActiveTab: s.setActiveTab,
+      toggleSidebar: s.toggleSidebar,
+      zenMode: s.zenMode,
+      themeMode: s.themeMode,
+      exitZenMode: s.exitZenMode,
+      toggleZenMode: s.toggleZenMode,
+    }))
+  );
   const { status, latestVersion, settings, loadSettings, checkForUpdates } = useUpdateStore();
   const [showWebNotice, setShowWebNotice] = useState(!isTauri());
   const [showUpdateBanner, setShowUpdateBanner] = useState(true);
@@ -221,48 +237,61 @@ export const App: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {activeTab !== 'EDITOR' && !zenMode && <Sidebar />}
         <main className="flex-1 flex overflow-hidden">
-          {activeTab === 'EDITOR' && <DockingWorkspace />}
-          {activeTab === 'DASHBOARD' && <DashboardView />}
-          {activeTab === 'CHARACTERS' && <CharactersView />}
-          {activeTab === 'WORLD' && <WorldSettingsView />}
-          {activeTab === 'PLOTS' && <WorldSettingsView initialTab="PLOTS" />}
-          {activeTab === 'MEMORY' && <MemoryEngineView />}
+          <Suspense
+            fallback={
+              <div className="flex-1 flex items-center justify-center p-8 text-ink-2 font-serif text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <span>载入工坊组件...</span>
+                </div>
+              </div>
+            }
+          >
+            {activeTab === 'EDITOR' && <DockingWorkspace />}
+            {activeTab === 'DASHBOARD' && <DashboardView />}
+            {activeTab === 'CHARACTERS' && <CharactersView />}
+            {activeTab === 'WORLD' && <WorldSettingsView />}
+            {activeTab === 'PLOTS' && <WorldSettingsView initialTab="PLOTS" />}
+            {activeTab === 'MEMORY' && <MemoryEngineView />}
+          </Suspense>
         </main>
       </div>
 
       {/* 全局应用内对话框宿主（替代失效的原生 alert/confirm/prompt） */}
       <DialogHost />
 
-      {showUpdateModal && (
-        <SettingsModal
-          initialTab="UPDATER"
-          onClose={() => setShowUpdateModal(false)}
+      <Suspense fallback={null}>
+        {showUpdateModal && (
+          <SettingsModal
+            initialTab="UPDATER"
+            onClose={() => setShowUpdateModal(false)}
+          />
+        )}
+
+        {/* Global Shortcut Help Center Modal */}
+        <ShortcutHelpModal
+          isOpen={showShortcutModal}
+          onClose={() => setShowShortcutModal(false)}
         />
-      )}
 
-      {/* Global Shortcut Help Center Modal */}
-      <ShortcutHelpModal
-        isOpen={showShortcutModal}
-        onClose={() => setShowShortcutModal(false)}
-      />
+        {/* 文人案头速览与新书启航中心 (Writer's Desk) */}
+        <WritersDeskModal
+          isOpen={showDeskModal}
+          onClose={() => setShowDeskModal(false)}
+          onOpenWordImport={() => setShowWordImportModal(true)}
+          onOpenMap={() => setShowMapModal(true)}
+        />
 
-      {/* 文人案头速览与新书启航中心 (Writer's Desk) */}
-      <WritersDeskModal
-        isOpen={showDeskModal}
-        onClose={() => setShowDeskModal(false)}
-        onOpenWordImport={() => setShowWordImportModal(true)}
-        onOpenMap={() => setShowMapModal(true)}
-      />
+        {/* 导入 Word 模态框 */}
+        {showWordImportModal && (
+          <WordImportModal isOpen={true} onClose={() => setShowWordImportModal(false)} />
+        )}
 
-      {/* 导入 Word 模态框 */}
-      {showWordImportModal && (
-        <WordImportModal isOpen={true} onClose={() => setShowWordImportModal(false)} />
-      )}
-
-      {/* 架空世界沙盘地图模态框 */}
-      {showMapModal && (
-        <MapModal isOpen={true} onClose={() => setShowMapModal(false)} />
-      )}
+        {/* 架空世界沙盘地图模态框 */}
+        {showMapModal && (
+          <MapModal isOpen={true} onClose={() => setShowMapModal(false)} />
+        )}
+      </Suspense>
 
       {/* Global Lightweight Literary Toast Container */}
       <ToastContainer />

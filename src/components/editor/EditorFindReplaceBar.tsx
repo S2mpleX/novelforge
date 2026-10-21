@@ -225,7 +225,7 @@ export const EditorFindReplaceBar: React.FC<EditorFindReplaceBarProps> = ({
   return (
     <div
       onKeyDown={handleKeyDown}
-      className="border-b border-line dark:border-[#2e2a27] bg-[#f9f5eb]/95 dark:bg-[#1e1b17]/95 backdrop-blur-md px-3 py-2 flex flex-col gap-1.5 shadow-sm select-none z-20 animate-in slide-in-from-top-1 duration-150"
+      className="border-b border-line dark:border-[#2e2a27] bg-[#f9f5eb] dark:bg-[#1e1b17] px-3 py-2 flex flex-col gap-1.5 shadow-sm select-none z-20 animate-in slide-in-from-top-1 duration-150"
     >
       {/* Row 1: Search Inputs & Controls */}
       <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">

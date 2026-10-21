@@ -1765,7 +1765,10 @@ pnpm test:bugfixes
   ▶ [测试 4] 演武场推演系统对人设外貌特征的感知与装配联动
     ✅ PASS: 演武场单步推演联动顺利，发言人: 【洛清雪】
 
-  ▶ [测试 5] 角色清理与级联释放安全断言
+  ▶ [测试 5] 演武场临时/预设角色直接携带立绘贴图与外貌断言 (Actor-level Avatar)
+    ✅ PASS: 演武场预设角色完整支持立绘贴图、外貌特征与性别配置
+
+  ▶ [测试 6] 角色清理与级联释放安全断言
     ✅ PASS: 角色及其立绘与外貌元数据安全清理，无孤儿数据泄漏
 
   ===============================================================
@@ -1801,6 +1804,50 @@ pnpm test:bugfixes
   - `pnpm test:sandbox` (演武场对戏沙盒基础功能)：**12/12 项全部满分通过**；
   - `cargo run --manifest-path src-tauri/Cargo.toml --bin db_test`：**66/66 项原生全功能断言全部满分通过**；
   - 前端生产构建：`pnpm build` **1.30s 零错误 0 警告通过**！
+
+### 2.54 演武场角色立绘大图展示区、全景高清灯箱与多端视觉呈现优化验证 (ADR-061)
+- **验证范围**：
+  1. 演武场角色卡片立绘展示面积升级 600%（从 28x28px 升级为 80x96px 画报大图展示区）；
+  2. 全屏高清立绘灯箱系统（支持点击卡片立绘或【🔍 大图】按钮直接调出 85vh 高清全景视窗）；
+  3. 角色档案大视图 (`CharactersView.tsx`) 与侧边栏角色追踪面板 (`CharacterProfilesPanel.tsx`) 卡片与弹窗立绘呈现全面放大升级；
+  4. 全局测试与生产构建全绿验证。
+- **全套回归与构建验证矩阵**：
+  - `pnpm tsc --noEmit`：**0 错误 0 警告**；
+  - `pnpm test:character:visual` (角色立绘与视觉解析专项)：**6/6 项全部满分通过**；
+  - `pnpm test:sandbox:inspiration` (灵感探针与高光精修专项)：**6/6 项全部满分通过**；
+  - `pnpm test:sandbox:api` (多API分工与性别专项)：**4/4 项全部满分通过**；
+  - `cargo run --manifest-path src-tauri/Cargo.toml --bin db_test`：**66/66 项原生全功能断言全部满分通过**；
+  - 前端生产构建：`pnpm build` **1.44s 零错误 0 警告通过**！
+
+### 2.55 全局性能专项检查与多维极限优化验证 (ADR-062)
+- **验证范围**：
+  1. **Zustand 全局精准粒度订阅与浅比较 (`useShallow`)**：
+     - 重构 `App.tsx`、`Header.tsx`、`Sidebar.tsx`、`DockingWorkspace.tsx`、`NovelEditor.tsx`、`DualWordStatsBadge.tsx`、`CharacterSandboxPanel.tsx`、`ToolboxPanel.tsx`、`TimelinePanel.tsx`、`PlotThreadsPanel.tsx`、`VersionHistoryPanel.tsx`；
+     - 彻底消除正文防抖更新 (`editorContent`) 和 AI 流式 token 生成 (`streamText`) 引发的根组件全量重渲染。
+  2. **异步代码分割与独立切片 (`React.lazy` + `Suspense` + Rollup `manualChunks`)**：
+     - `App.tsx` 按需加载主视图与全局模态框；
+     - 清除各面板的静态模态框导入，消灭全部 14 处 `INEFFECTIVE_DYNAMIC_IMPORT` 警告；
+     - 独立拆解 `@tiptap`、`@xyflow/react`、`mammoth`、`peerjs`、`lucide-react` 为独立 Vendor Chunk；
+     - 首屏 JS 资源体积由 **2,478 kB 剧降至 456 kB** (降幅达 81.6%)！
+  3. **GPU 离屏模糊风暴治理 (`backdrop-blur` 消除)**：
+     - 清除 `EditorFindReplaceBar`、`FloatingSelectionMenu`、`ZenFloatingIsland`、`ZenChapterDrawer`、`NovelSelectorDropdown`、`ToastContainer` 中的 `backdrop-blur-*`，消除 WebView2 排版合成器的 GPU 离屏高斯模糊 pass。
+- **全套回归与构建验证矩阵**：
+  - `pnpm tsc --noEmit`：**0 错误 0 警告**；
+  - `pnpm test:character:visual`：**6/6 项全部满分通过**；
+  - `pnpm test:sandbox:inspiration`：**6/6 项全部满分通过**；
+  - `pnpm test:sandbox:api`：**4/4 项全部满分通过**；
+  - `pnpm test:sandbox`：**12/12 项全部满分通过**；
+  - `pnpm test:branches`：**5/5 项全部满分通过**；
+  - `pnpm test:header`：**9/9 项全部满分通过**；
+  - `pnpm test:docking`：**12/12 项全部满分通过**；
+  - `pnpm test:zen`：**12/12 项全部满分通过**；
+  - `pnpm test:humanizer`：**27/27 项全部满分通过**；
+  - `pnpm test:cohort2`：**46/46 项全部满分通过**；
+  - `pnpm test:cohort3`：**55/55 项全部满分通过**；
+  - `cargo run --manifest-path src-tauri/Cargo.toml --bin db_test`：**66/66 项原生全功能断言全部满分通过**；
+  - 前端生产构建：`pnpm build` **1.18s 零错误 0 警告极速完成**！
+
+
 
 
 

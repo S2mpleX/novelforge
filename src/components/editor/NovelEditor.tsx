@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useNovelStore } from '@/stores/useNovelStore';
+import { useShallow } from 'zustand/react/shallow';
 import { APP_CURRENT_VERSION } from '@/features/updater/services/UpdateService';
 import type { Chapter } from '@/types';
 import {
@@ -32,8 +33,8 @@ import {
   ChevronRight,
   PlusCircle,
 } from 'lucide-react';
-import { CreateNovelModal } from '@/components/modals/CreateNovelModal';
-import { CreateChapterModal } from '@/components/modals/CreateChapterModal';
+const CreateNovelModal = React.lazy(() => import('@/components/modals/CreateNovelModal').then(m => ({ default: m.CreateNovelModal })));
+const CreateChapterModal = React.lazy(() => import('@/components/modals/CreateChapterModal').then(m => ({ default: m.CreateChapterModal })));
 import { WindowControls } from '@/components/layout/WindowControls';
 import { FloatingSelectionMenu } from './FloatingSelectionMenu';
 import { ChapterPeekDrawer } from './ChapterPeekDrawer';
@@ -271,7 +272,22 @@ export const NovelEditor: React.FC = () => {
     themeMode,
     setThemeMode,
     registerFlushEditorSync,
-  } = useNovelStore();
+  } = useNovelStore(
+    useShallow((s) => ({
+      activeNovel: s.activeNovel,
+      activeChapter: s.activeChapter,
+      chapters: s.chapters,
+      selectChapter: s.selectChapter,
+      updateEditorContent: s.updateEditorContent,
+      saveCurrentChapter: s.saveCurrentChapter,
+      updateChapterTitle: s.updateChapterTitle,
+      zenMode: s.zenMode,
+      toggleZenMode: s.toggleZenMode,
+      themeMode: s.themeMode,
+      setThemeMode: s.setThemeMode,
+      registerFlushEditorSync: s.registerFlushEditorSync,
+    }))
+  );
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInputValue, setTitleInputValue] = useState('');
@@ -877,7 +893,9 @@ export const NovelEditor: React.FC = () => {
           </div>
         </div>
 
-        {showCreateNovel && <CreateNovelModal onClose={() => setShowCreateNovel(false)} />}
+        <React.Suspense fallback={null}>
+          {showCreateNovel && <CreateNovelModal onClose={() => setShowCreateNovel(false)} />}
+        </React.Suspense>
       </div>
     );
   }
@@ -911,7 +929,9 @@ export const NovelEditor: React.FC = () => {
           </div>
         </div>
 
-        {showCreateChapter && <CreateChapterModal onClose={() => setShowCreateChapter(false)} />}
+        <React.Suspense fallback={null}>
+          {showCreateChapter && <CreateChapterModal onClose={() => setShowCreateChapter(false)} />}
+        </React.Suspense>
       </div>
     );
   }
