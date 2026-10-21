@@ -1,6 +1,6 @@
 [package]
 name = "novelforge-ai"
-version = "2.5.0"
+version = "2.6.0"
 description = "NovelForge AI - Professional Multi-Agent Long-form Novel Creation System"
 authors = ["NovelForge Team"]
 edition = "2024"

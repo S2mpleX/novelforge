@@ -9,6 +9,7 @@ use novelforge_ai_lib::models::{
     SaveVoiceProfileInput, SaveModelArenaRunInput, UpdateNovelInput, UpdateVolumeInput,
     UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput, CreatePlotThreadInput,
     CreateChapterProposalInput, AcceptChapterProposalInput, RollbackChapterVersionInput, EvaluateChapterInput,
+    CharacterSandboxSession,
 };
 
 fn main() {
@@ -1108,11 +1109,45 @@ fn main() {
     assert!(names.contains(&"张三丰".to_string()) || names.contains(&"东方不败".to_string()), "必须从对话动作中识别未登记人物");
     println!("65. 验证智能实体反哺提案提取 (scan_entity_proposals): 候选人物提取验证通过");
 
+    // 66. 验证角色对戏演武场沙盒会话持久化与状态流转 (character_sandbox_sessions)
+    let sandbox_session = db.save_character_sandbox_session(&CharacterSandboxSession {
+        id: Uuid::new_v4().to_string(),
+        novel_id: novel.id.clone(),
+        chapter_id: Some(ch1.id.clone()),
+        scene_id: None,
+        title: "密室解药博弈".to_string(),
+        scene_setting: "深夜烛影摇曳，冷茶未尽".to_string(),
+        scene_goal: "试探对方虚实，逼出解药所在".to_string(),
+        characters_config_json: r#"[{"character_id":"c1","character_name":"萧离","private_motivation":"保命","private_secret":"解药在袖中","order_index":0}]"#.to_string(),
+        dialogue_history_json: r#"[{"round_index":1,"speaker_id":"c1","speaker_name":"萧离","inner_thought":"对方试探我伤势，我必须按兵不动","character_action":"轻吹浮沫","speech":"国师请回吧","is_narrator_event":false,"is_edited_by_user":false,"timestamp":1700000000000}]"#.to_string(),
+        status: "RUNNING".to_string(),
+        synthesized_prose: Some("烛光下，萧离慢慢放下茶盏，面色冷若寒霜。".to_string()),
+        branches_json: Some("[]".to_string()),
+        active_branch_id: Some("main".to_string()),
+        created_at: chrono::Utc::now().timestamp_millis(),
+        updated_at: chrono::Utc::now().timestamp_millis(),
+    }).expect("保存角色对戏沙盒会话失败");
+
+    let fetched_sess = db.get_character_sandbox_session(&sandbox_session.id).expect("查询沙盒会话失败");
+    assert!(fetched_sess.is_some(), "必须成功根据 ID 检索角色沙盒会话");
+    let sess_data = fetched_sess.unwrap();
+    assert_eq!(sess_data.title, "密室解药博弈");
+    assert!(sess_data.dialogue_history_json.contains("对方试探我伤势"), "私密内心独白必须安全持久化");
+    assert!(sess_data.dialogue_history_json.contains("轻吹浮沫"), "微动作必须安全持久化");
+
+    let sess_list = db.list_character_sandbox_sessions(&novel.id).expect("按作品检索沙盒会话失败");
+    assert!(!sess_list.is_empty(), "必须能列出作品下的所有沙盒会话");
+
+    db.delete_character_sandbox_session(&sandbox_session.id).expect("删除沙盒会话失败");
+    let after_delete = db.get_character_sandbox_session(&sandbox_session.id).expect("查询失败");
+    assert!(after_delete.is_none(), "删除后会话记录必须被彻底移除");
+    println!("66. 验证角色对戏演武场沙盒会话持久化与状态流转 (character_sandbox_sessions): 100% 验证通过");
+
     // 清理临时文件与沙箱数据库目录，保障环境零污染
     let _ = std::fs::remove_file(&epub_res.file_path);
     let _ = std::fs::remove_dir_all(&test_dir);
 
-    println!("=== 100% 测试验证通过！V3.3 核心业务与 Agent 驱动闭环 65 项全量断言通过！ ===");
+    println!("=== 100% 测试验证通过！V3.4 核心业务与 Agent 驱动闭环 66 项全量断言通过！ ===");
 }
 
 

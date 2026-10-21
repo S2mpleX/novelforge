@@ -27,6 +27,7 @@ use crate::models::{
     UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput, UpdateStoryPhaseInput,
     ChapterProposal, CreateChapterProposalInput, AcceptChapterProposalInput,
     RollbackChapterVersionInput, RollbackResult, EvaluationReport, EvaluateChapterInput,
+    CharacterSandboxSession,
 };
 
 #[derive(Clone)]
@@ -81,6 +82,8 @@ impl DbManager {
             "ALTER TABLE scenes ADD COLUMN time_anchor TEXT DEFAULT ''",
             "ALTER TABLE scenes ADD COLUMN conflict_target TEXT DEFAULT ''",
             "ALTER TABLE novels ADD COLUMN cover_url TEXT DEFAULT ''",
+            "ALTER TABLE character_sandbox_sessions ADD COLUMN branches_json TEXT DEFAULT '[]'",
+            "ALTER TABLE character_sandbox_sessions ADD COLUMN active_branch_id TEXT DEFAULT 'main'",
         ];
         for sql in migrations {
             let _ = conn.execute(sql, []);
@@ -5714,6 +5717,130 @@ impl DbManager {
     pub fn delete_model_arena_run(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute("DELETE FROM model_arena_runs WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // ==========================================
+    // V3.4.0 CHARACTER DIALOGUE SANDBOX OPERATIONS
+    // ==========================================
+
+    pub fn save_character_sandbox_session(
+        &self,
+        session: &CharacterSandboxSession,
+    ) -> Result<CharacterSandboxSession> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO character_sandbox_sessions (
+                id, novel_id, chapter_id, scene_id, title,
+                scene_setting, scene_goal, characters_config_json, dialogue_history_json,
+                status, synthesized_prose, branches_json, active_branch_id, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+             ON CONFLICT(id) DO UPDATE SET
+                title=excluded.title,
+                scene_setting=excluded.scene_setting,
+                scene_goal=excluded.scene_goal,
+                characters_config_json=excluded.characters_config_json,
+                dialogue_history_json=excluded.dialogue_history_json,
+                status=excluded.status,
+                synthesized_prose=excluded.synthesized_prose,
+                branches_json=excluded.branches_json,
+                active_branch_id=excluded.active_branch_id,
+                updated_at=excluded.updated_at",
+            params![
+                &session.id,
+                &session.novel_id,
+                &session.chapter_id,
+                &session.scene_id,
+                &session.title,
+                &session.scene_setting,
+                &session.scene_goal,
+                &session.characters_config_json,
+                &session.dialogue_history_json,
+                &session.status,
+                &session.synthesized_prose,
+                session.branches_json.as_deref().unwrap_or("[]"),
+                session.active_branch_id.as_deref().unwrap_or("main"),
+                session.created_at,
+                session.updated_at,
+            ],
+        )?;
+        Ok(session.clone())
+    }
+
+    pub fn get_character_sandbox_session(&self, id: &str) -> Result<Option<CharacterSandboxSession>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, chapter_id, scene_id, title,
+                    scene_setting, scene_goal, characters_config_json, dialogue_history_json,
+                    status, synthesized_prose, branches_json, active_branch_id, created_at, updated_at
+             FROM character_sandbox_sessions WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![id], |row| {
+            Ok(CharacterSandboxSession {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                chapter_id: row.get(2)?,
+                scene_id: row.get(3)?,
+                title: row.get(4)?,
+                scene_setting: row.get(5)?,
+                scene_goal: row.get(6)?,
+                characters_config_json: row.get(7)?,
+                dialogue_history_json: row.get(8)?,
+                status: row.get(9)?,
+                synthesized_prose: row.get(10)?,
+                branches_json: row.get(11).ok().flatten().or_else(|| Some("[]".to_string())),
+                active_branch_id: row.get(12).ok().flatten().or_else(|| Some("main".to_string())),
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
+            })
+        })?;
+        if let Some(row) = rows.next() {
+            Ok(Some(row?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn list_character_sandbox_sessions(&self, novel_id: &str) -> Result<Vec<CharacterSandboxSession>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, novel_id, chapter_id, scene_id, title,
+                    scene_setting, scene_goal, characters_config_json, dialogue_history_json,
+                    status, synthesized_prose, branches_json, active_branch_id, created_at, updated_at
+             FROM character_sandbox_sessions WHERE novel_id = ?1 ORDER BY updated_at DESC",
+        )?;
+        let rows = stmt.query_map(params![novel_id], |row| {
+            Ok(CharacterSandboxSession {
+                id: row.get(0)?,
+                novel_id: row.get(1)?,
+                chapter_id: row.get(2)?,
+                scene_id: row.get(3)?,
+                title: row.get(4)?,
+                scene_setting: row.get(5)?,
+                scene_goal: row.get(6)?,
+                characters_config_json: row.get(7)?,
+                dialogue_history_json: row.get(8)?,
+                status: row.get(9)?,
+                synthesized_prose: row.get(10)?,
+                branches_json: row.get(11).ok().flatten().or_else(|| Some("[]".to_string())),
+                active_branch_id: row.get(12).ok().flatten().or_else(|| Some("main".to_string())),
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn delete_character_sandbox_session(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "DELETE FROM character_sandbox_sessions WHERE id = ?1",
+            params![id],
+        )?;
         Ok(())
     }
 }

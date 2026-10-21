@@ -54,6 +54,7 @@ import { FullCheckPanel } from './panels/FullCheckPanel';
 import { AssetProposalPanel } from './panels/AssetProposalPanel';
 import { BatchRevisePanel } from './panels/BatchRevisePanel';
 import { MapPanel } from './panels/MapPanel';
+import { CharacterSandboxPanel } from './panels/CharacterSandboxPanel';
 import { Sliders, FileSearch, HeartPulse } from 'lucide-react';
 
 export const PANEL_METADATA_MAP: Record<PanelType, PanelMeta> = {
@@ -398,6 +399,17 @@ export const PANEL_METADATA_MAP: Record<PanelType, PanelMeta> = {
     category: 'plot',
     description: '跨流派地标坐标定标、行军探索路线规划与行程耗时因果校对',
   },
+  character_sandbox: {
+    type: 'character_sandbox',
+    title: '角色对戏演武场',
+    iconName: 'Swords',
+    minWidth: 380,
+    minHeight: 320,
+    defaultSize: { width: 900, height: 640 },
+    allowMultiple: false,
+    category: 'ai',
+    description: '零心理污染沙盒对戏、独立心路独白(CoT)、机锋试探与一键小说正文转译',
+  },
 };
 
 export function getPanelIcon(panelType: PanelType) {
@@ -464,6 +476,8 @@ export function getPanelIcon(panelType: PanelType) {
       return Layers;
     case 'map_sandbox':
       return Compass;
+    case 'character_sandbox':
+      return Swords;
     default:
       return BookOpen;
   }
@@ -533,6 +547,8 @@ export function renderPanelComponent(panel: PanelInstance): React.ReactNode {
       return <BatchRevisePanel />;
     case 'map_sandbox':
       return <MapPanel />;
+    case 'character_sandbox':
+      return <CharacterSandboxPanel />;
     default:
       return (
         <div className="flex-1 flex items-center justify-center text-xs text-ink-2">

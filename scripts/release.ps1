@@ -1,4 +1,4 @@
-# NovelForge AI — 一键版本发布脚本
+﻿# NovelForge AI — 一键版本发布脚本
 # 用法：
 #   .\scripts\release.ps1 patch   → 2.2.0 → 2.2.1（修 Bug）
 #   .\scripts\release.ps1 minor   → 2.2.0 → 2.3.0（加功能）

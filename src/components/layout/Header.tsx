@@ -41,6 +41,7 @@ import {
   Layers,
   Keyboard,
   LayoutGrid,
+  Globe,
 } from 'lucide-react';
 import { toast } from '@/stores/useToastStore';
 import { APP_CURRENT_VERSION } from '@/features/updater/services/UpdateService';
@@ -63,6 +64,9 @@ const AssetProposalModal = React.lazy(() => import('@/components/modals/AssetPro
 const CreationWorkflowModal = React.lazy(() => import('@/components/modals/CreationWorkflowModal').then(m => ({ default: m.CreationWorkflowModal })));
 const BatchReviseModal = React.lazy(() => import('@/components/modals/BatchReviseModal').then(m => ({ default: m.BatchReviseModal })));
 const MapModal = React.lazy(() => import('@/components/modals/MapModal').then(m => ({ default: m.MapModal })));
+const CharacterSandboxModal = React.lazy(() => import('@/components/arena/CharacterSandboxModal').then(m => ({ default: m.CharacterSandboxModal })));
+const CollaborationModal = React.lazy(() => import('@/components/collaboration/CollaborationModal').then(m => ({ default: m.CollaborationModal })));
+import { useCollaborationStore } from '@/stores/useCollaborationStore';
 
 import { DualWordStatsBadge } from '@/components/common/DualWordStatsBadge';
 import { useUpdateStore } from '@/features/updater/stores/useUpdateStore';
@@ -188,6 +192,9 @@ export const Header: React.FC = () => {
   const [showWorkflowGuideModal, setShowWorkflowGuideModal] = useState(false);
   const [showBatchReviseModal, setShowBatchReviseModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [showSandboxModal, setShowSandboxModal] = useState(false);
+  const [showCollaborationModal, setShowCollaborationModal] = useState(false);
+  const { status: collabStatus, roomCode: collabRoomCode } = useCollaborationStore();
 
   // Popovers state
   const [exportMessage, setExportMessage] = useState<string | null>(null);
@@ -197,6 +204,20 @@ export const Header: React.FC = () => {
   const workshopMenuRef = useRef<HTMLDivElement | null>(null);
   const [showNovelMenu, setShowNovelMenu] = useState(false);
   const novelMenuRef = useRef<HTMLDivElement | null>(null);
+  const [showPipelineMenu, setShowPipelineMenu] = useState(false);
+  const pipelineMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close pipeline menu when clicking outside
+  useEffect(() => {
+    if (!showPipelineMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (pipelineMenuRef.current && !pipelineMenuRef.current.contains(e.target as Node)) {
+        setShowPipelineMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showPipelineMenu]);
 
   // Close scale menu when clicking outside
   useEffect(() => {
@@ -313,6 +334,9 @@ export const Header: React.FC = () => {
     }
   };
 
+  const currentPipelineStep = CREATION_PIPELINE.find((p) => p.id === activeTab) || CREATION_PIPELINE[4];
+  const CurrentPipelineIcon = currentPipelineStep.icon;
+
   return (
     <>
       <header
@@ -323,7 +347,7 @@ export const Header: React.FC = () => {
         {/* ============================================================ */}
         {/* ZONE 1 (LEFT): Brand & Active Project Selector              */}
         {/* ============================================================ */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 mr-1 sm:mr-2">
           {/* Toggle Chapters Sidebar */}
           <button
             onClick={toggleSidebar}
@@ -338,11 +362,11 @@ export const Header: React.FC = () => {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-600 via-amber-700 to-orange-700 flex items-center justify-center shadow-xs border border-amber-600/30 shrink-0">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <div className="hidden sm:flex items-center gap-1 whitespace-nowrap">
+            <div className="hidden lg:flex items-center gap-1 whitespace-nowrap">
               <span className="font-bold text-ink dark:text-[#f3eee7] text-xs lg:text-sm tracking-wide font-serif">
                 NovelForge
               </span>
-              <span className="hidden xl:inline-block px-1.5 py-0.2 text-[9px] font-semibold bg-amber-800/10 dark:bg-amber-400/10 text-primary dark:text-amber-300 rounded-full border border-amber-800/20">
+              <span className="hidden 2xl:inline-block px-1.5 py-0.2 text-[9px] font-semibold bg-amber-800/10 dark:bg-amber-400/10 text-primary dark:text-amber-300 rounded-full border border-amber-800/20">
                 v{APP_CURRENT_VERSION}
               </span>
             </div>
@@ -350,11 +374,11 @@ export const Header: React.FC = () => {
 
           {/* Active Novel Badge & Quick Shelf Switcher */}
           {activeNovel ? (
-            <div ref={novelMenuRef} className="relative flex items-center ml-1 sm:ml-2 gap-1.5">
+            <div ref={novelMenuRef} className="relative flex items-center ml-0.5 sm:ml-1 gap-1.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowNovelMenu(!showNovelMenu)}
-                className={`group flex items-center gap-2 px-2.5 py-1 rounded-xl border transition-all cursor-pointer max-w-[160px] md:max-w-[210px] 2xl:max-w-[260px] ${
+                className={`group flex items-center gap-2 px-2 sm:px-2.5 py-1 rounded-xl border transition-all cursor-pointer max-w-[130px] sm:max-w-[170px] xl:max-w-[210px] 2xl:max-w-[260px] ${
                   showNovelMenu
                     ? 'bg-surface dark:bg-[#26221f] border-amber-800/50 dark:border-amber-600/50 shadow-xs'
                     : 'bg-[#e5dcce] dark:bg-[#23201d] hover:bg-surface-3-hover dark:hover:bg-[#2a2622] border-line dark:border-[#38332d]'
@@ -369,7 +393,7 @@ export const Header: React.FC = () => {
                     《{activeNovel.title}》
                   </div>
                   <div className="text-[10px] text-ink-2 dark:text-[#9e9486] flex items-center gap-1 leading-none mt-0.5">
-                    <span className="truncate max-w-[70px]">{activeNovel.genre_profile || '长篇通俗'}</span>
+                    <span className="truncate max-w-[50px] sm:max-w-[70px]">{activeNovel.genre_profile || '长篇通俗'}</span>
                     <span>·</span>
                     <span className="font-mono">{chapters.length}章</span>
                   </div>
@@ -385,11 +409,11 @@ export const Header: React.FC = () => {
               <button
                 type="button"
                 onClick={() => window.dispatchEvent(new CustomEvent('novelforge:open-desk'))}
-                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-800/10 hover:bg-amber-800/15 dark:bg-amber-400/10 dark:hover:bg-amber-400/20 text-primary dark:text-amber-300 border border-amber-800/20 dark:border-amber-400/30 text-xs font-semibold font-serif transition cursor-pointer shadow-2xs hover:scale-105"
+                className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-amber-800/10 hover:bg-amber-800/15 dark:bg-amber-400/10 dark:hover:bg-amber-400/20 text-primary dark:text-amber-300 border border-amber-800/20 dark:border-amber-400/30 text-xs font-semibold font-serif transition cursor-pointer shadow-2xs hover:scale-105 shrink-0"
                 title="打开文人案头速览与新书启程中心 (快捷键: F2 或 Ctrl+D)"
               >
-                <Sparkles className="w-3.5 h-3.5 text-primary dark:text-amber-400" />
-                <span>案头</span>
+                <Sparkles className="w-3.5 h-3.5 text-primary dark:text-amber-400 shrink-0" />
+                <span className="hidden md:inline">案头</span>
               </button>
 
               {/* Shelf Quick Switcher Dropdown */}
@@ -397,17 +421,31 @@ export const Header: React.FC = () => {
                 <div className="absolute top-full left-0 mt-1.5 w-72 bg-surface dark:bg-[#201d1a] border border-line dark:border-[#38332e] rounded-xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
                   <div className="flex items-center justify-between px-2 py-1 text-[11px] font-bold text-primary dark:text-amber-400 border-b border-line dark:border-[#322d28] mb-1.5">
                     <span>我的书架 ({novels.length} 部)</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCreateNovel(true);
-                        setShowNovelMenu(false);
-                      }}
-                      className="flex items-center gap-1 text-[10px] text-primary hover:text-primary dark:text-amber-300 font-semibold cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>新建作品</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('novelforge:open-desk'));
+                          setShowNovelMenu(false);
+                        }}
+                        className="flex items-center gap-1 text-[10px] text-primary hover:underline cursor-pointer"
+                        title="打开文人案头速览 (F2)"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>案头</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreateNovel(true);
+                          setShowNovelMenu(false);
+                        }}
+                        className="flex items-center gap-1 text-[10px] text-primary hover:underline font-semibold cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>新建</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
@@ -465,7 +503,7 @@ export const Header: React.FC = () => {
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('novelforge:open-desk'))}
-              className="ml-1 sm:ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-700 to-amber-800 text-white text-xs font-bold font-serif shadow-sm animate-pulse cursor-pointer hover:from-amber-600 hover:to-amber-700"
+              className="ml-1 sm:ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-700 to-amber-800 text-white text-xs font-bold font-serif shadow-sm animate-pulse cursor-pointer hover:from-amber-600 hover:to-amber-700 shrink-0"
               title="案头尚无小说，点击开启新书 3 步向导"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -477,7 +515,7 @@ export const Header: React.FC = () => {
         {/* ============================================================ */}
         {/* ZONE 2 (CENTER): Mode Switcher Capsule & Creation Pipeline   */}
         {/* ============================================================ */}
-        <div className="flex items-center justify-center mx-1 lg:mx-2 min-w-0 shrink gap-1.5 sm:gap-2">
+        <div className="flex items-center justify-center mx-auto min-w-0 shrink-0 gap-1.5 sm:gap-2">
           {/* Dual Mode Switcher Capsule (方案 2: 纯粹写作 Zen 模式 vs 专业工坊 Studio 模式一键切换) */}
           <div className="flex items-center bg-surface-3 dark:bg-[#201d1a] p-0.5 rounded-xl border border-line dark:border-[#352f2a] shadow-inner shrink-0">
             <button
@@ -521,7 +559,76 @@ export const Header: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex items-center bg-surface-3 dark:bg-[#201d1a] p-0.5 lg:p-1 rounded-xl border border-line dark:border-[#352f2a] shadow-inner shrink-0">
+          {/* Creation Pipeline Stepper: 窄屏/常规屏 (< xl) 折叠为紧凑阶段胶囊，防顶栏拥挤重叠 */}
+          <div ref={pipelineMenuRef} className="relative xl:hidden flex items-center shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowPipelineMenu(!showPipelineMenu)}
+              className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-surface-3 dark:bg-[#201d1a] hover:bg-surface-3-hover dark:hover:bg-[#282421] text-xs font-serif font-bold text-ink dark:text-[#ede6dc] border border-line dark:border-[#352f2a] shadow-inner transition cursor-pointer shrink-0"
+              title="当前创作阶段，点击展开完整六步工作流"
+            >
+              <span className="w-3.5 h-3.5 rounded-full bg-amber-800 text-amber-100 flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
+                {currentPipelineStep.stepNum}
+              </span>
+              <CurrentPipelineIcon className="w-3.5 h-3.5 text-primary dark:text-amber-400 shrink-0" />
+              <span className="whitespace-nowrap">{currentPipelineStep.label}</span>
+              <ChevronDown className={`w-3 h-3 text-ink-2 dark:text-[#9e9486] transition-transform ${showPipelineMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showPipelineMenu && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-60 bg-surface dark:bg-[#201d1a] border border-line dark:border-[#38332e] rounded-xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="text-[10px] font-serif font-bold text-primary dark:text-amber-400 px-2 py-1 border-b border-line dark:border-[#322d28] mb-1.5 flex items-center justify-between">
+                  <span>六步创作工作流</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowWorkflowGuideModal(true);
+                      setShowPipelineMenu(false);
+                    }}
+                    className="text-[10px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <HelpCircle className="w-3 h-3" />
+                    <span>向导指南</span>
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  {CREATION_PIPELINE.map((item) => {
+                    const StepIcon = item.icon;
+                    const isItemActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveTab(item.id);
+                          setShowPipelineMenu(false);
+                        }}
+                        className={`w-full p-1.5 rounded-lg text-left flex items-center justify-between text-xs transition cursor-pointer ${
+                          isItemActive
+                            ? 'bg-amber-800/15 dark:bg-amber-400/15 text-primary dark:text-amber-300 font-bold border border-amber-800/30'
+                            : 'text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono font-bold ${
+                            isItemActive ? 'bg-amber-800 text-amber-100' : 'bg-surface-3 dark:bg-[#342e29] text-ink-2'
+                          }`}>
+                            {item.stepNum}
+                          </span>
+                          <StepIcon className="w-3.5 h-3.5 shrink-0" />
+                          <span>{item.label}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-ink-2 opacity-60">Ctrl+{item.stepNum}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Creation Pipeline Stepper: 超宽屏 (>= xl) 展开完整横向步进器 */}
+          <div className="hidden xl:flex items-center bg-surface-3 dark:bg-[#201d1a] p-0.5 lg:p-1 rounded-xl border border-line dark:border-[#352f2a] shadow-inner shrink-0">
             {CREATION_PIPELINE.map((item, idx) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -640,6 +747,19 @@ export const Header: React.FC = () => {
               <div className="hidden 3xl:flex items-center shrink-0">
                 <DualWordStatsBadge />
               </div>
+            )}
+
+            {/* P2P 联机状态常驻小胶囊 */}
+            {collabStatus === 'CONNECTED' && (
+              <button
+                type="button"
+                onClick={() => setShowCollaborationModal(true)}
+                className="h-7 px-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[11px] font-mono flex items-center gap-1.5 hover:bg-emerald-500/20 transition-colors shrink-0"
+                title="P2P 联机创作进行中，点击打开协作面板"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                <span>P2P: {collabRoomCode}</span>
+              </button>
             )}
 
             {/* Quick Command Palette Search Button */}
@@ -804,6 +924,24 @@ export const Header: React.FC = () => {
                       <Compass className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400 shrink-0" />
                       <span className="flex-1 truncate">世界地理与势力沙盘</span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowSandboxModal(true); setShowWorkshopMenu(false); }}
+                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
+                    >
+                      <Swords className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span className="flex-1 truncate">角色对戏演武场</span>
+                      <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-600 font-mono">NEW</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowCollaborationModal(true); setShowWorkshopMenu(false); }}
+                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
+                    >
+                      <Globe className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span className="flex-1 truncate">互联网 P2P 联机创作</span>
+                      <span className="text-[10px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-600 font-mono">P2P</span>
+                    </button>
                   </div>
 
                   {/* Category 3: Audit, Proposals & Publishing */}
@@ -951,10 +1089,10 @@ export const Header: React.FC = () => {
               {themeMode === 'dark' ? <Sun className="w-4 h-4 text-amber-400 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
             </button>
 
-            {/* Zen Mode Toggle */}
+            {/* Zen Mode Toggle (已在 Zone 2 核心切换胶囊中常驻，桌面端隐藏防重复拥挤，极窄视口备用) */}
             <button
               onClick={toggleZenMode}
-              className={`p-2 rounded-lg transition shrink-0 cursor-pointer ${
+              className={`hidden max-sm:flex p-2 rounded-lg transition shrink-0 cursor-pointer ${
                 zenMode
                   ? 'text-primary dark:text-amber-400 bg-[#854d0e]/15 font-bold border border-[#854d0e]/30'
                   : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#ede6dc] hover:bg-surface-3-hover dark:hover:bg-[#282421]'
@@ -1110,6 +1248,19 @@ export const Header: React.FC = () => {
             onClose={() => setShowMapModal(false)}
           />
         )}
+        {showSandboxModal && (
+          <CharacterSandboxModal
+            isOpen={showSandboxModal}
+            onClose={() => setShowSandboxModal(false)}
+          />
+        )}
+        {showCollaborationModal && (
+          <CollaborationModal
+            isOpen={showCollaborationModal}
+            onClose={() => setShowCollaborationModal(false)}
+            onOpenSandbox={() => setShowSandboxModal(true)}
+          />
+        )}
         <CommandPaletteModal
           isOpen={showCommandPalette}
           onClose={() => setShowCommandPalette(false)}
@@ -1139,6 +1290,8 @@ export const Header: React.FC = () => {
           onOpenAssetProposal={() => setShowAssetProposalModal(true)}
           onOpenBatchRevise={() => setShowBatchReviseModal(true)}
           onOpenMap={() => setShowMapModal(true)}
+          onOpenSandbox={() => setShowSandboxModal(true)}
+          onOpenCollaboration={() => setShowCollaborationModal(true)}
         />
       </React.Suspense>
     </>

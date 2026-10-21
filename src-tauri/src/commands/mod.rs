@@ -1,6 +1,8 @@
 use tauri::{AppHandle, Emitter, State};
 
 use crate::database::DbManager;
+use uuid::Uuid;
+use crate::database::count_chinese_characters;
 use crate::models::{
     AiModel, AiProvider, CanonFact, Chapter, ChapterVersion, Character, CharacterRelationship,
     CharacterStateEvent, CollaborativeWorkflowInput, CollaborativeWorkflowResult,
@@ -26,6 +28,9 @@ use crate::models::{
     UpdateCharacterInput, UpdateWorldRuleInput, UpdatePlotThreadInput, UpdateStoryPhaseInput,
     ChapterProposal, CreateChapterProposalInput, AcceptChapterProposalInput,
     RollbackChapterVersionInput, RollbackResult, EvaluationReport, EvaluateChapterInput,
+    CharacterActorConfig, DialogueRoundRecord, CharacterSandboxSession,
+    CreateSandboxSessionInput, UpdateSandboxSessionInput, ExecuteSandboxStepInput,
+    ExecuteSandboxStepResult, SynthesizeSandboxProseInput, SynthesizeSandboxProseResult,
 };
 use crate::providers::{
     ChatMessage, ChatCompletionRequest, ConnectionTestResult, OpenAIClient,
@@ -2419,4 +2424,463 @@ pub async fn optimize_writing_prompt(
         }
     }
 }
+
+// ==========================================
+// V3.4.0 CHARACTER DIALOGUE SANDBOX COMMANDS
+// ==========================================
+
+#[tauri::command]
+pub async fn create_character_sandbox_session(
+    db: State<'_, DbManager>,
+    input: CreateSandboxSessionInput,
+) -> Result<CharacterSandboxSession, String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    let id = Uuid::new_v4().to_string();
+    let characters_config_json = serde_json::to_string(&input.characters_config).unwrap_or_else(|_| "[]".to_string());
+    
+    let session = CharacterSandboxSession {
+        id,
+        novel_id: input.novel_id,
+        chapter_id: input.chapter_id,
+        scene_id: input.scene_id,
+        title: input.title,
+        scene_setting: input.scene_setting,
+        scene_goal: input.scene_goal,
+        characters_config_json,
+        dialogue_history_json: "[]".to_string(),
+        status: "DRAFT".to_string(),
+        synthesized_prose: Some("".to_string()),
+        branches_json: input.branches_json.or_else(|| Some("[]".to_string())),
+        active_branch_id: input.active_branch_id.or_else(|| Some("main".to_string())),
+        created_at: now,
+        updated_at: now,
+    };
+
+    db.save_character_sandbox_session(&session)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_character_sandbox_session(
+    db: State<'_, DbManager>,
+    id: String,
+) -> Result<CharacterSandboxSession, String> {
+    db.get_character_sandbox_session(&id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("未找到指定的角色沙盒会话: {}", id))
+}
+
+#[tauri::command]
+pub async fn list_character_sandbox_sessions(
+    db: State<'_, DbManager>,
+    novel_id: String,
+) -> Result<Vec<CharacterSandboxSession>, String> {
+    db.list_character_sandbox_sessions(&novel_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_character_sandbox_session(
+    db: State<'_, DbManager>,
+    input: UpdateSandboxSessionInput,
+) -> Result<CharacterSandboxSession, String> {
+    let mut session = db
+        .get_character_sandbox_session(&input.id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("未找到要更新的角色沙盒会话: {}", input.id))?;
+
+    let now = chrono::Utc::now().timestamp_millis();
+    session.updated_at = now;
+
+    if let Some(title) = input.title {
+        session.title = title;
+    }
+    if let Some(setting) = input.scene_setting {
+        session.scene_setting = setting;
+    }
+    if let Some(goal) = input.scene_goal {
+        session.scene_goal = goal;
+    }
+    if let Some(configs) = input.characters_config {
+        session.characters_config_json = serde_json::to_string(&configs).unwrap_or_else(|_| "[]".to_string());
+    }
+    if let Some(history) = input.dialogue_history {
+        session.dialogue_history_json = serde_json::to_string(&history).unwrap_or_else(|_| "[]".to_string());
+    }
+    if let Some(status) = input.status {
+        session.status = status;
+    }
+    if let Some(prose) = input.synthesized_prose {
+        session.synthesized_prose = Some(prose);
+    }
+    if let Some(branches) = input.branches_json {
+        session.branches_json = Some(branches);
+    }
+    if let Some(branch_id) = input.active_branch_id {
+        session.active_branch_id = Some(branch_id);
+    }
+
+    db.save_character_sandbox_session(&session)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_character_sandbox_session(
+    db: State<'_, DbManager>,
+    id: String,
+) -> Result<(), String> {
+    db.delete_character_sandbox_session(&id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn execute_character_sandbox_step(
+    db: State<'_, DbManager>,
+    input: ExecuteSandboxStepInput,
+) -> Result<ExecuteSandboxStepResult, String> {
+    let mut session = db
+        .get_character_sandbox_session(&input.session_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("未找到沙盒会话: {}", input.session_id))?;
+
+    let actors: Vec<CharacterActorConfig> = serde_json::from_str(&session.characters_config_json)
+        .unwrap_or_default();
+    if actors.is_empty() {
+        return Err("当前对戏沙盒未配置任何出场角色！".to_string());
+    }
+
+    let mut history: Vec<DialogueRoundRecord> = serde_json::from_str(&session.dialogue_history_json)
+        .unwrap_or_default();
+
+    let now = chrono::Utc::now().timestamp_millis();
+
+    // 1. 如果作者输入了旁白突发变故，先将旁白事件落库
+    if let Some(ref intervention) = input.narrator_intervention {
+        let trimmed = intervention.trim();
+        if !trimmed.is_empty() {
+            let narrator_round = DialogueRoundRecord {
+                round_index: (history.len() + 1) as i64,
+                speaker_id: "narrator".to_string(),
+                speaker_name: "旁白/天意".to_string(),
+                inner_thought: "".to_string(),
+                subtext: None,
+                character_action: trimmed.to_string(),
+                speech: "".to_string(),
+                is_narrator_event: true,
+                is_edited_by_user: true,
+                ooc_warning: None,
+                branch_id: session.active_branch_id.clone(),
+                timestamp: now,
+            };
+            history.push(narrator_round);
+        }
+    }
+
+    // 2. 确定当前应该发言的角色
+    let actor_index = if let Some(ref target_id) = input.target_speaker_id {
+        actors.iter().position(|a| &a.character_id == target_id).unwrap_or(0)
+    } else {
+        // 计算非旁白轮数，轮流发言
+        let char_rounds_count = history.iter().filter(|r| !r.is_narrator_event).count();
+        char_rounds_count % actors.len()
+    };
+
+    let current_actor = &actors[actor_index];
+
+    // 3. 读取该角色的底层设定档案（若被用户在后台删除则优雅降级，保障会话不崩溃）
+    let (char_name, char_aliases, char_personality, char_background, char_motivation) =
+        match db.get_character(&current_actor.character_id) {
+            Ok(p) => (p.name, p.aliases, p.personality, p.background, p.motivation),
+            Err(_) => (
+                current_actor.character_name.clone(),
+                "".to_string(),
+                "性格深沉未明".to_string(),
+                "生平背景不详".to_string(),
+                current_actor.private_motivation.clone(),
+            ),
+        };
+
+    // 4. 读取该角色绑定的 AI 模型与服务商
+    let (provider, model_name) = if let Some(ref pid) = current_actor.provider_id {
+        let p = db
+            .get_provider_by_id(pid)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("未找到指定服务商: {}", pid))?;
+        let m = current_actor
+            .model_name
+            .clone()
+            .unwrap_or_else(|| "gpt-4o-mini".to_string());
+        (p, m)
+    } else {
+        let (p, m) = db
+            .get_active_provider_and_model()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "未找到激活的 AI 服务商与模型".to_string())?;
+        let chosen_model = current_actor.model_name.clone().unwrap_or(m.model_name);
+        (p, chosen_model)
+    };
+
+    // 5. 组装公开发言历史（严格过滤掉所有角色的 inner_thought，保障认知沙盒与战争迷雾！）
+    let mut public_history_text = String::new();
+    for r in &history {
+        if r.is_narrator_event {
+            public_history_text.push_str(&format!("【突发环境/旁白】{}\n", r.character_action));
+        } else {
+            let mut line = format!("{}: ", r.speaker_name);
+            if !r.character_action.trim().is_empty() {
+                line.push_str(&format!("（{}）", r.character_action.trim()));
+            }
+            if !r.speech.trim().is_empty() {
+                line.push_str(&format!("“{}”", r.speech.trim()));
+            }
+            public_history_text.push_str(&format!("{}\n", line));
+        }
+    }
+    if public_history_text.is_empty() {
+        public_history_text = "（双方初次对峙，尚无人开口）\n".to_string();
+    }
+
+    // 6. 组装角色专属私密 Prompt
+    let system_prompt = format!(
+        "你是小说中的角色【{}】的灵魂专属子代理。\n\
+         【你的核心人设】\n\
+         - 姓名/别名：{} ({})\n\
+         - 性格特质：{}\n\
+         - 生平背景：{}\n\
+         - 核心动机：{}\n\
+         - 语言风格/口癖：{}\n\n\
+         【你在本场戏中的绝密动机与秘密（★最高机密，其他角色绝不知晓，严禁主动对外宣读，但你的每一个算盘和回击都要基于此）】\n\
+         - 当场私密动机：{}\n\
+         - 隐藏秘密与软肋：{}\n\n\
+         【场景环境与冲突目标】\n\
+         - 场景设定：{}\n\
+         - 本场交锋目标：{}\n\n\
+         【推演与输出规则】\n\
+         1. 严禁全知上帝视角！你不知道对方心里在想什么，只能根据对方刚才说出口的台词和动作进行试探、回击或隐忍。\n\
+         2. 必须且只能严格按照以下 XML 标签输出四段内容：\n\
+         <inner_thought>你的私密内心算盘、动机权衡与即时策略（其他角色不可见）</inner_thought>\n\
+         <subtext>你的潜台词/弦外之音：这句表面台词背后的真实意图或隐秘威胁（一句话精辟概括）</subtext>\n\
+         <action>你当下的微动作、微表情、手头动作或生理反应（公开展现给其他人）</action>\n\
+         <speech>你真正说出口的台词（公开展现给其他人，允许留白与潜台词）</speech>",
+        current_actor.character_name,
+        char_name,
+        char_aliases,
+        char_personality,
+        char_background,
+        char_motivation,
+        current_actor.voice_quirks.as_deref().unwrap_or("沉着冷静，话留三分"),
+        current_actor.private_motivation,
+        current_actor.private_secret,
+        session.scene_setting,
+        session.scene_goal
+    );
+
+    let user_prompt = format!(
+        "【当前已公开发生的现场对局实录】\n\
+         {}\n\n\
+         轮到你【{}】回应了。请立刻在心中权衡利弊，并给出你的行动与台词：",
+        public_history_text, current_actor.character_name
+    );
+
+    let client = OpenAIClient::new();
+    let req = ChatCompletionRequest {
+        model: model_name,
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: system_prompt,
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: user_prompt,
+            },
+        ],
+        temperature: input.temperature.or(Some(0.75)),
+        max_tokens: Some(1500),
+        stream: false,
+    };
+
+    let raw_reply = client
+        .chat_completion(&provider.base_url, &provider.api_key, req)
+        .await?;
+
+    // 7. 解析结构化标签
+    let (inner_thought, subtext, action, speech) = parse_character_subagent_output(&raw_reply);
+
+    let new_round = DialogueRoundRecord {
+        round_index: (history.len() + 1) as i64,
+        speaker_id: current_actor.character_id.clone(),
+        speaker_name: current_actor.character_name.clone(),
+        inner_thought,
+        subtext,
+        character_action: action,
+        speech,
+        is_narrator_event: false,
+        is_edited_by_user: false,
+        ooc_warning: None,
+        branch_id: session.active_branch_id.clone(),
+        timestamp: chrono::Utc::now().timestamp_millis(),
+    };
+
+    history.push(new_round.clone());
+    session.dialogue_history_json = serde_json::to_string(&history).unwrap_or_else(|_| "[]".to_string());
+    session.status = "RUNNING".to_string();
+    session.updated_at = chrono::Utc::now().timestamp_millis();
+
+    let _ = db.save_character_sandbox_session(&session);
+
+    let next_index = (actor_index + 1) % actors.len();
+    let next_speaker_id = actors.get(next_index).map(|a| a.character_id.clone());
+
+    Ok(ExecuteSandboxStepResult {
+        round: new_round,
+        next_recommended_speaker_id: next_speaker_id,
+        is_completed: history.len() >= 20, // 达到合理上限可提示完成
+        total_rounds: history.len(),
+    })
+}
+
+#[tauri::command]
+pub async fn synthesize_sandbox_dialogue_to_prose(
+    db: State<'_, DbManager>,
+    input: SynthesizeSandboxProseInput,
+) -> Result<SynthesizeSandboxProseResult, String> {
+    let start_time = chrono::Utc::now().timestamp_millis();
+    let mut session = db
+        .get_character_sandbox_session(&input.session_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("未找到沙盒会话: {}", input.session_id))?;
+
+    let novel = db.get_novel(&session.novel_id).map_err(|e| e.to_string())?;
+
+    let (provider, model) = db
+        .get_active_provider_and_model()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "未找到激活的 AI 服务商与模型".to_string())?;
+
+    let history: Vec<DialogueRoundRecord> = serde_json::from_str(&session.dialogue_history_json)
+        .unwrap_or_default();
+    if history.is_empty() {
+        return Err("当前对戏沙盒尚无任何对白记录，无法合成正文！".to_string());
+    }
+
+    // 格式化对戏脚本供作家转译
+    let mut dialogue_transcript = String::new();
+    for (i, r) in history.iter().enumerate() {
+        if r.is_narrator_event {
+            dialogue_transcript.push_str(&format!("[节拍{}] 【突发事件/环境】{}\n", i + 1, r.character_action));
+        } else {
+            dialogue_transcript.push_str(&format!(
+                "[节拍{}] 【{}】\n- 心理暗流: {}\n- 肢体动作: {}\n- 台词: “{}”\n",
+                i + 1,
+                r.speaker_name,
+                if r.inner_thought.trim().is_empty() { "无特别思绪" } else { r.inner_thought.trim() },
+                r.character_action.trim(),
+                r.speech.trim()
+            ));
+        }
+    }
+
+    let pov = input.pov_mode.unwrap_or_else(|| "THIRD_LIMITED".to_string());
+    let guidance = input.custom_guidance.unwrap_or_else(|| "保持文学留白，侧重眼神对峙与呼吸节奏".to_string());
+
+    let system_prompt = format!(
+        "你是中文长篇小说正文转译大师 (Dialogue to Prose Synthesizer)。\n\
+         当前正在创作小说《{}》，流派基调：{}，文风：{}。\n\n\
+         【任务】\n\
+         依据输入的【场景环境】与【角色对戏实录节拍】，创作成一段跌宕起伏、文学质感极高的小说正文段落。\n\n\
+         【转译创作铁律】\n\
+         1. 彻底融化内心戏：各角色的“心理暗流”是动机支撑，严禁机械写成“某某心想”，而必须转化为细腻的第三人称有限视角白描、下意识微动作与神态沉吟！\n\
+         2. Show, Don't Tell：封杀一切 AI 机械套话（严禁“嘴角勾起弧度”、“眼中闪过冷芒”、“空气凝固”等）；台词与动作自然穿插。\n\
+         3. 视点要求：采用{}视角；结合指导意见：{}。\n\
+         4. 直接从第一行开始输出纯正文小说段落，段落间空一行，严禁任何客套说明！",
+        novel.title, novel.genre_profile, novel.writing_style, pov, guidance
+    );
+
+    let user_prompt = format!(
+        "【场景环境设定】\n{}\n\n\
+         【场景冲突目标】\n{}\n\n\
+         【角色演武场对戏实录】\n{}\n\n\
+         请立刻开始转译创作小说正文：",
+        session.scene_setting, session.scene_goal, dialogue_transcript
+    );
+
+    let client = OpenAIClient::new();
+    let req = ChatCompletionRequest {
+        model: model.model_name,
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: system_prompt,
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: user_prompt,
+            },
+        ],
+        temperature: Some(0.72),
+        max_tokens: Some(3000),
+        stream: false,
+    };
+
+    let synthesized_prose = client
+        .chat_completion(&provider.base_url, &provider.api_key, req)
+        .await?;
+
+    let word_count = count_chinese_characters(&synthesized_prose) as usize;
+    let end_time = chrono::Utc::now().timestamp_millis();
+    let duration_ms = end_time - start_time;
+
+    // 持久化合成结果
+    session.synthesized_prose = Some(synthesized_prose.clone());
+    session.status = "COMPLETED".to_string();
+    session.updated_at = end_time;
+    let _ = db.save_character_sandbox_session(&session);
+
+    Ok(SynthesizeSandboxProseResult {
+        session_id: session.id,
+        synthesized_prose,
+        word_count,
+        duration_ms,
+    })
+}
+
+/// 辅助解析 XML 标签提取私密思考、潜台词、微动作与台词 (绝对防 Panic 与 UTF-8 越界安全)
+fn parse_character_subagent_output(raw: &str) -> (String, Option<String>, String, String) {
+    let thought = safe_extract_between(raw, "<inner_thought>", "</inner_thought>").unwrap_or_default();
+    let subtext = safe_extract_between(raw, "<subtext>", "</subtext>");
+    let action = safe_extract_between(raw, "<action>", "</action>").unwrap_or_default();
+    let mut speech = safe_extract_between(raw, "<speech>", "</speech>").unwrap_or_default();
+
+    // 容错降级：如果模型没有输出标准 speech 标签，尝试从引号中提取
+    if speech.is_empty() {
+        if let Some(s) = safe_extract_between(raw, "“", "”") {
+            speech = s;
+        } else if let Some(s) = safe_extract_between(raw, "\"", "\"") {
+            speech = s;
+        }
+    }
+
+    if speech.is_empty() && action.is_empty() && thought.is_empty() {
+        speech = raw.trim().to_string();
+    }
+
+    (thought, subtext, action, speech)
+}
+
+/// 绝对防 Panic 的子字符串提取辅助函数 (带严格边界检查与正向相对偏移量计算)
+fn safe_extract_between(raw: &str, start_tag: &str, end_tag: &str) -> Option<String> {
+    let s = raw.find(start_tag)?;
+    let after_start = s + start_tag.len();
+    if after_start > raw.len() || !raw.is_char_boundary(after_start) {
+        return None;
+    }
+    let rel_e = raw[after_start..].find(end_tag)?;
+    let e = after_start + rel_e;
+    if e > raw.len() || !raw.is_char_boundary(e) {
+        return None;
+    }
+    Some(raw[after_start..e].trim().to_string())
+}
+
 

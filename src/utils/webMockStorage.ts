@@ -2242,6 +2242,147 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
       return;
     }
 
+    // --- V3.4.0 Character Dialogue Sandbox Mock ---
+    case 'create_character_sandbox_session': {
+      const input = args?.input;
+      const sessions = getStorage<any[]>('character_sandbox_sessions', []);
+      const newSession = {
+        id: 'sandbox_' + Math.random().toString(36).slice(2, 9),
+        novel_id: input?.novel_id || '',
+        chapter_id: input?.chapter_id || null,
+        scene_id: input?.scene_id || null,
+        title: input?.title || '未命名对戏沙盒',
+        scene_setting: input?.scene_setting || '',
+        scene_goal: input?.scene_goal || '',
+        characters_config_json: JSON.stringify(input?.characters_config || []),
+        dialogue_history_json: '[]',
+        status: 'DRAFT',
+        synthesized_prose: '',
+        branches_json: args.input?.branches_json || '[]',
+        active_branch_id: args.input?.active_branch_id || 'main',
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+      sessions.unshift(newSession);
+      setStorage('character_sandbox_sessions', sessions);
+      return newSession;
+    }
+
+    case 'get_character_sandbox_session': {
+      const sessions = getStorage<any[]>('character_sandbox_sessions', []);
+      return sessions.find((s) => s.id === args?.id) || null;
+    }
+
+    case 'list_character_sandbox_sessions': {
+      const sessions = getStorage<any[]>('character_sandbox_sessions', []);
+      return sessions.filter((s) => s.novel_id === args?.novelId);
+    }
+
+    case 'update_character_sandbox_session': {
+      const input = args?.input;
+      const sessions = getStorage<any[]>('character_sandbox_sessions', []);
+      const idx = sessions.findIndex((s) => s.id === input?.id);
+      if (idx !== -1) {
+        const item = sessions[idx];
+        if (input.title) item.title = input.title;
+        if (input.scene_setting) item.scene_setting = input.scene_setting;
+        if (input.scene_goal) item.scene_goal = input.scene_goal;
+        if (input.characters_config) item.characters_config_json = JSON.stringify(input.characters_config);
+        if (input.dialogue_history) item.dialogue_history_json = JSON.stringify(input.dialogue_history);
+        if (input.status) item.status = input.status;
+        if (input.synthesized_prose) item.synthesized_prose = input.synthesized_prose;
+        if (input.branches_json) item.branches_json = input.branches_json;
+        if (input.active_branch_id) item.active_branch_id = input.active_branch_id;
+        item.updated_at = Date.now();
+        sessions[idx] = item;
+        setStorage('character_sandbox_sessions', sessions);
+        return item;
+      }
+      return null;
+    }
+
+    case 'delete_character_sandbox_session': {
+      const sessions = getStorage<any[]>('character_sandbox_sessions', []);
+      setStorage('character_sandbox_sessions', sessions.filter((s) => s.id !== args?.id));
+      return;
+    }
+
+    case 'execute_character_sandbox_step': {
+      const input = args?.input;
+      const sessions = getStorage<any[]>('character_sandbox_sessions', []);
+      const session = sessions.find((s) => s.id === input?.session_id);
+      if (!session) throw new Error('未找到沙盒会话');
+
+      const actors = JSON.parse(session.characters_config_json || '[]');
+      const history = JSON.parse(session.dialogue_history_json || '[]');
+
+      if (input?.narrator_intervention?.trim()) {
+        history.push({
+          round_index: history.length + 1,
+          speaker_id: 'narrator',
+          speaker_name: '旁白/天意',
+          inner_thought: '',
+          character_action: input.narrator_intervention.trim(),
+          speech: '',
+          is_narrator_event: true,
+          is_edited_by_user: true,
+          timestamp: Date.now(),
+        });
+      }
+
+      const actor = (input?.target_speaker_id
+        ? actors.find((a: any) => a.character_id === input.target_speaker_id)
+        : null) || actors[history.filter((h: any) => !h.is_narrator_event).length % Math.max(1, actors.length)] || {
+        character_id: 'char_default',
+        character_name: '角色',
+      };
+
+      const newRound = {
+        round_index: history.length + 1,
+        speaker_id: actor.character_id,
+        speaker_name: actor.character_name,
+        inner_thought: `【思考链】对方眼神游离，试探解药虚实。我必须按兵不动，顺势反问。`,
+        subtext: `表面平静反问，实则逼迫对方露出援军虚实的破绽`,
+        character_action: `（微抿一口冷茶，眼神微冷）`,
+        speech: `阁下深夜至此，难道只为问一句废话？`,
+        is_narrator_event: false,
+        is_edited_by_user: false,
+        branch_id: session.active_branch_id || 'main',
+        timestamp: Date.now(),
+      };
+      history.push(newRound);
+      session.dialogue_history_json = JSON.stringify(history);
+      session.status = 'RUNNING';
+      session.updated_at = Date.now();
+      setStorage('character_sandbox_sessions', sessions);
+
+      return {
+        round: newRound,
+        next_recommended_speaker_id: actors.find((a: any) => a.character_id !== actor.character_id)?.character_id,
+        is_completed: history.length >= 10,
+        total_rounds: history.length,
+      };
+    }
+
+    case 'synthesize_sandbox_dialogue_to_prose': {
+      const input = args?.input;
+      const sessions = getStorage<any[]>('character_sandbox_sessions', []);
+      const session = sessions.find((s) => s.id === input?.session_id);
+      const text = `窗外夜色渐深，冷风透过雕花木格卷起案前白幡。\n\n茶水早已冷透，泛着微暗的墨色光泽。两人默然相对，视线在昏黄烛影下几度交错交锋。没有刀光剑影，唯有指尖摩挲青瓷杯壁的细碎声响，字字机锋，句句暗藏杀意。`;
+      if (session) {
+        session.synthesized_prose = text;
+        session.status = 'COMPLETED';
+        session.updated_at = Date.now();
+        setStorage('character_sandbox_sessions', sessions);
+      }
+      return {
+        session_id: input?.session_id,
+        synthesized_prose: text,
+        word_count: 120,
+        duration_ms: 1200,
+      };
+    }
+
     default:
       console.warn(`[WebMock] Unhandled command: ${cmd}`, args);
       return null;

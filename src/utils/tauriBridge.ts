@@ -73,6 +73,13 @@ import type {
   ChapterProposal,
   RollbackResult,
   EvaluationReport,
+  CharacterSandboxSession,
+  CreateSandboxSessionInput,
+  UpdateSandboxSessionInput,
+  ExecuteSandboxStepInput,
+  ExecuteSandboxStepResult,
+  SynthesizeSandboxProseInput,
+  SynthesizeSandboxProseResult,
 } from '@/types';
 
 /**
@@ -650,4 +657,20 @@ export const api = {
   // --- V2.5.1: AI Prompt Optimizer ---
   optimizeWritingPrompt: (input: OptimizeWritingPromptInput) =>
     safeInvoke<OptimizeWritingPromptResult>('optimize_writing_prompt', { input }),
+
+  // --- V3.4.0: Character Dialogue Sandbox ---
+  createSandboxSession: (input: CreateSandboxSessionInput) =>
+    safeInvoke<CharacterSandboxSession>('create_character_sandbox_session', { input }),
+  getSandboxSession: (id: string) =>
+    safeInvoke<CharacterSandboxSession>('get_character_sandbox_session', { id }),
+  listSandboxSessions: (novelId: string) =>
+    safeInvoke<CharacterSandboxSession[]>('list_character_sandbox_sessions', { novelId }),
+  updateSandboxSession: (input: UpdateSandboxSessionInput) =>
+    safeInvoke<CharacterSandboxSession>('update_character_sandbox_session', { input }),
+  deleteSandboxSession: (id: string) =>
+    safeInvoke<void>('delete_character_sandbox_session', { id }),
+  executeSandboxStep: (input: ExecuteSandboxStepInput) =>
+    safeInvoke<ExecuteSandboxStepResult>('execute_character_sandbox_step', { input }),
+  synthesizeSandboxProse: (input: SynthesizeSandboxProseInput) =>
+    safeInvoke<SynthesizeSandboxProseResult>('synthesize_sandbox_dialogue_to_prose', { input }),
 };

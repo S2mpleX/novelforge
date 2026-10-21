@@ -200,6 +200,14 @@ pub fn run() {
             commands::delete_model_arena_run,
             // V2.5.1 AI Prompt Optimizer
             commands::optimize_writing_prompt,
+            // V3.4.0 Character Dialogue Sandbox
+            commands::create_character_sandbox_session,
+            commands::get_character_sandbox_session,
+            commands::list_character_sandbox_sessions,
+            commands::update_character_sandbox_session,
+            commands::delete_character_sandbox_session,
+            commands::execute_character_sandbox_step,
+            commands::synthesize_sandbox_dialogue_to_prose,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovelForge AI application");

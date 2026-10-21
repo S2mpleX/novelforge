@@ -944,5 +944,115 @@ export interface RollbackResult {
   message: string;
 }
 
+// ==========================================
+// V3.4.0 CHARACTER DIALOGUE SANDBOX TYPES
+// ==========================================
+
+export interface CharacterActorConfig {
+  character_id: string;
+  character_name: string;
+  provider_id?: string;
+  model_name?: string;
+  private_motivation: string;
+  private_secret: string;
+  voice_quirks?: string;
+  order_index: number;
+  is_human?: boolean;
+}
+
+export interface DialogueRoundRecord {
+  round_index: number;
+  speaker_id: string;
+  speaker_name: string;
+  inner_thought: string;
+  subtext?: string;
+  character_action: string;
+  speech: string;
+  is_narrator_event: boolean;
+  is_edited_by_user: boolean;
+  ooc_warning?: string;
+  branch_id?: string;
+  timestamp: number;
+}
+
+export interface SandboxBranch {
+  id: string;
+  name: string;
+  fork_round_index: number;
+  history: DialogueRoundRecord[];
+  created_at: number;
+}
+
+export interface CharacterSandboxSession {
+  id: string;
+  novel_id: string;
+  chapter_id?: string;
+  scene_id?: string;
+  title: string;
+  scene_setting: string;
+  scene_goal: string;
+  characters_config_json: string;
+  dialogue_history_json: string;
+  status: 'DRAFT' | 'RUNNING' | 'PAUSED' | 'COMPLETED';
+  synthesized_prose?: string;
+  branches_json?: string;
+  active_branch_id?: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CreateSandboxSessionInput {
+  novel_id: string;
+  chapter_id?: string;
+  scene_id?: string;
+  title: string;
+  scene_setting: string;
+  scene_goal: string;
+  characters_config: CharacterActorConfig[];
+  branches_json?: string;
+  active_branch_id?: string;
+}
+
+export interface UpdateSandboxSessionInput {
+  id: string;
+  title?: string;
+  scene_setting?: string;
+  scene_goal?: string;
+  characters_config?: CharacterActorConfig[];
+  dialogue_history?: DialogueRoundRecord[];
+  status?: string;
+  synthesized_prose?: string;
+  branches_json?: string;
+  active_branch_id?: string;
+}
+
+export interface ExecuteSandboxStepInput {
+  session_id: string;
+  target_speaker_id?: string;
+  narrator_intervention?: string;
+  temperature?: number;
+}
+
+export interface ExecuteSandboxStepResult {
+  round: DialogueRoundRecord;
+  next_recommended_speaker_id?: string;
+  is_completed: boolean;
+  total_rounds: number;
+}
+
+export interface SynthesizeSandboxProseInput {
+  session_id: string;
+  custom_guidance?: string;
+  pov_mode?: string;
+}
+
+export interface SynthesizeSandboxProseResult {
+  session_id: string;
+  synthesized_prose: string;
+  word_count: number;
+  duration_ms: number;
+}
+
+
 
 

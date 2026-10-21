@@ -508,6 +508,26 @@ CREATE TABLE IF NOT EXISTS model_arena_runs (
     FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
 );
 
+-- Character Sandbox Sessions table (角色对手戏演武场沙盒)
+CREATE TABLE IF NOT EXISTS character_sandbox_sessions (
+    id TEXT PRIMARY KEY,
+    novel_id TEXT NOT NULL,
+    chapter_id TEXT,
+    scene_id TEXT,
+    title TEXT NOT NULL,
+    scene_setting TEXT NOT NULL,
+    scene_goal TEXT NOT NULL,
+    characters_config_json TEXT NOT NULL DEFAULT '[]',
+    dialogue_history_json TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'DRAFT', -- 'DRAFT', 'RUNNING', 'PAUSED', 'COMPLETED'
+    synthesized_prose TEXT DEFAULT '',
+    branches_json TEXT DEFAULT '[]',
+    active_branch_id TEXT DEFAULT 'main',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
+
 -- Create indexes for high performance
 CREATE INDEX IF NOT EXISTS idx_chapters_novel_id ON chapters(novel_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_volume_id ON chapters(volume_id);
@@ -537,6 +557,8 @@ CREATE INDEX IF NOT EXISTS idx_workflow_runs_novel ON workflow_runs(novel_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_step_records_run ON workflow_step_records(run_id, step_index);
 CREATE INDEX IF NOT EXISTS idx_voice_profiles_novel ON voice_profiles(novel_id);
 CREATE INDEX IF NOT EXISTS idx_model_arena_runs_novel ON model_arena_runs(novel_id);
+CREATE INDEX IF NOT EXISTS idx_sandbox_sessions_novel ON character_sandbox_sessions(novel_id);
+CREATE INDEX IF NOT EXISTS idx_sandbox_sessions_chapter ON character_sandbox_sessions(chapter_id);
 "#;
 
 pub const FTS5_SCHEMA: &str = r#"

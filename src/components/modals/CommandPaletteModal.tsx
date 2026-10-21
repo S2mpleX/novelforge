@@ -30,6 +30,7 @@ import {
   HeartPulse,
   Lightbulb,
   Layers,
+  Globe,
 } from 'lucide-react';
 
 interface Props {
@@ -53,6 +54,8 @@ interface Props {
   onOpenAssetProposal?: () => void;
   onOpenBatchRevise?: () => void;
   onOpenMap?: () => void;
+  onOpenSandbox?: () => void;
+  onOpenCollaboration?: () => void;
 }
 
 export const CommandPaletteModal: React.FC<Props> = ({
@@ -76,6 +79,8 @@ export const CommandPaletteModal: React.FC<Props> = ({
   onOpenAssetProposal,
   onOpenBatchRevise,
   onOpenMap,
+  onOpenSandbox,
+  onOpenCollaboration,
 }) => {
   const {
     chapters,
@@ -174,6 +179,26 @@ export const CommandPaletteModal: React.FC<Props> = ({
       action: () => {
         onClose();
         onOpenArena?.();
+      },
+    },
+    {
+      id: 'cmd-sandbox',
+      icon: <Users className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
+      title: '打开角色对戏演武场 (多子代理独立心路推演/战争迷雾对手戏/正文转译)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenSandbox?.();
+      },
+    },
+    {
+      id: 'cmd-collaboration',
+      icon: <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
+      title: '打开互联网 P2P 联机创作中心 (6位房间码异地直连 / 演武场联机 / 提案投递)',
+      category: '智能写作',
+      action: () => {
+        onClose();
+        onOpenCollaboration?.();
       },
     },
     {

@@ -48,6 +48,17 @@ test('Header 顶栏显著位置集成【沉浸写作】vs【专业工坊】双�
   assert(headerSource.includes('LayoutGrid'), '专业工坊配备工坊网格图标');
 });
 
+test('Header 顶栏 Zone 1 与 Zone 2 具备弹性防重叠与窄屏自适应胶囊架构', () => {
+  // 1. Zone 2 杜绝无约束 center 溢出覆盖 Zone 1
+  assert(headerSource.includes('mx-auto') && headerSource.includes('shrink-0'), 'Zone 2 采用 mx-auto 与 shrink-0 居中，杜绝因 Flex shrink 导致的负空间逆向溢出重叠');
+  // 2. 案头快捷入口与项目选择器具备防挤压 shrink-0
+  assert(headerSource.includes('title="打开文人案头速览与新书启程中心 (快捷键: F2 或 Ctrl+D)"'), '保留案头直达按钮');
+  // 3. 常规屏/窄屏 (< xl) 支持紧凑阶段选择胶囊
+  assert(headerSource.includes('showPipelineMenu'), '包含窄屏创作流程下拉菜单控制');
+  assert(headerSource.includes('xl:hidden'), '窄屏阶段胶囊具备 xl:hidden 响应式切换');
+  assert(headerSource.includes('hidden xl:flex'), '宽屏完整六步横向进度条具备 hidden xl:flex 断点响应');
+});
+
 test('DockingWorkspace 在 zenMode 开启时彻底独占呈现 ZenWritingWorkspace', () => {
   assert(workspaceSource.includes('import { ZenWritingWorkspace }'), '导入 ZenWritingWorkspace');
   assert(workspaceSource.includes('if (zenMode) {'), '判断 zenMode 独占拦截');

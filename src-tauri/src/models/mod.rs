@@ -1308,4 +1308,121 @@ pub struct RollbackResult {
     pub message: String,
 }
 
+// ==========================================
+// V3.4.0 CHARACTER DIALOGUE SANDBOX (角色对戏演武场)
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterActorConfig {
+    pub character_id: String,
+    pub character_name: String,
+    pub provider_id: Option<String>,
+    pub model_name: Option<String>,
+    pub private_motivation: String,
+    pub private_secret: String,
+    pub voice_quirks: Option<String>,
+    pub order_index: i64,
+    #[serde(default)]
+    pub is_human: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DialogueRoundRecord {
+    pub round_index: i64,
+    pub speaker_id: String,
+    pub speaker_name: String,
+    pub inner_thought: String,      // 私密心理独白 (对其他角色完全屏蔽)
+    #[serde(default)]
+    pub subtext: Option<String>,    // 潜台词/弦外之音
+    pub character_action: String,   // 动作与微表情
+    pub speech: String,             // 台词
+    pub is_narrator_event: bool,    // 是否为旁白/环境突发事件
+    pub is_edited_by_user: bool,    // 是否经过作者原地编辑
+    #[serde(default)]
+    pub ooc_warning: Option<String>, // 人设偏离/崩坏智能诊断预警
+    #[serde(default)]
+    pub branch_id: Option<String>,  // 所属推演分支 ID ('main' 或自定义分支)
+    pub timestamp: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterSandboxSession {
+    pub id: String,
+    pub novel_id: String,
+    pub chapter_id: Option<String>,
+    pub scene_id: Option<String>,
+    pub title: String,
+    pub scene_setting: String,
+    pub scene_goal: String,
+    pub characters_config_json: String,
+    pub dialogue_history_json: String,
+    pub status: String,
+    pub synthesized_prose: Option<String>,
+    #[serde(default)]
+    pub branches_json: Option<String>, // 树状分支推演列表 JSON
+    #[serde(default)]
+    pub active_branch_id: Option<String>, // 当前活跃分支 ID (默认 'main')
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateSandboxSessionInput {
+    pub novel_id: String,
+    pub chapter_id: Option<String>,
+    pub scene_id: Option<String>,
+    pub title: String,
+    pub scene_setting: String,
+    pub scene_goal: String,
+    pub characters_config: Vec<CharacterActorConfig>,
+    pub branches_json: Option<String>,
+    pub active_branch_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateSandboxSessionInput {
+    pub id: String,
+    pub title: Option<String>,
+    pub scene_setting: Option<String>,
+    pub scene_goal: Option<String>,
+    pub characters_config: Option<Vec<CharacterActorConfig>>,
+    pub dialogue_history: Option<Vec<DialogueRoundRecord>>,
+    pub status: Option<String>,
+    pub synthesized_prose: Option<String>,
+    pub branches_json: Option<String>,
+    pub active_branch_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecuteSandboxStepInput {
+    pub session_id: String,
+    pub target_speaker_id: Option<String>, // 若指定则由该角色发言，否则按顺序轮换
+    pub narrator_intervention: Option<String>, // 作者作为旁白插入的环境变故/台词
+    pub temperature: Option<f32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecuteSandboxStepResult {
+    pub round: DialogueRoundRecord,
+    pub next_recommended_speaker_id: Option<String>,
+    pub is_completed: bool,
+    pub total_rounds: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SynthesizeSandboxProseInput {
+    pub session_id: String,
+    pub custom_guidance: Option<String>,
+    pub pov_mode: Option<String>, // 'THIRD_LIMITED' | 'THIRD_OMNISCIENT'
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SynthesizeSandboxProseResult {
+    pub session_id: String,
+    pub synthesized_prose: String,
+    pub word_count: usize,
+    pub duration_ms: i64,
+}
+
+
 
