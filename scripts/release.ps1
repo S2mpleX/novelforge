@@ -209,7 +209,26 @@ New-Item -ItemType Directory -Force -Path $destDir | Out-Null
 $exeName = Get-ChildItem $bundleDir -Filter ('*_' + $newVersion + '_x64-setup.exe') | Select-Object -First 1
 if ($exeName) {
     Copy-Item $exeName.FullName -Destination $destDir
-    Copy-Item ($exeName.FullName + '.sig') -Destination $destDir -ErrorAction SilentlyContinue
+        $sigSrc = $exeName.FullName + '.sig'
+    if (Test-Path $sigSrc) {
+        Copy-Item $sigSrc -Destination $destDir -ErrorAction SilentlyContinue
+        $sigContent = (Get-Content $sigSrc -Raw).Trim()
+        $ghExeName = $exeName.Name -replace '\s+', '.'
+        $latestMeta = @{
+            version = $newVersion
+            notes = "## NovelForge AI v$newVersion 正式发布`n`n请通过应用内自动更新或下载随附安装包升级。"
+            pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+                "windows-x86_64" = @{
+                    signature = $sigContent
+                    url = "https://github.com/S2mpleX/novelforge/releases/download/v$newVersion/$ghExeName"
+                }
+            }
+        }
+        $latestJsonPath = Join-Path $destDir "latest.json"
+        $latestMeta | ConvertTo-Json -Depth 5 | Set-Content -Path $latestJsonPath -Encoding UTF8
+        Write-Host "     ✅ 已就绪更新清单 latest.json" -ForegroundColor Green
+    }
     $sizeMB = [math]::Round($exeName.Length / 1MB, 2)
     Write-Host ''
     Write-Host '╔══════════════════════════════════════════════════╗' -ForegroundColor Green
