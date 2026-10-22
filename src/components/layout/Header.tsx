@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { useShallow } from 'zustand/react/shallow';
 import { api } from '@/utils/tauriBridge';
+import { allPanelsInTree } from '@/utils/dockingTree';
 import {
   BookOpen,
   CheckCircle2,
@@ -43,6 +44,7 @@ import {
   Keyboard,
   LayoutGrid,
   Globe,
+  X,
 } from 'lucide-react';
 import { toast } from '@/stores/useToastStore';
 import { APP_CURRENT_VERSION } from '@/features/updater/services/UpdateService';
@@ -184,8 +186,6 @@ export const Header: React.FC = () => {
     activeTab,
     setActiveTab,
     toggleSidebar,
-    toggleRightPanel,
-    rightPanelOpen,
     activeProvider,
     activeModel,
     zenMode,
@@ -207,8 +207,6 @@ export const Header: React.FC = () => {
       activeTab: s.activeTab,
       setActiveTab: s.setActiveTab,
       toggleSidebar: s.toggleSidebar,
-      toggleRightPanel: s.toggleRightPanel,
-      rightPanelOpen: s.rightPanelOpen,
       activeProvider: s.activeProvider,
       activeModel: s.activeModel,
       zenMode: s.zenMode,
@@ -227,9 +225,16 @@ export const Header: React.FC = () => {
   const chaptersCount = useNovelStore((s) => s.chapters.length);
 
   const { status } = useUpdateStore();
-  const openPanel = useWorkspaceStore((s) => s.openPanel);
+  const togglePanel = useWorkspaceStore((s) => s.togglePanel);
   const applyPreset = useWorkspaceStore((s) => s.applyPreset);
   const activePresetKey = useWorkspaceStore((s) => s.activePresetKey);
+
+  const isAiAssistantOpen = useWorkspaceStore((s) => {
+    if (!s.layout?.root) return false;
+    const inTree = allPanelsInTree(s.layout.root).some((p) => p.panelType === 'ai_assistant');
+    const inFloating = s.layout.floatingPanels?.some((f) => f.panel.panelType === 'ai_assistant') || false;
+    return inTree || inFloating;
+  });
 
   // Modals state
   const [showSettings, setShowSettings] = useState(false);
@@ -475,7 +480,12 @@ export const Header: React.FC = () => {
                     《{activeNovel.title}》
                   </div>
                   <div className="text-[10px] text-ink-2 dark:text-[#9e9486] flex items-center gap-1 leading-none mt-0.5">
-                    <span className="truncate max-w-[50px] sm:max-w-[70px]">{activeNovel.genre_profile || '长篇通俗'}</span>
+                    <span
+                      title={activeNovel.genre_profile || '长篇通俗'}
+                      className="truncate max-w-[80px] sm:max-w-[110px] xl:max-w-[140px]"
+                    >
+                      {activeNovel.genre_profile || '长篇通俗'}
+                    </span>
                     <span>·</span>
                     <span className="font-mono">{chaptersCount}章</span>
                   </div>
@@ -932,175 +942,390 @@ export const Header: React.FC = () => {
               </button>
 
               {showWorkshopMenu && (
-                <div className="absolute top-full right-0 mt-1.5 w-64 bg-surface dark:bg-[#1f1c19] border border-line dark:border-[#38332e] rounded-xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 space-y-2">
-                  {/* Category 1: Input & Typesetting */}
-                  <div>
-                    <div className="text-[10px] font-serif font-bold text-primary dark:text-amber-400 px-2 py-0.5 border-b border-line dark:border-[#322d28] mb-1 flex items-center justify-between">
-                      <span>稿件输入与排版</span>
-                      <span className="text-[9px] font-sans font-normal opacity-70">格式与分章</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setShowWordImportModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-blue-900 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition text-left cursor-pointer"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                      <div className="flex-1 truncate">
-                        <span className="font-bold">Word (.docx) 导入分章</span>
+                <div className="absolute top-full right-0 mt-2 w-[590px] max-w-[94vw] max-h-[85vh] bg-surface dark:bg-[#1a1714] border border-line dark:border-[#38332d] rounded-2xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 flex flex-col overflow-hidden">
+                  {/* Top Header */}
+                  <div className="px-4 py-2.5 border-b border-line dark:border-[#302a24] flex items-center justify-between bg-surface-2/60 dark:bg-[#161311] shrink-0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-amber-800/10 dark:bg-amber-400/10 text-primary dark:text-amber-400 flex items-center justify-center">
+                        <Wand2 className="w-3.5 h-3.5" />
                       </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowTypesetterModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-primary dark:text-amber-400 shrink-0" />
-                      <span className="flex-1 truncate">网文排版清洗机</span>
-                    </button>
-                    <div className="grid grid-cols-2 gap-1 mt-1 px-1">
-                      <button
-                        type="button"
-                        onClick={() => { handleExport('txt'); setShowWorkshopMenu(false); }}
-                        className="py-1 px-1.5 rounded text-[11px] text-ink-2 dark:text-[#a09485] hover:bg-[#eee5d5] dark:hover:bg-[#2b2724] border border-line dark:border-[#38332d] flex items-center justify-center gap-1"
-                      >
-                        <Download className="w-3 h-3" />
-                        <span>导出本章TXT</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { handleExportNovel('markdown'); setShowWorkshopMenu(false); }}
-                        className="py-1 px-1.5 rounded text-[11px] text-ink-2 dark:text-[#a09485] hover:bg-[#eee5d5] dark:hover:bg-[#2b2724] border border-line dark:border-[#38332d] flex items-center justify-center gap-1"
-                      >
-                        <Download className="w-3 h-3" />
-                        <span>导出全本MD</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Category 2: AI Assistance & Deconstruction */}
-                  <div>
-                    <div className="text-[10px] font-serif font-bold text-primary dark:text-amber-400 px-2 py-0.5 border-b border-line dark:border-[#322d28] mb-1 flex items-center justify-between">
-                      <span>AI 创作与拆解</span>
-                      <span className="text-[9px] font-sans font-normal opacity-70">协同工坊</span>
+                      <div>
+                        <span className="text-xs font-bold text-ink dark:text-stone-100">小说创作工坊中心</span>
+                        <span className="text-[10px] text-ink-2 dark:text-[#8e8476] ml-2">17 项全能创作与交付套件</span>
+                      </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => { setShowDeconstructModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
+                      onClick={() => setShowWorkshopMenu(false)}
+                      className="text-ink-2 hover:text-ink dark:hover:text-stone-100 p-1 rounded-md hover:bg-surface-3 dark:hover:bg-[#25201c] transition cursor-pointer"
+                      title="关闭工坊菜单"
                     >
-                      <FileSearch className="w-3.5 h-3.5 text-purple-700 dark:text-purple-400 shrink-0" />
-                      <span className="flex-1 truncate">爆款范文拆解器</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowToolboxModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <Wand2 className="w-3.5 h-3.5 text-primary dark:text-amber-400 shrink-0" />
-                      <span className="flex-1 truncate">小说专项百宝箱</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowWorkflowModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <GitBranch className="w-3.5 h-3.5 text-indigo-700 dark:text-indigo-400 shrink-0" />
-                      <span className="flex-1 truncate">剧情工作流引擎</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowVoiceProfileModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <Feather className="w-3.5 h-3.5 text-primary dark:text-amber-400 shrink-0" />
-                      <span className="flex-1 truncate">作者文风档案工作室</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowArenaModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <Swords className="w-3.5 h-3.5 text-primary dark:text-amber-400 shrink-0" />
-                      <span className="flex-1 truncate">双模型比稿竞技场</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowBatchReviseModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <Layers className="w-3.5 h-3.5 text-primary dark:text-amber-400 shrink-0" />
-                      <span className="flex-1 truncate">跨章节批量重塑</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowMapModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <Compass className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400 shrink-0" />
-                      <span className="flex-1 truncate">世界地理与势力沙盘</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowSandboxModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <Swords className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span className="flex-1 truncate">角色对戏演武场</span>
-                      <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-600 font-mono">NEW</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowCollaborationModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <Globe className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                      <span className="flex-1 truncate">互联网 P2P 联机创作</span>
-                      <span className="text-[10px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-600 font-mono">P2P</span>
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
 
-                  {/* Category 3: Audit, Proposals & Publishing */}
-                  <div>
-                    <div className="text-[10px] font-serif font-bold text-primary dark:text-amber-400 px-2 py-0.5 border-b border-line dark:border-[#322d28] mb-1 flex items-center justify-between">
-                      <span>质检、沉淀与交付</span>
-                      <span className="text-[9px] font-sans font-normal opacity-70">全书闭环</span>
+                  {/* Body: Two-Column Responsive Grid */}
+                  <div className="p-3 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Left Column: 稿件排版 + 质检闭环 */}
+                    <div className="space-y-3">
+                      {/* Section 1: 稿件输入与排版 */}
+                      <div className="bg-surface-2/40 dark:bg-[#201c18] border border-line/60 dark:border-[#2e2823] rounded-xl p-2.5 space-y-1">
+                        <div className="flex items-center justify-between pb-1.5 px-1 border-b border-line/60 dark:border-[#2e2823] text-primary dark:text-amber-400">
+                          <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>稿件输入与排版</span>
+                          </div>
+                          <span className="text-[9px] text-ink-2 dark:text-[#8e8476]">格式转换 / 导出</span>
+                        </div>
+
+                        {/* Word Import */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowWordImportModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-blue-500/10 dark:bg-blue-400/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20">
+                            <FileText className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              Word (.docx) 导入分章
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              智能识别多级目录与自动拆分
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Typesetter */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowTypesetterModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-amber-500/10 dark:bg-amber-400/10 text-primary dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                            <Sparkles className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              网文排版清洗机
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              段首缩进、空行标点一键规范化
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Export Buttons */}
+                        <div className="grid grid-cols-2 gap-1.5 pt-1 px-0.5">
+                          <button
+                            type="button"
+                            onClick={() => { handleExport('txt'); setShowWorkshopMenu(false); }}
+                            className="py-1 px-2 rounded-lg text-[11px] font-medium text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-stone-100 bg-surface dark:bg-[#1a1714] hover:bg-surface-3 dark:hover:bg-[#2a241f] border border-line dark:border-[#332c25] flex items-center justify-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Download className="w-3 h-3 text-primary dark:text-amber-400" />
+                            <span>导出本章 TXT</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { handleExportNovel('markdown'); setShowWorkshopMenu(false); }}
+                            className="py-1 px-2 rounded-lg text-[11px] font-medium text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-stone-100 bg-surface dark:bg-[#1a1714] hover:bg-surface-3 dark:hover:bg-[#2a241f] border border-line dark:border-[#332c25] flex items-center justify-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Download className="w-3 h-3 text-primary dark:text-amber-400" />
+                            <span>导出全本 MD</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Section 2: 质检、闭环与交付 */}
+                      <div className="bg-surface-2/40 dark:bg-[#201c18] border border-line/60 dark:border-[#2e2823] rounded-xl p-2.5 space-y-1">
+                        <div className="flex items-center justify-between pb-1.5 px-1 border-b border-line/60 dark:border-[#2e2823] text-rose-700 dark:text-rose-400">
+                          <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                            <HeartPulse className="w-3.5 h-3.5" />
+                            <span>质检、沉淀与交付</span>
+                          </div>
+                          <span className="text-[9px] text-ink-2 dark:text-[#8e8476]">全书闭环</span>
+                        </div>
+
+                        {/* Full Check */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowFullCheckModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-rose-500/10 dark:bg-rose-400/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/20">
+                            <HeartPulse className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              全书贯通因果体检
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              跨章节逻辑断点与伏笔冲突扫描
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Asset Proposal */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowAssetProposalModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 dark:bg-emerald-400/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                            <PackageOpen className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              正文资产沉淀提案
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              从正文中自动萃取权威人物与设定
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Agent Skills */}
+                        <button
+                          type="button"
+                          onClick={() => { setSettingsInitialTab('SKILLS'); setShowSettings(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-amber-500/10 dark:bg-amber-400/10 text-primary dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                            <Sliders className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              Agent Skills 技能中心
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              管理多领域专家技能与知识工具
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Publishing & Backup */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowPublishingModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition group text-left cursor-pointer border border-emerald-600/20 dark:border-emerald-500/20 bg-emerald-500/5"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                            <Archive className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 group-hover:text-emerald-700 transition block truncate">
+                              发布交付与数据备份
+                            </span>
+                            <span className="text-[10px] text-emerald-700/80 dark:text-emerald-400/70 block truncate">
+                              多格式成品导出与全书数据库备份
+                            </span>
+                          </div>
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => { setShowFullCheckModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <HeartPulse className="w-3.5 h-3.5 text-rose-700 dark:text-rose-400 shrink-0" />
-                      <span className="flex-1 truncate">全书贯通因果体检</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowAssetProposalModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <PackageOpen className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
-                      <span className="flex-1 truncate">正文资产沉淀提案</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSettingsInitialTab('SKILLS');
-                        setShowSettings(true);
-                        setShowWorkshopMenu(false);
-                      }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer"
-                    >
-                      <Sliders className="w-3.5 h-3.5 text-primary dark:text-amber-400 shrink-0" />
-                      <span className="flex-1 truncate">Agent Skills 技能中心</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowPublishingModal(true); setShowWorkshopMenu(false); }}
-                      className="w-full px-2 py-1.5 rounded-lg text-xs font-serif flex items-center gap-2 text-ink dark:text-[#ede6dc] hover:bg-surface-3 dark:hover:bg-[#282421] transition text-left cursor-pointer font-bold text-emerald-800 dark:text-emerald-400 mt-1"
-                    >
-                      <Archive className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
-                      <span className="flex-1 truncate">发布交付与数据备份</span>
-                    </button>
+
+                    {/* Right Column: AI 创作拆解 + 演武沙盘 */}
+                    <div className="space-y-3">
+                      {/* Section 3: AI 创作与拆解 */}
+                      <div className="bg-surface-2/40 dark:bg-[#201c18] border border-line/60 dark:border-[#2e2823] rounded-xl p-2.5 space-y-1">
+                        <div className="flex items-center justify-between pb-1.5 px-1 border-b border-line/60 dark:border-[#2e2823] text-purple-700 dark:text-purple-400">
+                          <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                            <Wand2 className="w-3.5 h-3.5" />
+                            <span>AI 创作与拆解工坊</span>
+                          </div>
+                          <span className="text-[9px] text-ink-2 dark:text-[#8e8476]">多模态辅助</span>
+                        </div>
+
+                        {/* Deconstruct */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowDeconstructModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/20">
+                            <FileSearch className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              爆款范文拆解器
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              逆向拆解黄金三章节奏与爽点模型
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Toolbox */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowToolboxModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-primary dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                            <Wand2 className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              小说专项百宝箱
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              玄幻起名、金手指脑洞与灵感锦囊
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Workflow Engine */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowWorkflowModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20">
+                            <GitBranch className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              剧情工作流引擎
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              多 Agent 协同流水线可视化编排
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Voice Profile */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowVoiceProfileModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-primary dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                            <Feather className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              作者文风档案工作室
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              作者文风指纹提取与语气克隆
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Arena */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowArenaModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-primary dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                            <Swords className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              双模型比稿竞技场
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              多大模型同题盲测比稿评测
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Batch Revise */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowBatchReviseModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-primary dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                            <Layers className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              跨章节批量重塑
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              全本批量去AI味与文风统一精修
+                            </span>
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Section 4: 推演、沙盘与协作 */}
+                      <div className="bg-surface-2/40 dark:bg-[#201c18] border border-line/60 dark:border-[#2e2823] rounded-xl p-2.5 space-y-1">
+                        <div className="flex items-center justify-between pb-1.5 px-1 border-b border-line/60 dark:border-[#2e2823] text-blue-700 dark:text-blue-400">
+                          <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                            <Compass className="w-3.5 h-3.5" />
+                            <span>沙盘推演与协同</span>
+                          </div>
+                          <span className="text-[9px] text-ink-2 dark:text-[#8e8476]">演武互动</span>
+                        </div>
+
+                        {/* Sandbox */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowSandboxModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                            <Swords className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition truncate">
+                                角色对戏演武场
+                              </span>
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-bold">NEW</span>
+                            </div>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              自主演练角色对话博弈与碰撞火花
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Map */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowMapModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20">
+                            <Compass className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition block truncate">
+                              世界地理与势力沙盘
+                            </span>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              势力疆界、地理地貌与阵营关系
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* P2P Collaboration */}
+                        <button
+                          type="button"
+                          onClick={() => { setShowCollaborationModal(true); setShowWorkshopMenu(false); }}
+                          className="w-full p-1.5 rounded-lg flex items-center gap-2.5 hover:bg-surface-3 dark:hover:bg-[#28231e] transition group text-left cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20">
+                            <Globe className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-semibold text-ink dark:text-stone-200 group-hover:text-primary dark:group-hover:text-amber-300 transition truncate">
+                                互联网 P2P 联机创作
+                              </span>
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 font-mono font-bold">P2P</span>
+                            </div>
+                            <span className="text-[10px] text-ink-2 dark:text-[#8e8476] block truncate">
+                              点对点无中继多端实时协作合著
+                            </span>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1243,17 +1468,24 @@ export const Header: React.FC = () => {
             {/* AI Assistant Right Panel Toggle */}
             <button
               onClick={() => {
-                toggleRightPanel();
-                openPanel('ai_assistant');
+                if (activeTab !== 'EDITOR') {
+                  setActiveTab('EDITOR');
+                }
+                const opened = togglePanel('ai_assistant', undefined, { preferredSide: 'right' });
+                if (opened) {
+                  toast.success('AI 写作助手已展开', '已就绪于右侧工作区，可随时提问或协助创作');
+                } else {
+                  toast.info('AI 写作助手已收起', '已收拢 AI 助手面板，留出更多创作空间');
+                }
               }}
               className={`p-1.5 rounded-lg transition shrink-0 cursor-pointer ${
-                rightPanelOpen
+                isAiAssistantOpen
                   ? 'text-primary dark:text-amber-300 bg-amber-800/10 dark:bg-amber-400/15 border border-amber-800/25 dark:border-amber-400/30 shadow-sm'
                   : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#ede6dc] hover:bg-surface-3-hover dark:hover:bg-[#282421]'
               }`}
-              title="折叠/展开 AI 写作助手面板"
+              title={isAiAssistantOpen ? '折叠收起 AI 写作助手面板' : '展开呼出 AI 写作助手面板 (右侧)'}
             >
-              {rightPanelOpen ? <PanelRightClose className="w-4 h-4 shrink-0" /> : <PanelRightOpen className="w-4 h-4 shrink-0" />}
+              {isAiAssistantOpen ? <PanelRightClose className="w-4 h-4 shrink-0" /> : <PanelRightOpen className="w-4 h-4 shrink-0" />}
             </button>
           </div>
         </div>

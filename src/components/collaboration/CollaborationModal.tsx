@@ -395,7 +395,7 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
               <div className="p-3 rounded-xl bg-stone-100/70 dark:bg-black/20 border border-stone-200 dark:border-stone-800 text-[11px] text-[#8a7f73] flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>
-                  本功能采用标准 WebRTC P2P 数据通道直连，小说正文与思考链不经任何中间业务服务器留存，完全保存在双方本地 SQLite 中。
+                  采用 WebRTC P2P 直连，小说正文与思考链不经服务器留存，仅保存在双方本地 SQLite。
                 </span>
               </div>
             </div>

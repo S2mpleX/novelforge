@@ -17,6 +17,15 @@ interface AgentInfo {
 
 const AGENTS: AgentInfo[] = [
   {
+    id: 'director_commander',
+    name: '创作指挥官 (Director Commander)',
+    role: '自然语言一键指挥与意图自主调度',
+    promptFile: 'prompts/director_commander.md',
+    status: 'READY',
+    responsibility: '零阻碍理解作家口语化自然语言指令，智能解析意图并一键调度正文创作输出',
+    temperature: 0.75,
+  },
+  {
     id: 'editor_in_chief',
     name: 'AI 主编 (Editor-in-Chief)',
     role: '宏观规划与整体风控',

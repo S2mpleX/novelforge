@@ -2367,7 +2367,7 @@ dependencies = [
 
 [[package]]
 name = "novelforge-ai"
-version = "2.7.2"
+version = "2.7.3"
 dependencies = [
  "chrono",
  "dirs 5.0.1",

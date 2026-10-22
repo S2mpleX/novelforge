@@ -11,9 +11,6 @@ import {
   RotateCcw,
   ExternalLink,
   Sliders,
-  Compass,
-  Feather,
-  Sparkles,
 } from 'lucide-react';
 
 export const WorkspaceToolbar: React.FC = () => {
@@ -66,51 +63,8 @@ export const WorkspaceToolbar: React.FC = () => {
   return (
     <>
       <div className="h-9 border-b border-line dark:border-[#2e2a27] bg-surface-2 dark:bg-[#1a1714] px-3 flex items-center justify-between text-xs select-none shrink-0 z-20 shadow-xs min-w-0">
-        {/* Left: Tri-Mode Quick Switcher & Preset Selector */}
+        {/* Left: Preset Selector & Add Panel Dropdown */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Tri-Mode Quick Switcher Capsule (极简三态化直达胶囊) */}
-          <div className="flex items-center bg-surface dark:bg-[#201d1a] p-0.5 rounded-md border border-line dark:border-[#352f2a] shadow-2xs shrink-0">
-            <button
-              type="button"
-              onClick={() => applyPreset('tri_plan')}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1 transition cursor-pointer ${
-                activePresetKey === 'tri_plan' || activePresetKey === 'world_building' || activePresetKey === 'plot_planning' || activePresetKey === 'concept_workshop'
-                  ? 'bg-emerald-800/15 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-600/30'
-                  : 'text-ink-2 hover:text-ink'
-              }`}
-              title="构思设计态 (PLAN)：大纲、沙盒演武与世界设定"
-            >
-              <Compass className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span>构思</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset('focus_writing')}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1 transition cursor-pointer ${
-                activePresetKey === 'focus_writing' || activePresetKey === 'tri_write' || activePresetKey === 'free_custom'
-                  ? 'bg-amber-800/15 text-primary dark:text-amber-300 font-bold border border-amber-800/30'
-                  : 'text-ink-2 hover:text-ink'
-              }`}
-              title="沉浸码字态 (WRITE)：目录、正文居中与AI写作助手"
-            >
-              <Feather className="w-3 h-3 text-primary dark:text-amber-400 shrink-0" />
-              <span>码字</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset('tri_polish')}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1 transition cursor-pointer ${
-                activePresetKey === 'tri_polish' || activePresetKey === 'workflow_pipeline' || activePresetKey === 'agent_collaboration'
-                  ? 'bg-blue-800/15 text-blue-700 dark:text-blue-300 font-bold border border-blue-600/30'
-                  : 'text-ink-2 hover:text-ink'
-              }`}
-              title="审稿精修态 (POLISH)：正文、审稿质检与排版清洗"
-            >
-              <Sparkles className="w-3 h-3 text-blue-600 dark:text-blue-400 shrink-0" />
-              <span>精修</span>
-            </button>
-          </div>
-
           <div className="relative shrink-0" ref={presetDropdownRef}>
             <button
               onClick={() => setShowPresetDropdown(!showPresetDropdown)}

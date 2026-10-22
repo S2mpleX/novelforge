@@ -51,13 +51,11 @@ test('Header 顶栏严密保留【沉浸写作 Zen】与【专业工坊 Studio�
   assert(headerSource.includes('LayoutGrid'), '必须具备 LayoutGrid 图标');
 });
 
-test('WorkspaceToolbar 工作区工具栏提供三态快捷切换药丸胶囊', () => {
-  assert(toolbarSource.includes('🌿 构思') || toolbarSource.includes('构思'), '工具栏包含构思快捷键');
-  assert(toolbarSource.includes('✍️ 码字') || toolbarSource.includes('码字'), '工具栏包含码字快捷键');
-  assert(toolbarSource.includes('🔍 精修') || toolbarSource.includes('精修'), '工具栏包含精修快捷键');
-  assert(toolbarSource.includes("applyPreset('tri_plan')"), '工具栏支持切换 tri_plan');
-  assert(toolbarSource.includes("applyPreset('focus_writing')"), '工具栏支持切换 focus_writing');
-  assert(toolbarSource.includes("applyPreset('tri_polish')"), '工具栏支持切换 tri_polish');
+test('WorkspaceToolbar 二级工具栏专注于工作区预设与模块扩展，不与顶栏三态胶囊重复冗余', () => {
+  assert(toolbarSource.includes('applyPreset'), '工具栏支持预设应用 applyPreset');
+  assert(toolbarSource.includes('resetToDefaultLayout'), '工具栏支持恢复布局 resetToDefaultLayout');
+  assert(toolbarSource.includes('openPanel'), '工具栏支持添加模块 openPanel');
+  assert(!toolbarSource.includes('构思设计态 (PLAN)'), '二级工具栏不再重复包含构思设计态胶囊');
 });
 
 test('workspacePresets.ts 导出三态布局与内置预设定义', () => {

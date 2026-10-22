@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
 import type {
@@ -33,6 +33,9 @@ import {
   FastForward,
   Volume2,
   VolumeX,
+  Compass,
+  Feather,
+  Users,
 } from 'lucide-react';
 import { useTypewriterStream } from '@/utils/useTypewriterStream';
 import { confirmDialog } from '@/utils/dialog';
@@ -53,6 +56,17 @@ const PROMPT_PRESETS = [
   { shortLabel: '伏笔', label: '暗埋伏笔', desc: '埋设一处隐秘线索或特殊道具细节', instruction: '在此段落中不经意间埋下一处隐秘的线索、反常的细节或神秘物品，为后文重大揭秘做好前置伏笔。' },
   { shortLabel: '交锋', label: '动作交锋', desc: '招式拆解明快凌厉，节奏紧凑冲击力强', instruction: '描写激烈紧凑的打斗/交锋过程，招式动作动词精准，节奏起伏明快，具有极强的视觉画面冲击力。' },
   { shortLabel: '钩子', label: '章末钩子', desc: '在最关键处戛然而止，制造极强追更欲', instruction: '将情节推进至关键节点，并在此处制造一个悬念钩子（Cliffhanger），给读者留下强烈的追更期待。' },
+];
+
+const QUICK_COMMANDS = [
+  { label: '🚀 顺承推向高潮', prompt: '顺承当前剧情，加快叙事节奏，将冲突推向本场戏的高潮。' },
+  { label: '🎭 激烈言语交锋', prompt: '写一段主角与对手之间暗藏杀机、步步紧逼的激烈言语试探与机锋对白。' },
+  { label: '⚡ 制造突发变故', prompt: '设计一个意料之外但符合世界观逻辑的突发变故，打破现有僵局。' },
+  { label: '🍃 文学去AI味', prompt: '将当前内容重塑，剔除所有AI套话与说教腔，增强生理微反应与动作临场感。' },
+  { label: '🎣 打造断章悬念', prompt: '为本章末尾设计一个扣人心弦的断章悬念钩子，让读者产生强烈的追读欲。' },
+  { label: '🔍 查矛盾并重写', prompt: '检查当前场景是否存在与世界观或人设的矛盾，修正逻辑漏洞并润色重塑。' },
+  { label: '👀 补充五感环境', prompt: '为当前场景丰富冰冷、压抑的物象细节与声色声效，强化沉浸式氛围烘托。' },
+  { label: '🧠 角色心理独白', prompt: '深入主角此刻的极限心理博弈，写出压抑隐忍与不为人知的暗暗权衡。' },
 ];
 
 interface StashedDraft {
@@ -77,6 +91,15 @@ const formatTextToParagraphs = (rawText: string): string => {
     .join('');
 };
 
+const ASSISTANT_TABS = [
+  { key: 'COMMANDER' as const, label: '指挥官', icon: Compass, tip: '自然语言一键指挥 Agent' },
+  { key: 'STREAM_WRITE' as const, label: '单章写作', icon: Feather, tip: '流式正文执笔与场景节拍续写' },
+  { key: 'COLLABORATE' as const, label: '协同编排', icon: Users, tip: '编剧·作家·审稿多角色协同流水线' },
+  { key: 'CONTINUITY' as const, label: '逻辑审稿', icon: ShieldCheck, tip: '世界观法则与人物因果审计' },
+  { key: 'STYLE_POLISH' as const, label: '文学润色', icon: Sparkles, tip: '消除AI味与修辞质感精修' },
+  { key: 'TOOLBOX' as const, label: '作家锦囊', icon: Bookmark, tip: '起名灵感、剧情锦囊与草稿箱' },
+];
+
 export const AiAssistantPanel: React.FC = () => {
   const {
     activeNovel,
@@ -89,8 +112,13 @@ export const AiAssistantPanel: React.FC = () => {
     creationContext,
   } = useNovelStore();
 
-  const [activeTab, setActiveTab] = useState<'STREAM_WRITE' | 'COLLABORATE' | 'CONTINUITY' | 'STYLE_POLISH' | 'TOOLBOX'>('STREAM_WRITE');
+  const [activeTab, setActiveTab] = useState<'COMMANDER' | 'STREAM_WRITE' | 'COLLABORATE' | 'CONTINUITY' | 'STYLE_POLISH' | 'TOOLBOX'>('COMMANDER');
   const [showHierarchyContext, setShowHierarchyContext] = useState(false);
+
+  // --- DIRECTOR COMMANDER AGENT STATE ---
+  const [commanderInput, setCommanderInput] = useState('');
+  const [lastExecutedCommand, setLastExecutedCommand] = useState('');
+  const [copiedCommanderProse, setCopiedCommanderProse] = useState(false);
 
   // --- TYPEWRITER STREAMING ENGINE ---
   const {
@@ -442,6 +470,90 @@ export const AiAssistantPanel: React.FC = () => {
     );
   };
 
+  // --- HANDLERS & PARSERS: DIRECTOR COMMANDER AGENT ---
+  const parsedCommanderResult = useMemo(() => {
+    const raw = fullStreamResult || streamResult || '';
+    if (!raw) return { strategy: '', prose: '' };
+
+    const strategyMarker = '【🎯 策略拆解】：';
+    const proseMarker = '【✍️ 正文创作成果】：';
+
+    if (raw.includes(proseMarker)) {
+      const parts = raw.split(proseMarker);
+      const strategyPart = parts[0].replace(strategyMarker, '').trim();
+      const prosePart = parts.slice(1).join(proseMarker).trim();
+      return { strategy: strategyPart, prose: prosePart };
+    } else if (raw.includes(strategyMarker)) {
+      return { strategy: raw.replace(strategyMarker, '').trim(), prose: '' };
+    }
+
+    return { strategy: '', prose: raw };
+  }, [fullStreamResult, streamResult]);
+
+  const handleRunCommander = async (overridePrompt?: string) => {
+    const textToRun = (overridePrompt || commanderInput).trim();
+    if (!textToRun) {
+      setStatusMessage('请输入自然语言指挥指令，或点击下方快捷建议！');
+      return;
+    }
+    if (!activeNovel || !activeChapter) {
+      setStatusMessage('请先选择或创建小说章节！');
+      return;
+    }
+
+    setIsGenerating(true);
+    resetTypewriter();
+    setLastExecutedCommand(textToRun);
+    setStatusMessage('🎯 创作指挥官 Agent 正在领会指令并构思执笔...');
+
+    const commanderInstruction = [
+      `【全能创作指挥官 Agent (Director Commander) 自然语言调度任务】：`,
+      `人类作家下达的即时指挥指令：`,
+      `“${textToRun}”`,
+      ``,
+      `【意图理解与文学创作要求】：`,
+      `1. 深入领会人类作家的真实核心诉求（续写高潮、言语交锋、增加反转、去AI味精修或逻辑补全）；`,
+      `2. 紧密结合当前小说题材（${activeNovel.genre_profile || '长篇通俗小说'} · 文风：${activeNovel.writing_style || '生动沉浸'}）与既有上下文，自主推进剧情；`,
+      `3. 严禁使用任何AI空洞套话（如“倒吸凉气”、“嘴角冷笑”、“空气凝固”）与说明文式过渡词；`,
+      `4. 输出格式结构（必须严格包含以下两部分）：`,
+      `【🎯 策略拆解】：用简明 1~2 句话点出对作者指令的领会与核心戏剧看点；`,
+      `【✍️ 正文创作成果】：输出高质量小说正文段落（段落自然换行，严禁任何闲聊废话）。`,
+    ].join('\n');
+
+    try {
+      await api.generateStreamChapter({
+        novel_id: activeNovel.id,
+        chapter_id: activeChapter.id,
+        instruction: commanderInstruction,
+        current_content: useNovelStore.getState().editorContent,
+        temperature: 0.75,
+        max_tokens: 4096,
+      });
+    } catch (e: any) {
+      setIsGenerating(false);
+      setStatusMessage(`指挥官执行失败: ${e.message || e}`);
+    }
+  };
+
+  const handleApplyCommanderProse = async (mode: 'APPEND' | 'REPLACE') => {
+    const textToApply = parsedCommanderResult.prose || fullStreamResult || streamResult;
+    if (!textToApply.trim()) return;
+
+    const formattedParagraphs = formatTextToParagraphs(textToApply);
+
+    if (mode === 'APPEND') {
+      const newContent = (useNovelStore.getState().editorContent || '') + formattedParagraphs;
+      updateEditorContent(newContent);
+      await saveCurrentChapter(true, 'AI_COMMANDER_APPEND');
+      setStatusMessage('指挥官正文已追加至章节末尾！');
+    } else {
+      if (!await confirmDialog('确定用指挥官生成的正文替换当前章节吗？（原正文已存为历史快照，可随时回退）')) return;
+      updateEditorContent(formattedParagraphs);
+      await saveCurrentChapter(true, 'AI_COMMANDER_REPLACE');
+      setStatusMessage('正文已替换并保存历史快照！');
+    }
+  };
+
   // --- HANDLERS: STREAM WRITE ---
   const handleStartGeneration = async () => {
     if (!activeNovel || !activeChapter) return;
@@ -730,27 +842,30 @@ export const AiAssistantPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center p-1.5 bg-surface-3 border-b border-line gap-1 overflow-x-auto no-scrollbar scroll-smooth">
-        {[
-          { key: 'STREAM_WRITE', label: '单章写作' },
-          { key: 'COLLABORATE', label: '协同编排' },
-          { key: 'CONTINUITY', label: '逻辑审稿' },
-          { key: 'STYLE_POLISH', label: '文学润色' },
-          { key: 'TOOLBOX', label: '作家锦囊' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            className={`flex-1 min-w-[62px] px-2 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap text-center transition-all shrink-0 ${
-              activeTab === tab.key
-                ? 'bg-[#854d0e] text-white shadow-xs'
-                : 'text-ink-2 hover:text-ink hover:bg-surface-3-hover'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Function Tabs Bar */}
+      <div className="p-1.5 sm:p-2 bg-surface-3/70 dark:bg-[#181513] border-b border-line shrink-0">
+        <div className="grid grid-cols-3 gap-1.5">
+          {ASSISTANT_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                title={tab.tip}
+                className={`flex items-center justify-center gap-1.5 py-1.5 px-1.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer select-none border ${
+                  isActive
+                    ? 'bg-amber-800 dark:bg-amber-700 text-white border-amber-900/30 dark:border-amber-600/30 shadow-2xs font-semibold'
+                    : 'bg-surface dark:bg-[#231f1c] text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-stone-100 hover:bg-surface-2 dark:hover:bg-[#2b2622] border-line/70 dark:border-[#332c25]'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-200' : 'text-ink-2 dark:text-[#8e8476]'}`} />
+                <span className="truncate">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Status Bar */}
@@ -758,6 +873,220 @@ export const AiAssistantPanel: React.FC = () => {
         <div className="px-3.5 py-2 bg-[#faecd8] border-b border-[#f0d4b2] text-[11px] text-primary flex items-center gap-2 shrink-0 animate-in fade-in">
           <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
           <span className="truncate">{statusMessage}</span>
+        </div>
+      )}
+
+      {/* TAB 0: DIRECTOR COMMANDER AGENT */}
+      {activeTab === 'COMMANDER' && (
+        <div className="flex-1 flex flex-col min-h-0 p-3 overflow-y-auto bg-surface-2/40 space-y-3">
+          {/* Agent Identity & Status */}
+          <div className="p-3 rounded-xl bg-gradient-to-r from-amber-900/10 via-amber-800/10 to-orange-800/10 border border-amber-800/25 dark:border-amber-600/30 shadow-2xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold text-xs text-primary dark:text-amber-300">
+                <Compass className="w-4 h-4 text-primary dark:text-amber-400" />
+                <span>创作指挥官 Agent (Director Commander)</span>
+              </div>
+              <span className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                在线就绪
+              </span>
+            </div>
+            <p className="text-[11px] text-ink-2 dark:text-[#a09485] leading-relaxed">
+              告别繁琐点击！直接使用<strong>自然语言</strong>下达指令，Agent 自主理解意图、统筹因果与题材人设，一键全自动执笔。
+            </p>
+            {activeChapter && (
+              <div className="text-[10px] text-primary dark:text-amber-400 font-serif flex items-center gap-1 pt-1 border-t border-amber-800/15">
+                <span>当前锚定：第 {activeChapter.chapter_number} 章《{activeChapter.title}》</span>
+              </div>
+            )}
+          </div>
+
+          {/* Natural Language Command Input Card */}
+          <div className="bg-surface border border-line rounded-xl p-3 shadow-xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-ink dark:text-stone-200 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-primary dark:text-amber-400" />
+                自然语言指令指挥区
+              </label>
+              {commanderInput && (
+                <button
+                  type="button"
+                  onClick={() => setCommanderInput('')}
+                  className="text-[10px] text-ink-2 hover:text-rose-600 cursor-pointer"
+                >
+                  清空输入
+                </button>
+              )}
+            </div>
+
+            <textarea
+              value={commanderInput}
+              onChange={(e) => setCommanderInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  handleRunCommander();
+                }
+              }}
+              rows={4}
+              placeholder="对 Agent 说出你的任意创作意图...&#10;例如：&#10;• “写一段主角潜入密室的紧张搜查，发现神秘玉简，400字左右”&#10;• “把刚才这段对话重塑得更有机锋火药味，去去AI味”&#10;• “顺承上文，突然引爆一场敌袭打破平静”"
+              className="w-full bg-surface-2 dark:bg-[#181513] border border-line dark:border-[#352f2a] rounded-lg p-2.5 text-xs text-ink dark:text-[#ede6dc] placeholder:text-ink-2/60 focus:outline-none focus:border-amber-700 font-serif leading-relaxed resize-none shadow-inner"
+            />
+
+            {/* Quick Inspiration Prompts Chips */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold text-ink-2 dark:text-[#a09485] block">
+                💡 快捷自然语言灵感指令（点击快速填入）：
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_COMMANDS.map((item, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setCommanderInput(item.prompt)}
+                    className="text-[10px] px-2 py-1 rounded-md bg-surface-2 dark:bg-[#201d19] hover:bg-amber-800/10 dark:hover:bg-amber-400/15 text-ink dark:text-stone-300 hover:text-primary dark:hover:text-amber-300 border border-line dark:border-[#332c25] transition cursor-pointer"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Submit Action */}
+            <div className="pt-1 flex items-center justify-between gap-2 border-t border-line/60">
+              <span className="text-[10px] text-ink-2 dark:text-[#8e8476] hidden sm:inline">
+                快捷键 <kbd className="px-1 py-0.5 rounded bg-surface-2 border border-line font-mono text-[9px]">Ctrl+Enter</kbd> 一键执行
+              </span>
+              <button
+                type="button"
+                onClick={() => handleRunCommander()}
+                disabled={isGenerating || !commanderInput.trim()}
+                className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 disabled:opacity-40 cursor-pointer"
+              >
+                {isGenerating ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>指挥官创作推进中...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>🚀 一键指挥 Agent 执行</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Results Stream Card */}
+          {(isGenerating || fullStreamResult || streamResult) ? (
+            <div className="space-y-3 animate-in fade-in">
+              {lastExecutedCommand && (
+                <div className="flex items-center gap-1.5 text-[11px] text-ink-2 dark:text-[#a09485] px-1">
+                  <Compass className="w-3 h-3 text-primary shrink-0" />
+                  <span className="truncate">已执行指令：“{lastExecutedCommand}”</span>
+                </div>
+              )}
+              {/* Strategy Card */}
+              {parsedCommanderResult.strategy && (
+                <div className="p-3 rounded-xl bg-amber-500/10 dark:bg-amber-400/10 border border-amber-800/20 dark:border-amber-400/25 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-primary dark:text-amber-300">
+                    <Compass className="w-3.5 h-3.5 text-primary dark:text-amber-400" />
+                    <span>指挥官意图领会与策略拆解</span>
+                  </div>
+                  <p className="text-xs text-ink dark:text-stone-300 font-serif leading-relaxed">
+                    {parsedCommanderResult.strategy}
+                  </p>
+                </div>
+              )}
+
+              {/* Prose Card */}
+              <div className="bg-surface border border-line rounded-xl p-3.5 shadow-xs space-y-2.5">
+                <div className="flex items-center justify-between pb-2 border-b border-line">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs text-ink dark:text-stone-100 flex items-center gap-1.5">
+                      <Feather className="w-3.5 h-3.5 text-primary" />
+                      正文创作成果
+                    </span>
+                    <span className="text-[10px] text-ink-2 bg-surface-2 px-1.5 py-0.2 rounded border border-line">
+                      约 {(parsedCommanderResult.prose || fullStreamResult || '').replace(/\s+/g, '').length} 字
+                    </span>
+                  </div>
+                  {isTyping && (
+                    <span className="text-[10px] text-amber-700 dark:text-amber-400 animate-pulse font-medium">
+                      ✍️ 正在打字输出...
+                    </span>
+                  )}
+                </div>
+
+                <div className="p-3.5 rounded-lg bg-surface-2/60 dark:bg-[#181513] border border-line dark:border-[#2e2a27] font-serif text-xs sm:text-[13px] leading-relaxed text-ink dark:text-stone-200 select-text whitespace-pre-wrap max-h-96 overflow-y-auto">
+                  {parsedCommanderResult.prose || fullStreamResult || streamResult || '正在准备生成正文...'}
+                </div>
+
+                {/* Prose Action Buttons */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyCommanderProse('APPEND')}
+                    disabled={isGenerating || !(parsedCommanderResult.prose || fullStreamResult)}
+                    className="py-1.5 px-2 rounded-lg bg-amber-800 hover:bg-amber-700 text-white font-semibold text-xs flex items-center justify-center gap-1 transition shadow-2xs disabled:opacity-40 cursor-pointer"
+                    title="将本段直接追加到正文末尾"
+                  >
+                    <PlusCircle className="w-3 h-3" />
+                    <span>追加到文末</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyCommanderProse('REPLACE')}
+                    disabled={isGenerating || !(parsedCommanderResult.prose || fullStreamResult)}
+                    className="py-1.5 px-2 rounded-lg bg-surface-2 dark:bg-[#28231e] hover:bg-[#ded5c4] dark:hover:bg-[#342e27] text-ink dark:text-[#ede6dc] border border-line font-medium text-xs flex items-center justify-center gap-1 transition shadow-2xs disabled:opacity-40 cursor-pointer"
+                    title="替换当前章节所有正文"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>替换正文</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const text = parsedCommanderResult.prose || fullStreamResult || streamResult;
+                      if (!text) return;
+                      await navigator.clipboard.writeText(text);
+                      setCopiedCommanderProse(true);
+                      setTimeout(() => setCopiedCommanderProse(false), 2000);
+                    }}
+                    disabled={!(parsedCommanderResult.prose || fullStreamResult)}
+                    className="py-1.5 px-2 rounded-lg bg-surface-2 dark:bg-[#28231e] hover:bg-[#ded5c4] dark:hover:bg-[#342e27] text-ink dark:text-[#ede6dc] border border-line font-medium text-xs flex items-center justify-center gap-1 transition shadow-2xs disabled:opacity-40 cursor-pointer"
+                  >
+                    {copiedCommanderProse ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedCommanderProse ? '已复制' : '复制正文'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStashCurrentDraft}
+                    disabled={!(parsedCommanderResult.prose || fullStreamResult)}
+                    className="py-1.5 px-2 rounded-lg bg-surface-2 dark:bg-[#28231e] hover:bg-[#ded5c4] dark:hover:bg-[#342e27] text-ink dark:text-[#ede6dc] border border-line font-medium text-xs flex items-center justify-center gap-1 transition shadow-2xs disabled:opacity-40 cursor-pointer"
+                    title="存入草稿箱备用"
+                  >
+                    <Bookmark className="w-3 h-3" />
+                    <span>存入草稿箱</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Empty State Guide */
+            <div className="py-10 px-4 text-center text-ink-2 dark:text-[#a09485] space-y-2 border border-dashed border-line dark:border-[#332c25] rounded-xl bg-surface/40">
+              <div className="w-10 h-10 rounded-full bg-amber-800/10 dark:bg-amber-400/10 text-primary dark:text-amber-400 flex items-center justify-center mx-auto">
+                <Compass className="w-5 h-5" />
+              </div>
+              <h4 className="font-bold text-xs text-ink dark:text-stone-200">
+                等待您的指挥指令
+              </h4>
+              <p className="text-[11px] max-w-xs mx-auto leading-relaxed">
+                无需手动点选任何参数。在上方输入任意自然语言（如：“顺承写一段对决”、“加点悬念”、“改写对话去AI味”），点击发射即可全自动执行！
+              </p>
+            </div>
+          )}
         </div>
       )}
 

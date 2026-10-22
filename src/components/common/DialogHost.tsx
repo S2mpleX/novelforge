@@ -141,34 +141,39 @@ export const DialogHost: React.FC = () => {
           />
         )}
 
-        {/* 操作按钮 */}
-        <div className="mt-5 flex items-center justify-end gap-2">
-          {cancelLabel && (
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="cursor-pointer rounded-lg border border-line bg-surface-2 px-3.5 py-1.5 font-serif text-xs font-medium text-ink-2 transition hover:bg-[#eee5d5] active:scale-95 dark:border-[#38332d] dark:bg-[#26221f] dark:text-[#a09485] dark:hover:bg-[#2d2925]"
-            >
-              {cancelLabel}
-            </button>
-          )}
-          <button
-            ref={confirmBtnRef}
-            type="button"
-            onClick={handleConfirm}
-            className={`cursor-pointer rounded-lg px-3.5 py-1.5 font-serif text-xs font-semibold text-white shadow-sm transition active:scale-95 ${
-              isDanger
-                ? 'bg-rose-600 hover:bg-rose-700'
-                : 'bg-amber-800 hover:bg-amber-700'
-            }`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
+        {/* 操作区与快捷键说明：左右两端对称平衡布局，充实左下角空间 */}
+        <div className="mt-5 flex items-center justify-between gap-3 pt-3.5 border-t border-line/50 dark:border-[#332e29]">
+          <div className="flex items-center gap-1.5 text-[11px] text-[#a89e8c] dark:text-[#7d756b] font-sans select-none">
+            <kbd className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono text-[10px] border border-line/60 dark:border-[#3d3832]">Enter</kbd>
+            <span>确认</span>
+            <span className="opacity-40">·</span>
+            <kbd className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono text-[10px] border border-line/60 dark:border-[#3d3832]">Esc</kbd>
+            <span>取消</span>
+          </div>
 
-        {/* 快捷键提示 */}
-        <div className="mt-3 text-right font-sans text-[10px] text-[#a89e8c] dark:text-[#6e685f]">
-          Enter 确认 · Esc 取消
+          <div className="flex items-center gap-2 shrink-0">
+            {cancelLabel && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="cursor-pointer rounded-xl border border-line bg-surface-2 px-3.5 py-1.5 font-serif text-xs font-medium text-ink-2 transition hover:bg-[#eee5d5] active:scale-95 dark:border-[#38332d] dark:bg-[#26221f] dark:text-[#a09485] dark:hover:bg-[#2d2925]"
+              >
+                {cancelLabel}
+              </button>
+            )}
+            <button
+              ref={confirmBtnRef}
+              type="button"
+              onClick={handleConfirm}
+              className={`cursor-pointer rounded-xl px-4 py-1.5 font-serif text-xs font-semibold text-white shadow-sm transition active:scale-95 ${
+                isDanger
+                  ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'
+                  : 'bg-amber-800 hover:bg-amber-700 shadow-amber-900/20'
+              }`}
+            >
+              {confirmLabel}
+            </button>
+          </div>
         </div>
       </div>
     </div>

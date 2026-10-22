@@ -1,7 +1,7 @@
 {
   "name": "novelforge-ai",
   "private": true,
-  "version": "2.7.2",
+  "version": "2.7.3",
   "type": "module",
   "scripts": {
     "dev": "vite",

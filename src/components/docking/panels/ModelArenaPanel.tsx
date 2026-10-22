@@ -468,7 +468,10 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             {/* Slot A Settings */}
             <div className="space-y-1.5 p-2 rounded bg-surface-2 dark:bg-[#201c18] border border-amber-800/10 dark:border-amber-500/20">
               <div className="font-bold text-primary flex items-center justify-between">
-                <span>🔴 选手 A (Slot A) 配置</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-700 shrink-0" />
+                  <span>选手 A (Slot A) 配置</span>
+                </span>
                 <span className="text-[11px] text-ink-2">发散度: {tempA}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -519,7 +522,10 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             {/* Slot B Settings */}
             <div className="space-y-1.5 p-2 rounded bg-surface-2 dark:bg-[#201c18] border border-emerald-800/10 dark:border-emerald-500/20">
               <div className="font-bold text-emerald-900 dark:text-emerald-300 flex items-center justify-between">
-                <span>🟢 选手 B (Slot B) 配置</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
+                  <span>选手 B (Slot B) 配置</span>
+                </span>
                 <span className="text-[11px] text-ink-2">发散度: {tempB}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -576,7 +582,7 @@ export const ModelArenaPanel: React.FC<ModelArenaPanelProps> = ({ onClose, isMod
             onChange={(e) => setPrompt(e.target.value)}
             rows={2}
             placeholder="输入创作指令、情节大纲或关键冲突，让两个 AI 模型同台飙戏比稿（例如：描写反派撕下伪装的震撼反转时刻，注意动作微表情）..."
-            className="w-full p-2.5 text-xs rounded-lg border border-line bg-surface dark:bg-[#1a1714] text-ink dark:text-stone-200 font-serif focus:outline-none focus:ring-1 focus:ring-amber-800 resize-none pr-32"
+            className="w-full p-2.5 text-xs rounded-lg border border-line bg-surface dark:bg-[#1a1714] text-ink dark:text-stone-200 font-serif focus:outline-none focus:ring-1 focus:ring-amber-800 resize-none pr-48"
           />
           <div className="absolute right-2 bottom-2.5 flex items-center gap-1.5 font-sans">
             <button

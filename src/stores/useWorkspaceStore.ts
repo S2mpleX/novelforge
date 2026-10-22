@@ -93,8 +93,13 @@ interface WorkspaceState {
   openPanel: (
     panelType: PanelType,
     params?: Record<string, any>,
-    options?: { asFloating?: boolean; title?: string }
+    options?: { asFloating?: boolean; title?: string; preferredSide?: 'left' | 'right' }
   ) => void;
+  togglePanel: (
+    panelType: PanelType,
+    params?: Record<string, any>,
+    options?: { preferredSide?: 'left' | 'right'; title?: string }
+  ) => boolean;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -570,11 +575,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
-    // 停靠到第一个 TabGroup 或活跃 TabGroup
-    const firstTab = findFirstTabGroup(layout.root);
-    if (firstTab) {
-      const nextRoot = addTabToGroup(layout.root, firstTab.id, newPanel);
+    // 停靠到目标 TabGroup (优先根据 preferredSide 选取，默认根据 panelType 偏向右侧或左侧)
+    const preferRight =
+      options?.preferredSide === 'right' ||
+      panelType === 'ai_assistant' ||
+      panelType === 'editor_in_chief' ||
+      panelType === 'review_report';
+
+    const targetTab = preferRight
+      ? findRightmostTabGroup(layout.root) || findFirstTabGroup(layout.root)
+      : findFirstTabGroup(layout.root);
+
+    if (targetTab) {
+      const nextRoot = addTabToGroup(layout.root, targetTab.id, newPanel);
       set({ layout: { ...layout, root: nextRoot } });
+      get().setActiveTab(targetTab.id, instanceId);
       get().saveWorkspace();
     } else {
       const nextRoot: TabGroupNode = {
@@ -585,6 +600,24 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       };
       set({ layout: { ...layout, root: nextRoot } });
       get().saveWorkspace();
+    }
+  },
+
+  togglePanel: (panelType, params, options) => {
+    const { layout } = get();
+    const instanceId = `${panelType}_${params?.id || 'main'}`;
+    const allPanels = allPanelsInTree(layout.root);
+    const existingInTree = allPanels.find((p) => p.instanceId === instanceId);
+    const existingFloating = layout.floatingPanels.find((f) => f.panel.instanceId === instanceId);
+
+    if (existingInTree || existingFloating) {
+      // 已经打开 -> 执行收起关闭
+      get().closePanel(instanceId);
+      return false;
+    } else {
+      // 未打开 -> 在对应侧边展开
+      get().openPanel(panelType, params, options);
+      return true;
     }
   },
 }));

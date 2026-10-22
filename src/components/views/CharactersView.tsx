@@ -332,40 +332,40 @@ export const CharactersView: React.FC = () => {
                             <span>AI立绘</span>
                           </button>
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-ink text-sm font-serif">{c.name}</span>
+                            <span className="font-bold text-ink text-sm font-serif truncate" title={c.name}>{c.name}</span>
                             {c.gender && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-800/10 dark:bg-amber-400/10 text-amber-900 dark:text-amber-300 border border-amber-800/20 font-sans">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-800/10 dark:bg-amber-400/10 text-amber-900 dark:text-amber-300 border border-amber-800/20 font-sans shrink-0">
                                 {c.gender}
                               </span>
                             )}
                             {c.avatar_url && (
-                              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 font-sans flex items-center gap-0.5">
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 font-sans flex items-center gap-0.5 shrink-0">
                                 <Image className="w-2.5 h-2.5" /> 立绘已配
                               </span>
                             )}
                           </div>
                           {c.aliases && (
-                            <span className="text-[11px] text-ink-2">({c.aliases})</span>
+                            <span className="text-[11px] text-ink-2 truncate block" title={c.aliases}>({c.aliases})</span>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-800/10 text-primary border border-amber-800/20 font-medium flex items-center gap-1">
+                      <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-800/10 text-primary border border-amber-800/20 font-medium flex items-center gap-1 shrink-0">
                           <UserCheck className="w-2.5 h-2.5" />
                           已激活
                         </span>
                         <button
                           onClick={() => handleStartEdit(c)}
-                          className="p-1 text-ink-2 hover:text-primary transition rounded hover:bg-surface-3 cursor-pointer"
+                          className="p-1 text-ink-2 hover:text-primary transition rounded hover:bg-surface-3 cursor-pointer shrink-0"
                           title="编辑人物档案"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteChar(c)}
-                          className="p-1 text-ink-2 hover:text-red-700 transition rounded hover:bg-surface-3 cursor-pointer"
+                          className="p-1 text-ink-2 hover:text-red-700 transition rounded hover:bg-surface-3 cursor-pointer shrink-0"
                           title="删除人物档案"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

@@ -347,7 +347,7 @@ export const SandboxImportBibleModal: React.FC<SandboxImportBibleModalProps> = (
             </select>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px] text-ink-2">
+          <div className="flex items-center gap-2 text-[11px] text-ink-2 shrink-0 whitespace-nowrap">
             <span>已载入：</span>
             <span className="font-mono text-primary font-bold">{chapters.length}</span> 章 ·
             <span className="font-mono text-primary font-bold">{worldRules.length}</span> 条铁律 ·
@@ -356,57 +356,57 @@ export const SandboxImportBibleModal: React.FC<SandboxImportBibleModalProps> = (
         </div>
 
         {/* Tabs Bar */}
-        <div className="flex border-b border-line bg-surface-2 text-xs font-serif shrink-0">
+        <div className="flex border-b border-line bg-surface-2 text-xs font-serif shrink-0 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('CHAPTERS')}
-            className={`flex-1 py-2 px-3 flex items-center justify-center gap-1.5 border-b-2 font-bold transition cursor-pointer ${
+            className={`flex-1 min-w-[140px] py-2 px-3 flex items-center justify-center gap-1.5 border-b-2 font-bold transition cursor-pointer whitespace-nowrap ${
               activeTab === 'CHAPTERS'
                 ? 'border-amber-700 text-primary bg-surface'
                 : 'border-transparent text-ink-2 hover:text-ink'
             }`}
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>1. 章节正文与目标 ({chapters.length})</span>
+            <FileText className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">1. 章节正文与目标 ({chapters.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('CANON')}
-            className={`flex-1 py-2 px-3 flex items-center justify-center gap-1.5 border-b-2 font-bold transition cursor-pointer ${
+            className={`flex-1 min-w-[140px] py-2 px-3 flex items-center justify-center gap-1.5 border-b-2 font-bold transition cursor-pointer whitespace-nowrap ${
               activeTab === 'CANON'
                 ? 'border-amber-700 text-primary bg-surface'
                 : 'border-transparent text-ink-2 hover:text-ink'
             }`}
           >
-            <Compass className="w-3.5 h-3.5" />
-            <span>2. 世界观铁律法则 ({worldRules.length})</span>
+            <Compass className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">2. 世界观铁律法则 ({worldRules.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('RELATIONS')}
-            className={`flex-1 py-2 px-3 flex items-center justify-center gap-1.5 border-b-2 font-bold transition cursor-pointer ${
+            className={`flex-1 min-w-[140px] py-2 px-3 flex items-center justify-center gap-1.5 border-b-2 font-bold transition cursor-pointer whitespace-nowrap ${
               activeTab === 'RELATIONS'
                 ? 'border-amber-700 text-primary bg-surface'
                 : 'border-transparent text-ink-2 hover:text-ink'
             }`}
           >
-            <Users className="w-3.5 h-3.5" />
-            <span>3. 角色羁绊与心境 ({relationships.length})</span>
+            <Users className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">3. 角色羁绊与心境 ({relationships.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('THREADS')}
-            className={`flex-1 py-2 px-3 flex items-center justify-center gap-1.5 border-b-2 font-bold transition cursor-pointer ${
+            className={`flex-1 min-w-[140px] py-2 px-3 flex items-center justify-center gap-1.5 border-b-2 font-bold transition cursor-pointer whitespace-nowrap ${
               activeTab === 'THREADS'
                 ? 'border-amber-700 text-primary bg-surface'
                 : 'border-transparent text-ink-2 hover:text-ink'
             }`}
           >
-            <Bookmark className="w-3.5 h-3.5" />
-            <span>4. 伏笔悬念暗线 ({plotThreads.length})</span>
+            <Bookmark className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">4. 伏笔悬念暗线 ({plotThreads.length})</span>
           </button>
         </div>
 

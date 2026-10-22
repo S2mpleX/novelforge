@@ -128,14 +128,20 @@ export const NovelSelectorDropdown: React.FC<NovelSelectorDropdownProps> = ({
           {/* 书籍信息主体 */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <span className="font-serif font-bold text-xs text-ink dark:text-[#ede6dc] truncate tracking-wide">
+              <span
+                title={activeNovel ? activeNovel.title : '未选择作品项目'}
+                className="font-serif font-bold text-xs text-ink dark:text-[#ede6dc] truncate tracking-wide"
+              >
                 {activeNovel ? activeNovel.title : '未选择作品项目'}
               </span>
             </div>
 
             <div className="flex items-center gap-1.5 mt-0.5">
               {activeNovel?.genre_profile ? (
-                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-800/10 dark:bg-amber-400/10 text-primary dark:text-amber-300 border border-amber-800/20 dark:border-amber-400/20 truncate max-w-[110px]">
+                <span
+                  title={activeNovel.genre_profile}
+                  className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-800/10 dark:bg-amber-400/10 text-primary dark:text-amber-300 border border-amber-800/20 dark:border-amber-400/20 truncate max-w-[180px]"
+                >
                   {activeNovel.genre_profile}
                 </span>
               ) : (
@@ -238,7 +244,9 @@ export const NovelSelectorDropdown: React.FC<NovelSelectorDropdownProps> = ({
 
                         <div className="flex items-center gap-2 mt-0.5 text-[10px] text-ink-2 dark:text-[#998f82]">
                           {novel.genre_profile && (
-                            <span className="truncate max-w-[120px]">{novel.genre_profile}</span>
+                            <span title={novel.genre_profile} className="truncate max-w-[180px]">
+                              {novel.genre_profile}
+                            </span>
                           )}
                           {novel.total_word_count !== undefined && (
                             <span className="font-mono">

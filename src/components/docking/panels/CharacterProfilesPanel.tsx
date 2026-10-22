@@ -372,16 +372,16 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
   return (
     <div className="flex flex-col h-full w-full bg-canvas text-ink text-xs overflow-hidden select-none font-sans">
       {/* 顶部主工具栏与视图切换 */}
-      <div className="p-2 border-b border-line bg-surface-2 flex items-center justify-between shrink-0 gap-2 min-w-0">
+      <div className="p-2 border-b border-line dark:border-[#2e2a27] bg-surface-2 dark:bg-[#1a1714] flex items-center justify-between shrink-0 gap-2 min-w-0">
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           {/* 模式切换胶囊 */}
-          <div className="flex items-center bg-[#ded5c4]/60 p-0.5 rounded-lg border border-line shrink-0">
+          <div className="flex items-center bg-[#ded5c4]/60 dark:bg-[#201d1a] p-0.5 rounded-lg border border-line dark:border-[#352f2a] shrink-0">
             <button
               onClick={() => setActiveTab('tracking')}
               className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === 'tracking'
                   ? 'bg-amber-800 text-white shadow-xs'
-                  : 'text-ink-2 hover:text-ink'
+                  : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#f3eee7]'
               }`}
             >
               <HeartPulse className="w-3.5 h-3.5 shrink-0" />
@@ -392,7 +392,7 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
               className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === 'profiles'
                   ? 'bg-amber-800 text-white shadow-xs'
-                  : 'text-ink-2 hover:text-ink'
+                  : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#f3eee7]'
               }`}
             >
               <Users className="w-3.5 h-3.5 shrink-0" />
@@ -400,14 +400,14 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
             </button>
           </div>
 
-          <span className="text-[11px] text-ink-2 hidden md:inline shrink-0 whitespace-nowrap">
+          <span className="text-[11px] text-ink-2 dark:text-[#a09485] hidden md:inline shrink-0 whitespace-nowrap">
             共 {characters.length} 位角色
           </span>
         </div>
 
         <button
           onClick={handleStartAdd}
-          className="px-2.5 py-1 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium transition flex items-center gap-1 shadow-xs text-[11px] shrink-0 whitespace-nowrap"
+          className="px-2.5 py-1 rounded bg-amber-800 text-white hover:bg-amber-700 font-medium transition flex items-center gap-1 shadow-xs text-[11px] shrink-0 whitespace-nowrap cursor-pointer"
         >
           <Plus className="w-3 h-3 shrink-0" />
           新建角色
@@ -416,20 +416,20 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
 
       {/* 出场追踪模式下的状态筛选与防复活安全锁 */}
       {activeTab === 'tracking' && (
-        <div className="border-b border-line bg-[#fbf9f5] px-3 py-2 space-y-2 shrink-0">
+        <div className="border-b border-line dark:border-[#2e2a27] bg-[#fbf9f5] dark:bg-[#1a1715] px-3 py-2 space-y-2 shrink-0">
           {/* 状态统计药丸 */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-ink-2 mr-1 flex items-center gap-1 font-medium">
+            <span className="text-[11px] text-ink-2 dark:text-[#a09485] mr-1 flex items-center gap-1 font-medium">
               <Filter className="w-3 h-3" /> 状态筛选:
             </span>
             {(['全部', '健康', '受伤', '闭关', '离场', '死亡'] as const).map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
-                className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition border ${
+                className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition border cursor-pointer ${
                   statusFilter === st
                     ? 'bg-amber-800 text-white border-amber-800 shadow-2xs'
-                    : 'bg-white border-line text-ink-2 hover:border-amber-700'
+                    : 'bg-surface dark:bg-[#25211e] border-line dark:border-[#38332d] text-ink-2 dark:text-[#a09485] hover:border-amber-700 hover:text-ink dark:hover:text-[#f3eee7]'
                 }`}
               >
                 {st === '全部' ? '全部' : getStatusDisplayName(st, activeNovel?.genre_profile || (activeNovel as any)?.genre)} ({counts[st]})
@@ -439,9 +439,9 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
 
           {/* 防死人复活安全提示条 */}
           {deceasedList.length > 0 && (
-            <div className="px-2.5 py-1 rounded-md bg-red-50 border border-red-200 text-red-800 flex items-center justify-between text-[11px]">
+            <div className="px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-800 dark:text-red-300 flex items-center justify-between text-[11px]">
               <div className="flex items-center gap-1.5">
-                <Skull className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                <Skull className="w-3.5 h-3.5 text-red-600 dark:text-red-400 shrink-0" />
                 <span>
                   <strong>因果锁已就绪：</strong>已确认陨落角色 ({deceasedList.map((d) => d.name).join('、')})，严防 AI 在后续章节擅自复活！
                 </span>
@@ -474,19 +474,19 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
           </div>
         ) : activeTab === 'tracking' ? (
           /* 出场生存追踪看板视图 (Tracking Board) */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 auto-rows-max">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3 auto-rows-max">
             {filtered.map((char) => {
               const curStatus = getNormalizedStatus(char.status);
               const conf = STATUS_CONFIG[curStatus];
               return (
                 <div
                   key={char.id}
-                  className="bg-surface border border-line rounded-xl p-3 shadow-xs hover:border-amber-700/60 transition flex flex-col justify-between"
+                  className="bg-surface border border-line rounded-xl p-3 shadow-xs hover:border-amber-700/60 transition flex flex-col justify-between overflow-hidden"
                 >
                   <div>
                     {/* 卡片头部：姓名与生存状态选择 */}
-                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-line">
-                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <div className="flex items-start justify-between gap-2 pb-2 mb-2 border-b border-line">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <div className="relative group shrink-0">
                           {char.avatar_url ? (
                             <img
@@ -521,9 +521,9 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                             <span>AI立绘</span>
                           </button>
                         </div>
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-sm text-primary truncate">{char.name}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-primary truncate" title={char.name}>{char.name}</span>
                             {char.gender && (
                               <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-sans shrink-0">
                                 {char.gender}
@@ -531,7 +531,7 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                             )}
                           </div>
                           {char.aliases && (
-                            <span className="text-[10px] text-ink-2 font-serif truncate max-w-[80px] block">
+                            <span className="text-[10px] text-ink-2 font-serif truncate block mt-0.5" title={char.aliases}>
                               ({char.aliases})
                             </span>
                           )}
@@ -550,13 +550,13 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                           backgroundColor: conf.bg,
                           borderColor: conf.border,
                         }}
-                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer outline-none transition"
+                        className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full border cursor-pointer outline-none transition shrink-0 max-w-[125px] truncate text-center"
                       >
-                        <option value="健康">🟢 {getStatusDisplayName('健康', activeNovel?.genre_profile)}</option>
-                        <option value="受伤">🟠 {getStatusDisplayName('受伤', activeNovel?.genre_profile)}</option>
-                        <option value="闭关">🔵 {getStatusDisplayName('闭关', activeNovel?.genre_profile)}</option>
-                        <option value="离场">⚪ {getStatusDisplayName('离场', activeNovel?.genre_profile)}</option>
-                        <option value="死亡">🔴 {getStatusDisplayName('死亡', activeNovel?.genre_profile)}</option>
+                        <option value="健康">{getStatusDisplayName('健康', activeNovel?.genre_profile)}</option>
+                        <option value="受伤">{getStatusDisplayName('受伤', activeNovel?.genre_profile)}</option>
+                        <option value="闭关">{getStatusDisplayName('闭关', activeNovel?.genre_profile)}</option>
+                        <option value="离场">{getStatusDisplayName('离场', activeNovel?.genre_profile)}</option>
+                        <option value="死亡">{getStatusDisplayName('死亡', activeNovel?.genre_profile)}</option>
                       </select>
                     </div>
 
@@ -584,26 +584,26 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                   </div>
 
                   {/* 快捷操作与最近更新提示 */}
-                  <div className="mt-2.5 pt-2 border-t border-line flex items-center justify-between text-[10px] text-ink-2">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-primary/60" />
-                      动态追踪已激活
+                  <div className="mt-2.5 pt-2 border-t border-line flex items-center justify-between text-[10px] text-ink-2 gap-2">
+                    <span className="flex items-center gap-1 shrink-0 whitespace-nowrap text-ink-2">
+                      <Clock className="w-3 h-3 text-primary/60 shrink-0" />
+                      <span>动态追踪已激活</span>
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
                       <button
                         onClick={() => handleStartEdit(char)}
-                        className="text-primary hover:text-amber-700 font-medium flex items-center gap-0.5 cursor-pointer"
+                        className="text-primary hover:text-amber-700 font-medium flex items-center gap-0.5 cursor-pointer whitespace-nowrap"
                         title="编辑人物档案"
                       >
-                        <Edit3 className="w-3 h-3" />
+                        <Edit3 className="w-3 h-3 shrink-0" />
                         编辑
                       </button>
                       <button
                         onClick={() => handleDeleteCharacter(char)}
-                        className="text-red-700 hover:text-red-800 font-medium flex items-center gap-0.5 cursor-pointer"
+                        className="text-red-700 hover:text-red-800 font-medium flex items-center gap-0.5 cursor-pointer whitespace-nowrap"
                         title="删除人物档案"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-3 h-3 shrink-0" />
                         删除
                       </button>
                     </div>
@@ -614,7 +614,7 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
           </div>
         ) : (
           /* 传统人物档案卡视图 (Profiles Grid) */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 auto-rows-max">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3 auto-rows-max">
             {filtered.map((char) => {
               const curStatus = getNormalizedStatus(char.status);
               const conf = STATUS_CONFIG[curStatus];
@@ -622,15 +622,15 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                 <div
                   key={char.id}
                   onClick={() => setSelectedCharacter(char)}
-                  className={`bg-surface border rounded-lg p-3 transition shadow-xs flex flex-col justify-between cursor-pointer ${
+                  className={`bg-surface border rounded-lg p-3 transition shadow-xs flex flex-col justify-between cursor-pointer overflow-hidden ${
                     selectedCharacter?.id === char.id
                       ? 'border-amber-800 ring-1 ring-amber-800/40'
                       : 'border-line hover:border-amber-800/40'
                   }`}
                 >
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <div className="flex items-start justify-between gap-2 mb-1.5 pb-2 border-b border-line/40">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <div className="relative group shrink-0">
                           {char.avatar_url ? (
                             <img
@@ -665,9 +665,9 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                             <span>AI立绘</span>
                           </button>
                         </div>
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-sm text-primary">{char.name}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-primary truncate" title={char.name}>{char.name}</span>
                             {char.gender && (
                               <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-sans shrink-0">
                                 {char.gender}
@@ -675,16 +675,16 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                             )}
                           </div>
                           {char.aliases && (
-                            <span className="text-[10px] text-ink-2 font-serif block truncate max-w-[80px]">
+                            <span className="text-[10px] text-ink-2 font-serif block truncate mt-0.5" title={char.aliases}>
                               （{char.aliases}）
                             </span>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
                         <span
                           style={{ color: conf.color, backgroundColor: conf.bg, borderColor: conf.border }}
-                          className="px-1.5 py-0.2 rounded text-[10px] border font-medium"
+                          className="px-1.5 py-0.2 rounded text-[10px] border font-medium shrink-0"
                         >
                           {curStatus}
                         </span>
@@ -693,20 +693,20 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                             e.stopPropagation();
                             handleStartEdit(char);
                           }}
-                          className="p-1 text-ink-2 hover:text-primary transition rounded hover:bg-surface-3 cursor-pointer"
+                          className="p-1 text-ink-2 hover:text-primary transition rounded hover:bg-surface-3 cursor-pointer shrink-0"
                           title="编辑人物档案"
                         >
-                          <Edit3 className="w-3 h-3" />
+                          <Edit3 className="w-3 h-3 shrink-0" />
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteCharacter(char);
                           }}
-                          className="p-1 text-ink-2 hover:text-red-700 transition rounded hover:bg-surface-3 cursor-pointer"
+                          className="p-1 text-ink-2 hover:text-red-700 transition rounded hover:bg-surface-3 cursor-pointer shrink-0"
                           title="删除人物档案"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3 h-3 shrink-0" />
                         </button>
                       </div>
                     </div>
@@ -894,11 +894,11 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                     onChange={(e) => setCharInitialStatus(e.target.value as CharacterLifeStatus)}
                     className="w-full bg-surface border border-line rounded px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
                   >
-                    <option value="健康">🟢 {getStatusDisplayName('健康', activeNovel?.genre_profile)}</option>
-                    <option value="受伤">🟠 {getStatusDisplayName('受伤', activeNovel?.genre_profile)}</option>
-                    <option value="闭关">🔵 {getStatusDisplayName('闭关', activeNovel?.genre_profile)}</option>
-                    <option value="离场">⚪ {getStatusDisplayName('离场', activeNovel?.genre_profile)}</option>
-                    <option value="死亡">🔴 {getStatusDisplayName('死亡', activeNovel?.genre_profile)}</option>
+                    <option value="健康">{getStatusDisplayName('健康', activeNovel?.genre_profile)}</option>
+                    <option value="受伤">{getStatusDisplayName('受伤', activeNovel?.genre_profile)}</option>
+                    <option value="闭关">{getStatusDisplayName('闭关', activeNovel?.genre_profile)}</option>
+                    <option value="离场">{getStatusDisplayName('离场', activeNovel?.genre_profile)}</option>
+                    <option value="死亡">{getStatusDisplayName('死亡', activeNovel?.genre_profile)}</option>
                   </select>
                 </div>
               </div>

@@ -247,14 +247,14 @@ export const VoiceSentinelDrawer: React.FC<VoiceSentinelDrawerProps> = ({
                 </div>
 
                 {/* 诊断原因与替换建议 */}
-                <div className="flex items-center justify-between font-sans text-[11px] pt-1">
-                  <span className="text-[#8c8275] dark:text-[#9e9587] truncate max-w-xs">
+                <div className="flex items-center justify-between font-sans text-[11px] pt-1 gap-2 min-w-0">
+                  <span className="text-[#8c8275] dark:text-[#9e9587] truncate min-w-0 flex-1" title={issue.reason}>
                     {issue.reason}
                   </span>
 
                   {issue.replacement && (
-                    <div className="flex items-center gap-1 text-emerald-800 dark:text-emerald-400 font-bold">
-                      <ArrowRight className="w-3 h-3 text-stone-400" />
+                    <div className="flex items-center gap-1 text-emerald-800 dark:text-emerald-400 font-bold shrink-0 whitespace-nowrap">
+                      <ArrowRight className="w-3 h-3 text-stone-400 shrink-0" />
                       <span>建议换为：{issue.replacement}</span>
                     </div>
                   )}

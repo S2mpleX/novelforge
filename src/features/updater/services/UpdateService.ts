@@ -7,7 +7,7 @@ import type {
 } from '../types';
 
 // 当前应用客户端内置版本号（与 package.json / Cargo.toml 同步）
-export const APP_CURRENT_VERSION = '2.7.2';
+export const APP_CURRENT_VERSION = '2.7.3';
 
 // 官方发布端点与仓库配置
 export const REPO_OWNER = 'S2mpleX';

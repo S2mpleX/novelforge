@@ -173,8 +173,8 @@ export const ToolboxPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* 专项快捷标签 */}
-      <div className="p-2 border-b border-border/40 grid grid-cols-4 gap-1 bg-background/50">
+      {/* 专项快捷标签：窄面板 2 列自适应，避免文本强行截断 */}
+      <div className="p-2 border-b border-border/40 grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-background/50">
         {QUICK_TOOLS.map((t) => (
           <button
             key={t.type}

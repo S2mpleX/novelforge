@@ -431,6 +431,20 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
       }
     };
     loadData();
+
+    // 跨面板实时热同步：监听小说全局设定与角色档案变动事件
+    const handleReloadStoryBible = async () => {
+      try {
+        const chars = await api.listCharacters(activeNovel.id);
+        setCharacters(chars);
+      } catch (e) {
+        console.error('演武沙盒热同步角色列表失败:', e);
+      }
+    };
+    window.addEventListener('novelforge:reload-story-bible', handleReloadStoryBible);
+    return () => {
+      window.removeEventListener('novelforge:reload-story-bible', handleReloadStoryBible);
+    };
   }, [activeNovel?.id]);
 
   // 智能滚动处理：使用 requestAnimationFrame 防抖节流，且仅在视角布尔状态翻转时触发重绘
@@ -2258,7 +2272,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                   <span>多模型分工</span>
                 </button>
 
-                {availableCharacters.length > 0 && (
+                {characters.length > 0 && (
                   <select
                     onChange={(e) => {
                       if (e.target.value) {
@@ -2266,17 +2280,23 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                         e.target.value = '';
                       }
                     }}
-                    defaultValue=""
-                    className="text-[11px] px-2 py-1 rounded border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#141210] text-[#5c5044] dark:text-[#c4baa8] outline-none cursor-pointer"
+                    value=""
+                    className="text-[11px] px-2 py-1 rounded border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#141210] text-[#5c5044] dark:text-[#c4baa8] outline-none cursor-pointer max-w-[170px] truncate"
+                    title="从右侧小说角色档案中挑选角色入场"
                   >
                     <option value="" disabled>
-                      + 挑选小说角色...
+                      {availableCharacters.length > 0
+                        ? `+ 挑选小说角色 (${availableCharacters.length}人待出场)...`
+                        : `全员已出场 (${characters.length}/${characters.length})`}
                     </option>
-                    {availableCharacters.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.gender ? `(${c.gender})` : ''}
-                      </option>
-                    ))}
+                    {characters.map((c) => {
+                      const isAlreadyIn = actors.some((a) => a.character_id === c.id);
+                      return (
+                        <option key={c.id} value={c.id} disabled={isAlreadyIn}>
+                          {c.name} {c.gender ? `(${c.gender})` : ''} {isAlreadyIn ? ' [已在场]' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 )}
               </div>
@@ -2713,20 +2733,20 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   return (
     <div className="w-full h-full flex flex-col bg-[#fdfbf7] dark:bg-[#181614] text-[#2c2621] dark:text-[#e8e2d8] select-none overflow-hidden font-sans">
       {/* 顶栏 (单行防挤压、防折行排版架构，实体背景消除滚动掉帧) */}
-      <div className="h-14 px-3 sm:px-4 border-b border-[#e6decc] dark:border-[#2d2824] bg-[#f7f2e7] dark:bg-[#201c19] flex items-center justify-between shrink-0 z-10 min-w-0">
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 mr-2">
+      <div className="h-14 px-3 sm:px-4 border-b border-[#e6decc] dark:border-[#2d2824] bg-[#f7f2e7] dark:bg-[#201c19] flex items-center justify-between shrink-0 z-10 min-w-0 gap-2 overflow-hidden">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 overflow-hidden">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-600/15 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shadow-xs shrink-0">
             <Swords className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
           </div>
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
             <h2 className="font-serif font-bold text-sm sm:text-base tracking-wide whitespace-nowrap shrink-0">角色对戏演武场</h2>
             
-            {/* 会话切换器下拉 */}
-            <div className="relative shrink-0 max-w-[130px] sm:max-w-[170px]">
+            {/* 会话切换器下拉：弹性自适应防重叠 */}
+            <div className="relative min-w-0 max-w-[120px] sm:max-w-[150px] shrink">
               <button
                 onClick={() => setShowSessionDropdown(!showSessionDropdown)}
                 className="flex items-center justify-between gap-1.5 px-2 py-1 text-xs rounded-lg border border-[#e0d6c3] dark:border-[#38312a] bg-white dark:bg-[#201c19] hover:bg-amber-50 dark:hover:bg-amber-950/20 font-medium transition-colors w-full min-w-0 overflow-hidden"
-                title="切换或新建对戏沙盒"
+                title={sessionTitle || '选择对戏会话'}
               >
                 <span className="truncate text-amber-900 dark:text-amber-300">
                   {sessionTitle || '选择对戏会话'}
@@ -2833,7 +2853,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
             title="打开灵感火花盒，查看提炼的金句、微动作、心理暗流与反转线索"
           >
             <Lightbulb className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="hidden lg:inline">灵感盒</span>
+            <span className="hidden xl:inline">灵感盒</span>
             {inspirationNotes.length > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold shrink-0">
                 {inspirationNotes.length}
@@ -2853,7 +2873,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
               title={showPrivateThoughts ? '当前：显示内心算盘独白' : '当前：隐藏内心独白'}
             >
               {showPrivateThoughts ? <Eye className="w-3.5 h-3.5 text-amber-600 shrink-0" /> : <EyeOff className="w-3.5 h-3.5 shrink-0" />}
-              <span className="hidden md:inline">内心戏</span>
+              <span className="hidden xl:inline">内心戏</span>
             </button>
             <button
               onClick={() => setShowSubtext(!showSubtext)}
@@ -2865,7 +2885,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
               title={showSubtext ? '当前：开启潜台词透视' : '当前：关闭潜台词透视'}
             >
               <MessageCircle className={`w-3.5 h-3.5 shrink-0 ${showSubtext ? 'text-purple-600' : ''}`} />
-              <span className="hidden md:inline">潜台词</span>
+              <span className="hidden xl:inline">潜台词</span>
             </button>
           </div>
 

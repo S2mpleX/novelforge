@@ -281,7 +281,7 @@ export const VoiceProfilePanel: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="如：悬疑冷冽·硬派电影感"
-                  className="w-full px-2.5 py-1 text-xs rounded border border-line bg-white focus:outline-none focus:ring-1 focus:ring-amber-800"
+                  className="w-full px-2.5 py-1 text-xs rounded border border-line bg-surface text-ink focus:outline-none focus:ring-1 focus:ring-amber-800"
                 />
               </div>
 
@@ -292,7 +292,7 @@ export const VoiceProfilePanel: React.FC = () => {
                   value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="简述该文风的核心调性、适合的场景类型"
-                  className="w-full px-2.5 py-1 text-xs rounded border border-line bg-white focus:outline-none focus:ring-1 focus:ring-amber-800"
+                  className="w-full px-2.5 py-1 text-xs rounded border border-line bg-surface text-ink focus:outline-none focus:ring-1 focus:ring-amber-800"
                 />
               </div>
 
@@ -302,7 +302,7 @@ export const VoiceProfilePanel: React.FC = () => {
                   <select
                     value={formData.sentence_rhythm || 'BALANCED'}
                     onChange={(e) => setFormData({ ...formData, sentence_rhythm: e.target.value })}
-                    className="w-full px-2 py-1 text-xs rounded border border-line bg-white"
+                    className="w-full px-2 py-1 text-xs rounded border border-line bg-surface text-ink"
                   >
                     <option value="FAST_PACED">爽利短句 (快节奏冲突)</option>
                     <option value="BALANCED">平缓均衡 (标准长篇叙事)</option>
@@ -315,7 +315,7 @@ export const VoiceProfilePanel: React.FC = () => {
                   <select
                     value={formData.vocabulary_tone || 'CLASSICAL_MODERN'}
                     onChange={(e) => setFormData({ ...formData, vocabulary_tone: e.target.value })}
-                    className="w-full px-2 py-1 text-xs rounded border border-line bg-white"
+                    className="w-full px-2 py-1 text-xs rounded border border-line bg-surface text-ink"
                   >
                     <option value="CLASSICAL_MODERN">文白相衬 (典雅修真/历史)</option>
                     <option value="CASUAL_MODERN">通俗利落 (都市爽文/异能)</option>
@@ -331,7 +331,7 @@ export const VoiceProfilePanel: React.FC = () => {
                   <select
                     value={formData.pov_preference || 'THIRD_LIMITED'}
                     onChange={(e) => setFormData({ ...formData, pov_preference: e.target.value })}
-                    className="w-full px-2 py-1 text-xs rounded border border-line bg-white"
+                    className="w-full px-2 py-1 text-xs rounded border border-line bg-surface text-ink"
                   >
                     <option value="THIRD_LIMITED">第三人称限制视角 (贴合主角心智)</option>
                     <option value="THIRD_OMNISCIENT">第三人称全知上帝视角</option>
@@ -343,7 +343,7 @@ export const VoiceProfilePanel: React.FC = () => {
                   <select
                     value={formData.sensory_ratio || 'BALANCED'}
                     onChange={(e) => setFormData({ ...formData, sensory_ratio: e.target.value })}
-                    className="w-full px-2 py-1 text-xs rounded border border-line bg-white"
+                    className="w-full px-2 py-1 text-xs rounded border border-line bg-surface text-ink"
                   >
                     <option value="BALANCED">视听均衡 (标准叙事)</option>
                     <option value="ACTION_CENTRIC">动作导向 (突出速度与冲击)</option>
@@ -359,7 +359,7 @@ export const VoiceProfilePanel: React.FC = () => {
                   value={formData.sample_text || ''}
                   onChange={(e) => setFormData({ ...formData, sample_text: e.target.value })}
                   placeholder="粘贴 100~300 字体现该文风语调与节奏的精选正文段落..."
-                  className="w-full p-2 text-xs rounded border border-line bg-white font-serif focus:outline-none focus:ring-1 focus:ring-amber-800"
+                  className="w-full p-2 text-xs rounded border border-line bg-surface text-ink font-serif focus:outline-none focus:ring-1 focus:ring-amber-800"
                 />
               </div>
 
@@ -473,19 +473,19 @@ export const VoiceProfilePanel: React.FC = () => {
 
               {/* 核心参数指标 */}
               <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="p-2 rounded bg-white border border-line">
+                <div className="p-2 rounded bg-surface border border-line">
                   <span className="text-ink-2">句式节奏：</span>
                   <span className="font-bold text-ink-2 ml-1">{selectedProfile.sentence_rhythm}</span>
                 </div>
-                <div className="p-2 rounded bg-white border border-line">
+                <div className="p-2 rounded bg-surface border border-line">
                   <span className="text-ink-2">词汇语调：</span>
                   <span className="font-bold text-ink-2 ml-1">{selectedProfile.vocabulary_tone}</span>
                 </div>
-                <div className="p-2 rounded bg-white border border-line">
+                <div className="p-2 rounded bg-surface border border-line">
                   <span className="text-ink-2">叙事视角：</span>
                   <span className="font-bold text-ink-2 ml-1">{selectedProfile.pov_preference}</span>
                 </div>
-                <div className="p-2 rounded bg-white border border-line">
+                <div className="p-2 rounded bg-surface border border-line">
                   <span className="text-ink-2">感官配比：</span>
                   <span className="font-bold text-ink-2 ml-1">{selectedProfile.sensory_ratio}</span>
                 </div>
@@ -495,7 +495,7 @@ export const VoiceProfilePanel: React.FC = () => {
               {selectedProfile.sample_text && (
                 <div className="space-y-1">
                   <span className="font-bold text-xs text-ink-2">代表性样例文本：</span>
-                  <div className="p-3 rounded-lg bg-white border border-line font-serif text-xs text-ink leading-relaxed italic">
+                  <div className="p-3 rounded-lg bg-surface border border-line font-serif text-xs text-ink leading-relaxed italic">
                     “{selectedProfile.sample_text}”
                   </div>
                 </div>

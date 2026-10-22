@@ -222,7 +222,7 @@ export const NovelInfoPanel: React.FC = () => {
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full bg-white border border-line rounded-lg px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
+                  className="w-full bg-surface border border-line rounded-lg px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
                   placeholder="如：星海沉浮录"
                 />
               </div>
@@ -236,7 +236,7 @@ export const NovelInfoPanel: React.FC = () => {
                     type="text"
                     value={editGenre}
                     onChange={(e) => setEditGenre(e.target.value)}
-                    className="w-full bg-white border border-line rounded-lg px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
+                    className="w-full bg-surface border border-line rounded-lg px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
                     placeholder="如：硬核科幻 / 仙侠修真"
                   />
                 </div>
@@ -248,7 +248,7 @@ export const NovelInfoPanel: React.FC = () => {
                     type="text"
                     value={editStyle}
                     onChange={(e) => setEditStyle(e.target.value)}
-                    className="w-full bg-white border border-line rounded-lg px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
+                    className="w-full bg-surface border border-line rounded-lg px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-amber-700"
                     placeholder="如：冷峻克制 / 宏大叙事"
                   />
                 </div>
@@ -262,7 +262,7 @@ export const NovelInfoPanel: React.FC = () => {
                   rows={4}
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
-                  className="w-full bg-white border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-none focus:border-amber-700 font-serif leading-relaxed"
+                  className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-none focus:border-amber-700 font-serif leading-relaxed"
                   placeholder="简述故事核心矛盾、主要人物与世界背景..."
                 />
               </div>

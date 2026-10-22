@@ -229,7 +229,7 @@ export const TypesetterCleanerPanel: React.FC = () => {
 
       {/* 高级规则配置折叠面板 */}
       {showAdvanced && (
-        <div className="p-3 border-b border-stone-200 dark:border-stone-800 bg-stone-50/80 dark:bg-stone-900/40 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div className="p-3 border-b border-stone-200 dark:border-stone-800 bg-stone-50/80 dark:bg-stone-900/40 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"

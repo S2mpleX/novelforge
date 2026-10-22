@@ -324,7 +324,7 @@ export const ReviewReportPanel: React.FC = () => {
                                   setEditedDrafts((prev) => ({ ...prev, [f.id]: e.target.value }))
                                 }
                                 rows={3}
-                                className="w-full p-2 text-xs rounded border border-amber-800/30 bg-white font-serif focus:outline-none focus:ring-1 focus:ring-amber-800"
+                                className="w-full p-2 text-xs rounded border border-amber-800/30 bg-surface dark:bg-[#1f1c19] text-ink font-serif focus:outline-none focus:ring-1 focus:ring-amber-800"
                               />
                             ) : (
                               <InlineDiffViewer
