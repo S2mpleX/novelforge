@@ -240,7 +240,7 @@ export const SerializationModal: React.FC<SerializationModalProps> = ({ onClose 
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-surface">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 bg-surface">
           {/* Active Novel Summary */}
           {activeNovel ? (
             <div className="bg-surface p-4 rounded-xl border border-line flex items-center justify-between shadow-2xs">

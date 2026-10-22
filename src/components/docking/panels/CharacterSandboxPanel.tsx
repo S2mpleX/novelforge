@@ -3,6 +3,9 @@ import { useNovelStore } from '@/stores/useNovelStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useToastStore } from '@/stores/useToastStore';
 import { api } from '@/utils/tauriBridge';
+import { confirmDialog } from '@/utils/dialog';
+import { CharacterAvatarModal } from '@/components/modals/CharacterAvatarModal';
+import { optimizeImageFileToDataUrl } from '@/utils/imageOptimizer';
 import type {
   Character,
   AiProvider,
@@ -29,7 +32,6 @@ import {
   MessageSquare,
   BookOpen,
   Copy,
-  Settings2,
   FileText,
   Send,
   X,
@@ -53,6 +55,11 @@ import {
   Image,
   Upload,
   Loader2,
+  Split,
+  Dices,
+  GitCompare,
+  Pin,
+  ArrowRight,
 } from 'lucide-react';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 const CollaborationModal = lazy(() => import('@/components/collaboration/CollaborationModal').then(m => ({ default: m.CollaborationModal })));
@@ -233,17 +240,26 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   // 💬 潜台词透视状态
   const [showSubtext, setShowSubtext] = useState(true);
 
-  // 运行控制
+  // 运行控制与暂停/中断机制
   const [isRunning, setIsRunning] = useState(false);
   const isRunningRef = useRef(false);
+  const [isStepping, setIsStepping] = useState(false);
+  const isSteppingRef = useRef(false);
+  const cancelRequestedRef = useRef(false);
+  const currentStepSessionIdRef = useRef<string | null>(null);
+  const currentStepHistoryBeforeRef = useRef<DialogueRoundRecord[]>([]);
   const [autoRunRoundsRemaining, setAutoRunRoundsRemaining] = useState(0);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [synthesizedProse, setSynthesizedProse] = useState('');
-  const [showConfig, setShowConfig] = useState(true);
+  // 🎭 剧本与角色阵容设定抽屉及分界面状态 (Drawer & Sub-interfaces)
+  const [showConfigDrawer, setShowConfigDrawer] = useState(false);
+  const [configDrawerTab, setConfigDrawerTab] = useState<'actors' | 'scene' | 'presets'>('actors');
+  const [isConfigDrawerPinned, setIsConfigDrawerPinned] = useState(false);
   const [showSynthesizedModal, setShowSynthesizedModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const [showSpeakerPicker, setShowSpeakerPicker] = useState(false);
+  const [showInterveneMenu, setShowInterveneMenu] = useState(false);
   const [isImportingDemo, setIsImportingDemo] = useState(false);
   const [showCollabModal, setShowCollabModal] = useState(false);
   const [showImportBibleModal, setShowImportBibleModal] = useState(false);
@@ -263,10 +279,35 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   const [probeSpeakerName, setProbeSpeakerName] = useState('');
   const [customActionGuidance, setCustomActionGuidance] = useState('');
 
-  // ✍️ 高光文段精修打磨状态
-  const [polishingStyle, setPolishingStyle] = useState<'CINEMATIC' | 'PSYCHOLOGICAL' | 'HARDCORE_TENSE'>('CINEMATIC');
-  const [polishingRange, setPolishingRange] = useState<'ALL' | 'RECENT_3'>('ALL');
+  // ✍️ 高光文段精修打磨状态 (Highlight Prose Polishing Studio)
+  const [polishingStyle, setPolishingStyle] = useState<
+    'CINEMATIC' | 'PSYCHOLOGICAL' | 'HARDCORE_TENSE' | 'CLASSICAL_ELEGANT' | 'DARK_HUMOR_IRONY'
+  >('CINEMATIC');
+  const [polishingRange, setPolishingRange] = useState<'FOCUSED_ROUND' | 'RECENT_3' | 'ALL'>('ALL');
+  const [polishingPov, setPolishingPov] = useState<'THIRD_LIMITED' | 'THIRD_OMNISCIENT' | 'FIRST_PERSON'>('THIRD_LIMITED');
+  const [polishingAnchorIndex, setPolishingAnchorIndex] = useState<number | null>(null);
   const [customPolishingGuidance, setCustomPolishingGuidance] = useState('');
+  const [polishingStudioView, setPolishingStudioView] = useState<'READ' | 'COMPARE' | 'DIFF' | 'EDIT'>('READ');
+  
+  // 多版本打磨历史 (留存快照，方便创作者横向比对挑选好句子)
+  const [polishedVariations, setPolishedVariations] = useState<
+    Array<{
+      id: string;
+      style: string;
+      pov: string;
+      range: string;
+      text: string;
+      wordCount: number;
+      timestamp: number;
+    }>
+  >([]);
+  const [activeVariationId, setActiveVariationId] = useState<string>('');
+  const [diffLeftVariationId, setDiffLeftVariationId] = useState<string>('');
+  const [diffRightVariationId, setDiffRightVariationId] = useState<string>('');
+  const [copiedParaIdx, setCopiedParaIdx] = useState<number | null>(null);
+
+  // 划选文字悬浮灵感捕获
+  const [selectedProseSnippet, setSelectedProseSnippet] = useState('');
 
   // 👗 角色立绘贴图与 AI 视觉理解弹窗状态
   const [showActorVisualModal, setShowActorVisualModal] = useState(false);
@@ -278,6 +319,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   const [modalAppearanceTags, setModalAppearanceTags] = useState<string[]>([]);
   const [syncToNovelDb, setSyncToNovelDb] = useState(true);
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
+  const [showAvatarGenModal, setShowAvatarGenModal] = useState(false);
   const actorFileInputRef = useRef<HTMLInputElement>(null);
 
   // P2P 互联网协同状态
@@ -437,6 +479,21 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
     return map;
   }, [characters]);
 
+  // 高光打磨台对比视角的原对戏切片
+  const comparedRounds = useMemo(() => {
+    if (dialogueHistory.length === 0) return [];
+    const anchor = polishingAnchorIndex;
+    if (polishingRange === 'FOCUSED_ROUND' && anchor !== null) {
+      const s = Math.max(0, anchor - 1);
+      const e = Math.min(dialogueHistory.length - 1, anchor + 1);
+      return dialogueHistory.slice(s, e + 1);
+    }
+    if (polishingRange === 'RECENT_3') {
+      return dialogueHistory.slice(Math.max(0, dialogueHistory.length - 3));
+    }
+    return dialogueHistory;
+  }, [dialogueHistory, polishingAnchorIndex, polishingRange]);
+
   // 可选新增角色列表 Memo：避免每次渲染重复执行 filter
   const availableCharacters = useMemo(() => {
     const actorIds = new Set(actors.map((a) => a.character_id));
@@ -449,6 +506,35 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   const nextSpeaker = actors[nextActorIndex] || null;
   const isHumanTurn = nextSpeaker?.is_human === true;
 
+  // 统一暂停/中断推演 (支持 Esc 快捷键、气泡卡片按钮与底部主控制键)
+  const handleStopDeduction = useCallback(async () => {
+    if (!isRunningRef.current && !isSteppingRef.current) return;
+
+    cancelRequestedRef.current = true;
+    const wasRunning = isRunningRef.current;
+    isRunningRef.current = false;
+    setIsRunning(false);
+    setAutoRunRoundsRemaining(0);
+
+    // 如果当前正处于单步模型调用等待中，且已记录了推演前快照，立即执行原子回滚保全现场
+    if (isSteppingRef.current && currentStepSessionIdRef.current) {
+      const snap = currentStepHistoryBeforeRef.current;
+      try {
+        await api.updateSandboxSession({
+          id: currentStepSessionIdRef.current,
+          dialogue_history: snap,
+          status: 'PAUSED',
+        });
+        setDialogueHistory(snap);
+      } catch (err) {
+        console.error('原子回滚推演历史失败:', err);
+      }
+      showToast('已立即暂停推演，已保全当前对戏现场', 'info');
+    } else if (wasRunning) {
+      showToast('已暂停连续推演', 'info');
+    }
+  }, [showToast]);
+
   // 键盘快捷键监听
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -458,13 +544,21 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
           handleInsertNarrator();
         } else if (isHumanTurn && humanSpeech.trim()) {
           handleHumanSubmit();
-        } else if (!isRunning && actors.length > 0) {
+        } else if (!isRunning && !isStepping && actors.length > 0) {
           executeStep();
         }
         return;
       }
 
       if (e.key === 'Escape') {
+        // ★ 核心修复：当推演正在进行中（无论是连续推演还是单步推演），优先响应暂停/中断指令！
+        if (isRunningRef.current || isSteppingRef.current) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleStopDeduction();
+          return;
+        }
+
         if (editingRoundIndex !== null) {
           setEditingRoundIndex(null);
         } else if (showNarratorInput) {
@@ -475,6 +569,8 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
           setShowExportMenu(false);
         } else if (showSpeakerPicker) {
           setShowSpeakerPicker(false);
+        } else if (showInterveneMenu) {
+          setShowInterveneMenu(false);
         }
       }
     };
@@ -485,14 +581,17 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
     showNarratorInput,
     narratorInput,
     isRunning,
+    isStepping,
     actors.length,
     editingRoundIndex,
     showSessionDropdown,
     showExportMenu,
     showSpeakerPicker,
+    showInterveneMenu,
     isHumanTurn,
     humanSpeech,
     nextSpeaker,
+    handleStopDeduction,
   ]);
 
   const initDefaultActors = (chars: Character[]) => {
@@ -693,7 +792,14 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   // 删除对戏沙盒
   const handleDeleteSession = async (sessId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('确定删除该场对戏记录吗？此操作不可逆。')) return;
+    const confirmed = await confirmDialog({
+      title: '删除对戏沙盒',
+      message: '确定删除该场对戏记录吗？此操作不可逆。',
+      tone: 'danger',
+      confirmText: '确定删除',
+      cancelText: '取消',
+    });
+    if (!confirmed) return;
     try {
       await api.deleteSandboxSession(sessId);
       const remaining = sessions.filter((s) => s.id !== sessId);
@@ -908,7 +1014,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
     }
   };
 
-  // 单步推演 (Step)
+  // 单步推演 (Step) - 支持中断/暂停与原子快照保全
   const executeStep = async (
     narratorText?: string,
     targetSpeakerId?: string,
@@ -917,6 +1023,10 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
     if (!activeNovel) return false;
     if (actors.length === 0) {
       showToast('请至少配置一名出场角色', 'warning');
+      return false;
+    }
+    // 防止并发重复步进
+    if (isSteppingRef.current) {
       return false;
     }
 
@@ -943,6 +1053,14 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
       });
     }
 
+    // 记录推演前对话历史快照，用于用户中途暂停时保全现场与原子回滚
+    const historyBefore = [...dialogueHistory];
+    currentStepHistoryBeforeRef.current = historyBefore;
+    currentStepSessionIdRef.current = sessionId;
+    cancelRequestedRef.current = false;
+    isSteppingRef.current = true;
+    setIsStepping(true);
+
     try {
       const res = await api.executeSandboxStep({
         session_id: sessionId,
@@ -950,6 +1068,23 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
         target_speaker_id: targetSpeakerId,
         action_guidance: actionGuidance,
       });
+
+      // 检查在等待模型返回期间，用户是否按下了暂停/Esc！
+      if (cancelRequestedRef.current) {
+        // 用户在模型推理期间发出了暂停指令：将沙盒会话原子回滚至推演前状态
+        try {
+          await api.updateSandboxSession({
+            id: sessionId,
+            dialogue_history: historyBefore,
+            status: 'PAUSED',
+          });
+          setDialogueHistory(historyBefore);
+        } catch (rollbackErr) {
+          console.error('回滚推演历史失败:', rollbackErr);
+        }
+        showToast('推演已成功暂停，已保全当前对戏现场', 'info');
+        return false;
+      }
 
       const fresh = await api.getSandboxSession(sessionId);
       if (fresh) {
@@ -960,8 +1095,16 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
       }
       return !res.is_completed;
     } catch (err: any) {
-      showToast(`推演中断: ${err.message || err}`, 'error');
+      if (cancelRequestedRef.current) {
+        showToast('推演已按需暂停', 'info');
+      } else {
+        showToast(`推演中断: ${err.message || err}`, 'error');
+      }
       return false;
+    } finally {
+      isSteppingRef.current = false;
+      setIsStepping(false);
+      cancelRequestedRef.current = false;
     }
   };
 
@@ -1026,14 +1169,13 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
     }
   };
 
-  // 连续自动推演
+  // 连续自动推演 (支持 Esc 快捷键与实时一键暂停)
   const handleStartAuto = async () => {
-    if (isRunningRef.current) {
-      isRunningRef.current = false;
-      setIsRunning(false);
-      showToast('已暂停推演', 'info');
+    if (isRunningRef.current || isSteppingRef.current) {
+      await handleStopDeduction();
       return;
     }
+    cancelRequestedRef.current = false;
     isRunningRef.current = true;
     setIsRunning(true);
     let rounds = 6;
@@ -1041,13 +1183,18 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
 
     while (rounds > 0 && isRunningRef.current) {
       const canContinue = await executeStep();
-      if (!isRunningRef.current) break;
+      if (!isRunningRef.current || cancelRequestedRef.current) break;
       rounds--;
       setAutoRunRoundsRemaining(rounds);
       if (!canContinue || rounds <= 0) break;
-      await new Promise((r) => setTimeout(r, 600));
+
+      // 细粒度可中断等待，避免 600ms 期间点击暂停不灵敏
+      for (let i = 0; i < 12; i++) {
+        if (!isRunningRef.current || cancelRequestedRef.current) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
     }
-    const wasStopped = !isRunningRef.current;
+    const wasStopped = !isRunningRef.current || cancelRequestedRef.current;
     isRunningRef.current = false;
     setIsRunning(false);
     setAutoRunRoundsRemaining(0);
@@ -1058,7 +1205,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
 
   // 重掷最新一轮台词 (Re-roll)
   const handleRerollLatestRound = async () => {
-    if (dialogueHistory.length === 0 || isRunning) return;
+    if (dialogueHistory.length === 0 || isRunning || isStepping) return;
     const lastRound = dialogueHistory[dialogueHistory.length - 1];
     if (lastRound.is_narrator_event) {
       showToast('旁白突发事件不支持重掷，可点击编辑或清空', 'info');
@@ -1221,7 +1368,14 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   const handleDeleteBranch = async (branchId: string) => {
     if (branchId === 'main') return;
     const target = branches.find((b) => b.id === branchId);
-    if (!window.confirm(`确定要删除分支【${target?.name || branchId}】吗？此操作无法撤销。`)) return;
+    const confirmed = await confirmDialog({
+      title: '删除推演分支',
+      message: `确定要删除分支【${target?.name || branchId}】吗？此操作无法撤销。`,
+      tone: 'danger',
+      confirmText: '删除分支',
+      cancelText: '取消',
+    });
+    if (!confirmed) return;
 
     const nextBranches = branches.filter((b) => b.id !== branchId);
     setBranches(nextBranches);
@@ -1244,7 +1398,14 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   // 清空对话记录重新开场 (保留角色设定与场景)
   const handleResetDialogue = async () => {
     if (dialogueHistory.length === 0) return;
-    if (!confirm('确定清空当前对戏记录吗？角色秘密、动机与场景设定将予以保留。')) return;
+    const confirmed = await confirmDialog({
+      title: '重置推演对戏记录',
+      message: '确定重置当前推演记录吗？对白实录将清空，角色秘密与场景设定将予以保留。',
+      tone: 'danger',
+      confirmText: '确认重置',
+      cancelText: '取消',
+    });
+    if (!confirmed) return;
     setDialogueHistory([]);
     setSynthesizedProse('');
     if (activeSession) {
@@ -1258,7 +1419,30 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
         console.error('更新会话历史失败:', err);
       }
     }
-    showToast('已清空对戏实录，可重新开场！', 'success');
+    showToast('已重置推演实录，可重新开场！', 'success');
+  };
+
+  // 重置场景目标与角色临时动机 (恢复纯净沙盒)
+  const handleResetSceneAndActors = async () => {
+    const confirmed = await confirmDialog({
+      title: '重置情境与出场设定',
+      message: '确定重置场景设定与出场角色动机吗？此操作将清空当前场景描述、交锋目标以及角色的临时秘密与动机。',
+      tone: 'danger',
+      confirmText: '确认重置',
+      cancelText: '取消',
+    });
+    if (!confirmed) return;
+    setSceneSetting('');
+    setSceneGoal('');
+    setSessionTitle('新对戏沙盒');
+    setActors((prev) =>
+      prev.map((a) => ({
+        ...a,
+        private_motivation: '',
+        private_secret: '',
+      }))
+    );
+    showToast('已重置场景与角色设定', 'info');
   };
 
   // 原地编辑台词
@@ -1498,40 +1682,160 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
     setShowNarratorInput(false);
   };
 
-  // ✍️ 高光文段优化精修 (Prose Polisher)
+  // ✍️ 高光文段优化精修 (Highlight Prose Polishing Studio)
   const handleSynthesizeProse = async (
-    overrideStyle?: 'CINEMATIC' | 'PSYCHOLOGICAL' | 'HARDCORE_TENSE',
-    overrideRange?: 'ALL' | 'RECENT_3'
+    overrideStyle?: 'CINEMATIC' | 'PSYCHOLOGICAL' | 'HARDCORE_TENSE' | 'CLASSICAL_ELEGANT' | 'DARK_HUMOR_IRONY',
+    overrideRange?: 'FOCUSED_ROUND' | 'RECENT_3' | 'ALL',
+    targetRoundIndex?: number,
+    overridePov?: 'THIRD_LIMITED' | 'THIRD_OMNISCIENT' | 'FIRST_PERSON'
   ) => {
     if (!activeSession) return;
     if (dialogueHistory.length === 0) {
       showToast('暂无对话记录，请先步进推演几轮对手戏', 'warning');
       return;
     }
+
+    const anchor = targetRoundIndex !== undefined ? targetRoundIndex : polishingAnchorIndex;
+    if (targetRoundIndex !== undefined) {
+      setPolishingAnchorIndex(targetRoundIndex);
+    }
+
     const currentStyle = overrideStyle || polishingStyle;
-    const currentRange = overrideRange || polishingRange;
+    const currentRange = overrideRange || (anchor !== null ? 'FOCUSED_ROUND' : polishingRange);
+    const currentPov = overridePov || polishingPov;
+
     if (overrideStyle) setPolishingStyle(overrideStyle);
     if (overrideRange) setPolishingRange(overrideRange);
+    if (overridePov) setPolishingPov(overridePov);
 
     setIsSynthesizing(true);
     try {
-      const startIdx = currentRange === 'RECENT_3' ? Math.max(0, dialogueHistory.length - 3) : 0;
-      const endIdx = dialogueHistory.length - 1;
+      let startIdx = 0;
+      let endIdx = dialogueHistory.length - 1;
+
+      if (currentRange === 'FOCUSED_ROUND' && anchor !== null) {
+        startIdx = Math.max(0, anchor - 1);
+        endIdx = Math.min(dialogueHistory.length - 1, anchor + 1);
+      } else if (currentRange === 'RECENT_3') {
+        startIdx = Math.max(0, dialogueHistory.length - 3);
+        endIdx = dialogueHistory.length - 1;
+      } else {
+        startIdx = 0;
+        endIdx = dialogueHistory.length - 1;
+      }
 
       const res = await api.synthesizeSandboxProse({
         session_id: activeSession.id,
         polishing_style: currentStyle,
+        pov_mode: currentPov,
         start_round_index: startIdx,
         end_round_index: endIdx,
         custom_guidance: customPolishingGuidance.trim() || undefined,
       });
+
+      const newVar = {
+        id: `var-${Date.now()}`,
+        style: currentStyle,
+        pov: currentPov,
+        range: currentRange,
+        text: res.synthesized_prose,
+        wordCount: res.word_count,
+        timestamp: Date.now(),
+      };
+
       setSynthesizedProse(res.synthesized_prose);
+      setPolishedVariations((prev) => {
+        const next = [newVar, ...prev.slice(0, 5)];
+        setDiffLeftVariationId(next[0].id);
+        if (next.length > 1) {
+          setDiffRightVariationId(next[1].id);
+        } else {
+          setDiffRightVariationId(next[0].id);
+        }
+        return next;
+      });
+      setActiveVariationId(newVar.id);
       setShowSynthesizedModal(true);
       showToast(`高光文段打磨完成，共 ${res.word_count} 字`, 'success');
     } catch (err: any) {
       showToast(`文段打磨失败: ${err.message || err}`, 'error');
     } finally {
       setIsSynthesizing(false);
+    }
+  };
+
+  // 成果采纳：将片段插入当前章节正文末尾/光标处并自动留存快照
+  const handleInsertTextToEditor = (textToInsert: string, toastMsg = '已将选段插入正文！') => {
+    if (!textToInsert.trim()) return;
+    const current = useNovelStore.getState().editorContent || '';
+    const nextContent = current ? `${current}\n\n${textToInsert.trim()}` : textToInsert.trim();
+    updateEditorContent(nextContent);
+    saveCurrentChapter(true, 'SANDBOX_SNIPPET_INSERT');
+    showToast(toastMsg, 'success');
+  };
+
+  // 划选文字悬浮灵感捕获
+  const handleStudioTextSelection = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) {
+      setSelectedProseSnippet('');
+      return;
+    }
+    const text = sel.toString().trim();
+    if (text.length >= 2) {
+      setSelectedProseSnippet(text);
+    } else {
+      setSelectedProseSnippet('');
+    }
+  };
+
+  const handleCaptureSelectedSnippet = () => {
+    if (!selectedProseSnippet) return;
+    const isQuote = selectedProseSnippet.includes('“') || selectedProseSnippet.includes('"');
+    const note: InspirationNote = {
+      id: `insp-sel-${Date.now()}`,
+      type: isQuote ? 'QUOTE' : 'ACTION',
+      content: selectedProseSnippet,
+      created_at: Date.now(),
+    };
+    const nextNotes = [note, ...inspirationNotes];
+    setInspirationNotes(nextNotes);
+    showToast(`已将 ${selectedProseSnippet.length} 字高光选句存入灵感盒！`, 'success');
+    if (activeSession) {
+      api.updateSandboxSession({
+        id: activeSession.id,
+        inspiration_notes_json: JSON.stringify(nextNotes),
+      }).catch(console.error);
+    }
+    setSelectedProseSnippet('');
+    window.getSelection()?.removeAllRanges();
+  };
+
+  // 智能提取高光描写与对白至灵感盒
+  const handleExtractHighlightsToInspiration = () => {
+    if (!synthesizedProse.trim()) return;
+    const lines = synthesizedProse
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length >= 10);
+    if (lines.length === 0) return;
+
+    const newNotes: InspirationNote[] = lines.slice(0, 3).map((line, idx) => ({
+      id: `insp-extract-${Date.now()}-${idx}`,
+      type: line.includes('“') || line.includes('"') ? 'QUOTE' : 'ACTION',
+      content: line,
+      created_at: Date.now() + idx,
+    }));
+
+    const nextNotes = [...newNotes, ...inspirationNotes];
+    setInspirationNotes(nextNotes);
+    showToast(`已成功提炼 ${newNotes.length} 条高光描写存入灵感盒！`, 'success');
+
+    if (activeSession) {
+      api.updateSandboxSession({
+        id: activeSession.id,
+        inspiration_notes_json: JSON.stringify(nextNotes),
+      }).catch(console.error);
     }
   };
 
@@ -1547,9 +1851,16 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   };
 
   // 成果采纳：替换当前正文
-  const handleReplaceEditor = () => {
+  const handleReplaceEditor = async () => {
     if (!synthesizedProse) return;
-    if (!confirm('确定将转译正文替换当前章节全部内容吗？系统会自动在版本抽屉留存备份。')) return;
+    const confirmed = await confirmDialog({
+      title: '替换当前章节正文',
+      message: '确定将转译正文替换当前章节全部内容吗？系统会自动在版本抽屉留存备份。',
+      tone: 'danger',
+      confirmText: '确认替换',
+      cancelText: '取消',
+    });
+    if (!confirmed) return;
     updateEditorContent(synthesizedProse);
     saveCurrentChapter(true, 'SANDBOX_PROSE_REPLACE');
     showToast('已替换章节正文并安全存档！', 'success');
@@ -1588,27 +1899,21 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
     setShowActorVisualModal(true);
   };
 
-  const handleActorFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleActorFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      showToast('请选择有效的图片文件 (PNG, JPG, WebP 等)', 'warning');
-      return;
+    try {
+      const optimized = await optimizeImageFileToDataUrl(file, {
+        maxDimension: 1024,
+        quality: 0.88,
+        maxFileSizeBytes: 10 * 1024 * 1024,
+      });
+      setModalAvatarUrl(optimized);
+      showToast('已载入立绘并完成高清优化，可点击【👁️ AI 识图】自动理解人设外貌', 'success');
+    } catch (err: any) {
+      showToast(err?.message || '读取立绘失败', 'warning');
     }
-
-    if (file.size > 8 * 1024 * 1024) {
-      showToast('图片尺寸不能超过 8MB', 'warning');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setModalAvatarUrl(dataUrl);
-      showToast('已载入立绘图片，可点击【👁️ AI 识图】自动理解人设外貌', 'success');
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleAnalyzeActorAppearance = async () => {
@@ -1815,258 +2120,93 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
   const latestRound = dialogueHistory[dialogueHistory.length - 1];
   const currentTension = latestRound ? calculateDialogueTension(latestRound) : { level: 2, label: '静默待命', colorClass: 'text-stone-500 bg-stone-500/10' };
 
-  return (
-    <div className="w-full h-full flex flex-col bg-[#fdfbf7] dark:bg-[#181614] text-[#2c2621] dark:text-[#e8e2d8] select-none overflow-hidden font-sans">
-      {/* 顶栏 (纯色实体背景，消除多层 backdrop-blur 导致的滚动渲染掉帧) */}
-      <div className="h-14 px-4 border-b border-[#e6decc] dark:border-[#2d2824] bg-[#f7f2e7] dark:bg-[#201c19] flex items-center justify-between shrink-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-600/15 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shadow-xs">
-            <Swords className="w-5 h-5" />
+  // 🎭 渲染剧本与角色阵容设定抽屉内部主体 (分界面分标签页体系)
+  const renderConfigDrawerContent = () => (
+    <div className="flex-1 min-h-0 flex flex-col bg-[#fbf8f0] dark:bg-[#1c1916] text-[#2c2621] dark:text-[#e8e2d8] select-none">
+      {/* 抽屉顶栏 */}
+      <div className="h-13 px-4 border-b border-[#e6decc] dark:border-[#2d2824] bg-[#f7f2e7] dark:bg-[#201c19] flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-amber-600/15 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <Sliders className="w-3.5 h-3.5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-serif font-bold text-base tracking-wide">角色对戏演武场</h2>
-              
-              {/* 会话切换器下拉 */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowSessionDropdown(!showSessionDropdown)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-[#e0d6c3] dark:border-[#38312a] bg-white dark:bg-[#201c19] hover:bg-amber-50 dark:hover:bg-amber-950/20 font-medium transition-colors"
-                  title="切换或新建对戏沙盒"
-                >
-                  <span className="max-w-[130px] truncate text-amber-900 dark:text-amber-300">
-                    {sessionTitle || '选择对戏会话'}
-                  </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-[#8a7f73]" />
-                </button>
-
-                {showSessionDropdown && (
-                  <div className="absolute left-0 top-full mt-1.5 w-64 bg-white dark:bg-[#1e1b18] rounded-xl shadow-md border border-[#ded5c2] dark:border-[#38322c] py-1.5 z-40 animate-in fade-in slide-in-from-top-1 duration-100">
-                    <div className="px-3 py-1.5 border-b border-[#eee7d8] dark:border-[#2e2823] flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-[#8a7f73] dark:text-[#9e9284]">
-                        历史对戏 ({sessions.length})
-                      </span>
-                      <button
-                        onClick={handleCreateNewSession}
-                        className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline font-bold flex items-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" /> 新建对戏
-                      </button>
-                    </div>
-
-                    <div className="max-h-56 overflow-y-auto overscroll-contain py-1">
-                      {sessions.length === 0 ? (
-                        <div className="px-3 py-2 text-xs text-[#8a7f73] text-center">暂无保存的会话</div>
-                      ) : (
-                        sessions.map((sess) => {
-                          const isCur = activeSession?.id === sess.id;
-                          return (
-                            <div
-                              key={sess.id}
-                              style={{ contentVisibility: 'auto', containIntrinsicSize: '0 36px' }}
-                              onClick={() => {
-                                loadSession(sess);
-                                setShowSessionDropdown(false);
-                              }}
-                              className={`px-3 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                                isCur
-                                  ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-300 font-bold'
-                                  : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#4a4036] dark:text-[#c4baa8]'
-                              }`}
-                            >
-                              <div className="truncate pr-2">
-                                <p className="truncate">{sess.title}</p>
-                              </div>
-                              <button
-                                onClick={(e) => handleDeleteSession(sess.id, e)}
-                                title="删除此会话"
-                                className="p-1 rounded text-[#a39788] hover:text-rose-600 transition-colors shrink-0"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 实时戏剧张力胶囊 */}
-              {dialogueHistory.length > 0 && (
-                <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-medium whitespace-nowrap shrink-0 ${currentTension.colorClass}`}>
-                  <Flame className="w-3.5 h-3.5 animate-pulse" />
-                  <span>张力: {currentTension.label} ({currentTension.level}/10)</span>
-                </div>
-              )}
-            </div>
-            <p className="text-xs text-[#8a7f73] dark:text-[#9e9284] truncate hidden 2xl:block">
-              零心理同质化 · 战争迷雾心路 (CoT) · 高光灵感火花捕捉
-            </p>
+          <div className="min-w-0">
+            <h3 className="font-serif font-bold text-sm text-[#2c2621] dark:text-[#e8e2d8] truncate">剧本与角色设定</h3>
           </div>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 font-bold shrink-0">
+            {actors.length} 位角色
+          </span>
         </div>
-
-        {/* 顶栏右侧功能区 (严密防折行防挤压架构) */}
-        <div className="flex items-center gap-1.5 relative shrink-0">
-          {/* 💡 灵感火花盒 */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            onClick={() => setShowInspirationDrawer(!showInspirationDrawer)}
-            className={`px-2.5 py-1.5 text-xs rounded-lg border flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-              showInspirationDrawer || inspirationNotes.length > 0
-                ? 'bg-amber-500/15 border-amber-500/40 text-amber-800 dark:text-amber-300 font-bold'
-                : 'border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 text-[#6e6357] dark:text-[#a89d91]'
+            onClick={() => setIsConfigDrawerPinned(!isConfigDrawerPinned)}
+            className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+              isConfigDrawerPinned
+                ? 'bg-amber-600/20 border-amber-500/50 text-amber-900 dark:text-amber-300 shadow-2xs'
+                : 'border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 text-[#8a7f73]'
             }`}
-            title="打开灵感火花盒，查看提炼的金句、微动作、心理暗流与反转线索"
+            title={isConfigDrawerPinned ? '取消侧栏固定，转换为悬浮抽屉模式' : '固定为常驻侧边栏'}
           >
-            <Lightbulb className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            <span>灵感盒 {inspirationNotes.length > 0 ? `(${inspirationNotes.length})` : ''}</span>
+            <Pin className={`w-3.5 h-3.5 ${isConfigDrawerPinned ? 'rotate-45 text-amber-700 dark:text-amber-400' : ''}`} />
           </button>
-
-          {/* 视角透视切换双分段胶囊 (内心戏 | 潜台词) */}
-          <div className="flex items-center p-0.5 rounded-lg border border-[#ded5c2] dark:border-[#38322c] bg-black/5 dark:bg-white/5 shrink-0 whitespace-nowrap">
-            <button
-              onClick={() => setShowPrivateThoughts(!showPrivateThoughts)}
-              className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 transition-all cursor-pointer ${
-                showPrivateThoughts
-                  ? 'bg-white dark:bg-[#201c19] text-amber-900 dark:text-amber-300 font-bold shadow-2xs'
-                  : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
-              }`}
-              title={showPrivateThoughts ? '当前：显示内心算盘独白' : '当前：隐藏内心独白'}
-            >
-              {showPrivateThoughts ? <Eye className="w-3.5 h-3.5 text-amber-600" /> : <EyeOff className="w-3.5 h-3.5" />}
-              <span>内心戏</span>
-            </button>
-            <button
-              onClick={() => setShowSubtext(!showSubtext)}
-              className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 transition-all cursor-pointer ${
-                showSubtext
-                  ? 'bg-white dark:bg-[#201c19] text-purple-900 dark:text-purple-300 font-bold shadow-2xs'
-                  : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
-              }`}
-              title={showSubtext ? '当前：开启潜台词透视' : '当前：关闭潜台词透视'}
-            >
-              <MessageCircle className={`w-3.5 h-3.5 ${showSubtext ? 'text-purple-600' : ''}`} />
-              <span>潜台词</span>
-            </button>
-          </div>
-
-          {/* 📚 导入设定 */}
           <button
             type="button"
-            onClick={() => setShowImportBibleModal(true)}
-            className="px-2.5 py-1.5 text-xs rounded-lg border border-amber-600/30 bg-amber-600/10 hover:bg-amber-600/20 text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-            title="从小说章节导入前情正文、大纲、世界观法则与角色羁绊"
+            onClick={() => setShowConfigDrawer(false)}
+            className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-[#8a7f73] hover:text-[#2c2621] dark:hover:text-[#e8e2d8] transition-colors cursor-pointer"
+            title="收起设定抽屉"
           >
-            <BookOpen className="w-3.5 h-3.5 text-amber-600" />
-            <span>导入设定</span>
+            <X className="w-4 h-4" />
           </button>
-
-          {/* 🌐 联机对戏 */}
-          <button
-            onClick={() => setShowCollabModal(true)}
-            className={`px-2.5 py-1.5 text-xs rounded-lg border flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              collabStatus === 'CONNECTED'
-                ? 'bg-emerald-600/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 font-medium'
-                : 'border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 text-[#6e6357] dark:text-[#a89d91]'
-            }`}
-            title="开启/管理 6 位房间码 P2P 互联网异地联机对戏"
-          >
-            <Globe className={`w-3.5 h-3.5 ${collabStatus === 'CONNECTED' ? 'text-emerald-600 animate-pulse' : ''}`} />
-            <span>{collabStatus === 'CONNECTED' ? `P2P:${collabRoomCode}` : '联机'}</span>
-          </button>
-
-          {/* 更多工具下拉菜单 (API模型管理、导出剧本/排练纪要) */}
-          <div className="relative shrink-0">
-            <button
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              className="px-2.5 py-1.5 text-xs rounded-lg border border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 font-medium flex items-center gap-1 transition-colors whitespace-nowrap shrink-0 text-[#6e6357] dark:text-[#a89d91] cursor-pointer"
-              title="工具箱与导出"
-            >
-              <Download className="w-3.5 h-3.5 text-blue-600" />
-              <span>导出/工具</span>
-              <ChevronDown className="w-3 h-3 text-[#8a7f73]" />
-            </button>
-
-            {showExportMenu && (
-              <div className="absolute right-0 top-full mt-1.5 w-56 bg-white dark:bg-[#201c19] rounded-xl shadow-md border border-[#ded5c2] dark:border-[#38322c] py-1.5 z-40 animate-in fade-in slide-in-from-top-1 duration-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowExportMenu(false);
-                    setShowSettingsModal(true);
-                  }}
-                  className="w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 text-[#4a4036] dark:text-[#c4baa8] cursor-pointer"
-                >
-                  <Sliders className="w-3.5 h-3.5 text-blue-600" />
-                  <span>🔌 API 与模型配置管理</span>
-                </button>
-                <div className="my-1 border-t border-[#eee7d8] dark:border-[#2e2823]" />
-                <button
-                  onClick={() => {
-                    setShowExportMenu(false);
-                    handleExportScript();
-                  }}
-                  disabled={dialogueHistory.length === 0}
-                  className="w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 disabled:opacity-40 text-[#4a4036] dark:text-[#c4baa8] cursor-pointer"
-                >
-                  <FileText className="w-3.5 h-3.5 text-amber-600" />
-                  <span>导出为戏剧对白脚本 (.txt)</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setShowExportMenu(false);
-                    handleExportRehearsalMarkdown();
-                  }}
-                  disabled={dialogueHistory.length === 0}
-                  className="w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 disabled:opacity-40 text-[#4a4036] dark:text-[#c4baa8] cursor-pointer"
-                >
-                  <BookmarkPlus className="w-3.5 h-3.5 text-blue-600" />
-                  <span>导出上帝视角排练纪要 (.md)</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 设置抽屉折叠 */}
-          <button
-            onClick={() => setShowConfig(!showConfig)}
-            className="p-1.5 text-xs rounded-lg border border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            title={showConfig ? '折叠左侧情境与阵容面板' : '展开左侧情境与阵容面板'}
-          >
-            <Settings2 className="w-4 h-4 text-[#73685d] dark:text-[#a89d91]" />
-          </button>
-
-          {/* ✍️ 优化精修文段 (主高光按钮) */}
-          <button
-            onClick={() => handleSynthesizeProse()}
-            disabled={dialogueHistory.length === 0 || isSynthesizing}
-            className="px-3 py-1.5 text-xs rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white font-medium flex items-center gap-1.5 shadow-sm transition-all whitespace-nowrap shrink-0 cursor-pointer"
-            title="将高光对手戏升华打磨为高质量小说描写文段（支持电影感/心理流/硬派多文风）"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>{isSynthesizing ? '打磨中...' : '✍️ 优化精修文段'}</span>
-          </button>
-
-          {/* 模态框关闭按钮 */}
-          {isModal && onClose && (
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-[#73685d] shrink-0 cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
 
-      {/* 主工作区 */}
-      <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* 左侧：沙盒情境与角色人设面板 (原生平滑滚动与 content-visibility 视口外懒渲染，彻底消除下拉滚动掉帧) */}
-        {showConfig && (
-          <div className="w-80 md:w-96 border-r border-[#e6decc] dark:border-[#2d2824] bg-[#fbf8f0] dark:bg-[#1c1916] flex flex-col shrink-0 overflow-y-auto p-4 space-y-4 overscroll-contain">
-            
+      {/* 分界面导航选项卡 (Tab 栏) */}
+      <div className="px-3.5 py-2 border-b border-[#e6decc] dark:border-[#2d2824] bg-[#f7f2e7]/60 dark:bg-[#201c19]/60 shrink-0">
+        <div className="grid grid-cols-3 p-1 rounded-xl bg-black/5 dark:bg-white/5 text-xs font-serif font-medium gap-1">
+          <button
+            type="button"
+            onClick={() => setConfigDrawerTab('actors')}
+            className={`py-1.5 px-1.5 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              configDrawerTab === 'actors'
+                ? 'bg-white dark:bg-[#141210] text-amber-900 dark:text-amber-300 font-bold shadow-2xs'
+                : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <span className="truncate">出场阵容 ({actors.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfigDrawerTab('scene')}
+            className={`py-1.5 px-1.5 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              configDrawerTab === 'scene'
+                ? 'bg-white dark:bg-[#141210] text-amber-900 dark:text-amber-300 font-bold shadow-2xs'
+                : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <span className="truncate">场景与目标</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfigDrawerTab('presets')}
+            className={`py-1.5 px-1.5 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              configDrawerTab === 'presets'
+                ? 'bg-white dark:bg-[#141210] text-amber-900 dark:text-amber-300 font-bold shadow-2xs'
+                : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
+            }`}
+          >
+            <Compass className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <span className="truncate">经典情境</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 分界面主体内容滚动区 */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 overscroll-contain transform-gpu">
+        {/* TAB 1: 出场阵容与动机 */}
+        {configDrawerTab === 'actors' && (
+          <div className="space-y-3.5">
             {/* 角色空态指引横幅 */}
             {characters.length < 2 && (
               <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
@@ -2081,7 +2221,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                   <button
                     onClick={handleImportDemoCharacters}
                     disabled={isImportingDemo}
-                    className="w-full px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-medium flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                    className="w-full px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-medium flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>{isImportingDemo ? '正在导入示范角色...' : '一键导入示范角色 (林渊 vs 洛清雪)'}</span>
@@ -2090,454 +2230,218 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
               </div>
             )}
 
-            {/* 经典情境模板一键载入 (纯色实体背景，跳过视口外重排重绘) */}
-            <div
-              style={{ contentVisibility: 'auto', containIntrinsicSize: '0 120px' }}
-              className="bg-white dark:bg-[#141210] p-3 rounded-xl border border-[#e8e0ce] dark:border-[#322c27] space-y-2"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-serif font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1">
-                  <Compass className="w-3.5 h-3.5" /> 经典情境模板库 (6大高冲突戏)
+            {/* 阵容工具栏 */}
+            <div className="flex items-center justify-between pb-1 border-b border-[#eee7d8] dark:border-[#2e2823]">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-serif font-bold text-[#4a4036] dark:text-[#d4cbbf] flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" /> 出场阵容 ({actors.length})
                 </span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {SANDBOX_PRESET_TEMPLATES.map((tmpl) => (
+                {actors.length >= 2 && (
                   <button
-                    key={tmpl.id}
-                    onClick={() => applyPresetTemplate(tmpl)}
-                    className="p-1.5 rounded-lg border border-[#e2d9c5] dark:border-[#3a332d] bg-white dark:bg-[#141210] hover:border-amber-500 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 text-center transition-all group cursor-pointer"
+                    onClick={handleSwapActors}
+                    title="互换双方攻守位置"
+                    className="p-1 text-[#8a7f73] hover:text-amber-700 transition-colors cursor-pointer"
                   >
-                    <span className="text-sm block mb-0.5">{tmpl.icon}</span>
-                    <span className="text-[10px] font-serif block truncate text-[#4a4036] dark:text-[#c4baa8] group-hover:text-amber-700 dark:group-hover:text-amber-400">
-                      {tmpl.name}
-                    </span>
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
                   </button>
-                ))}
+                )}
               </div>
-            </div>
 
-            {/* 场景与目标 (纯色实体背景) */}
-            <div
-              style={{ contentVisibility: 'auto', containIntrinsicSize: '0 240px' }}
-              className="bg-white dark:bg-[#141210] p-3 rounded-xl border border-[#e8e0ce] dark:border-[#322c27] space-y-2.5"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-serif font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5" /> 场景与交锋目标
-                </span>
-                <div className="flex items-center gap-2">
-                  {collabStatus === 'CONNECTED' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const ok = sendSandboxSync({
-                          session_title: sessionTitle,
-                          scene_setting: sceneSetting,
-                          scene_goal: sceneGoal,
-                          actors,
-                          dialogue_history: dialogueHistory,
-                          branches,
-                          active_branch_id: activeBranchId,
-                        });
-                        if (ok) showToast('已将当前演武场设定同步给协作者！', 'success');
-                      }}
-                      className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium flex items-center gap-1"
-                      title="通过 P2P 广播当前演武场给协作者"
-                    >
-                      <Globe className="w-3 h-3" /> 同步给协作者
-                    </button>
-                  )}
-                  <button
-                    onClick={handleSaveSession}
-                    className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline font-medium"
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleQuickMultiApiAssign}
+                  className="text-[10px] text-amber-700 dark:text-amber-400 hover:text-amber-800 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-1 rounded border border-amber-500/30 transition-colors flex items-center gap-1 cursor-pointer font-medium"
+                  title="为出场角色一键分配不同 AI 服务商与模型（支持跨模型对战推演）"
+                >
+                  <Sliders className="w-3 h-3 text-amber-600" />
+                  <span>多模型分工</span>
+                </button>
+
+                {availableCharacters.length > 0 && (
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddActor(e.target.value);
+                        e.target.value = '';
+                      }
+                    }}
+                    defaultValue=""
+                    className="text-[11px] px-2 py-1 rounded border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#141210] text-[#5c5044] dark:text-[#c4baa8] outline-none cursor-pointer"
                   >
-                    保存演武场
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowImportBibleModal(true)}
-                    className="text-[11px] text-amber-800 dark:text-amber-300 font-bold hover:underline flex items-center gap-1 cursor-pointer bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30"
-                    title="从当前小说导入章节正文前情、大纲与世界观法则"
-                  >
-                    <BookOpen className="w-3 h-3 text-amber-600" />
-                    <span>导入设定</span>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] text-[#8a7f73] dark:text-[#9e9284] block mb-1">对戏标题</label>
-                <input
-                  type="text"
-                  value={sessionTitle}
-                  onChange={(e) => setSessionTitle(e.target.value)}
-                  className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2d9c5] dark:border-[#3a332d] bg-white dark:bg-[#141210] focus:ring-1 focus:ring-amber-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] text-[#8a7f73] dark:text-[#9e9284] block mb-1">物理环境描写</label>
-                <textarea
-                  rows={2}
-                  value={sceneSetting}
-                  onChange={(e) => setSceneSetting(e.target.value)}
-                  className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2d9c5] dark:border-[#3a332d] bg-white dark:bg-[#141210] focus:ring-1 focus:ring-amber-500 outline-none resize-none"
-                  placeholder="例如：深夜书房，窗外风雪大作，案上灯花爆裂..."
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] text-[#8a7f73] dark:text-[#9e9284] block mb-1">冲突目标与戏剧节拍</label>
-                <textarea
-                  rows={2}
-                  value={sceneGoal}
-                  onChange={(e) => setSceneGoal(e.target.value)}
-                  className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2d9c5] dark:border-[#3a332d] bg-white dark:bg-[#141210] focus:ring-1 focus:ring-amber-500 outline-none resize-none"
-                  placeholder="本场戏的核心矛盾、试探目标与结局走向..."
-                />
-              </div>
-            </div>
-
-            {/* 出场角色列表 */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-serif font-bold text-[#4a4036] dark:text-[#d4cbbf] flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5" /> 出场阵容 ({actors.length})
-                  </span>
-                  {actors.length >= 2 && (
-                    <button
-                      onClick={handleSwapActors}
-                      title="互换双方攻守位置"
-                      className="p-1 text-[#8a7f73] hover:text-amber-700 transition-colors"
-                    >
-                      <ArrowLeftRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={handleQuickMultiApiAssign}
-                    className="text-[10px] text-amber-700 dark:text-amber-400 hover:text-amber-800 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-1 rounded border border-amber-500/30 transition-colors flex items-center gap-1 cursor-pointer font-medium"
-                    title="为出场角色一键分配不同 AI 服务商与模型（支持跨模型对战推演）"
-                  >
-                    <Sliders className="w-3 h-3 text-amber-600" />
-                    <span>多模型分工</span>
-                  </button>
-
-                  {/* 下拉添加角色 (使用 availableCharacters Memo 避免频繁 filter) */}
-                  {availableCharacters.length > 0 && (
-                    <select
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          handleAddActor(e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      defaultValue=""
-                      className="text-[11px] px-2 py-1 rounded border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#141210] text-[#5c5044] dark:text-[#c4baa8] outline-none cursor-pointer"
-                    >
-                      <option value="" disabled>
-                        + 挑选小说角色...
+                    <option value="" disabled>
+                      + 挑选小说角色...
+                    </option>
+                    {availableCharacters.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.gender ? `(${c.gender})` : ''}
                       </option>
-                      {availableCharacters.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {c.gender ? `(${c.gender})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                    ))}
+                  </select>
+                )}
               </div>
+            </div>
 
-              {actors.map((actor, idx) => {
-                const charObj = charactersMap.get(actor.character_id);
-                const avatarUrl = charObj?.avatar_url || actor.avatar_url;
-                const visualSummary = charObj?.visual_summary || actor.visual_summary;
-                const gender = charObj?.gender || actor.gender;
-                return (
-                  <div
-                    key={actor.character_id}
-                    style={{ contentVisibility: 'auto', containIntrinsicSize: '0 360px' }}
-                    className="p-3.5 rounded-xl bg-white dark:bg-[#141210] border border-[#e8e0ce] dark:border-[#322c27] space-y-2.5 shadow-xs"
-                  >
-                    {/* 🌟 角色立绘展示与元数据区 */}
-                    {avatarUrl ? (
-                      <div className="flex gap-3 items-start pb-2.5 border-b border-[#ebdcc7]/60 dark:border-[#38312a]/60">
-                        {/* 立绘大图展示区 (支持全景灯箱查看) */}
-                        <div className="relative group shrink-0">
+            {/* 角色卡片列表 */}
+            {actors.map((actor, idx) => {
+              const charObj = charactersMap.get(actor.character_id);
+              const avatarUrl = charObj?.avatar_url || actor.avatar_url;
+              const visualSummary = charObj?.visual_summary || actor.visual_summary;
+              const gender = charObj?.gender || actor.gender;
+              return (
+                <div
+                  key={actor.character_id}
+                  className="p-3.5 rounded-xl bg-white dark:bg-[#141210] border border-[#e8e0ce] dark:border-[#322c27] space-y-2.5 shadow-xs"
+                >
+                  {/* 角色卡片顶栏 */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="relative group/avatar cursor-pointer">
+                        {avatarUrl ? (
                           <img
                             src={avatarUrl}
                             alt={actor.character_name}
-                            onClick={() => setLightboxImageUrl(avatarUrl)}
-                            className="w-16 h-20 sm:w-20 sm:h-24 rounded-xl object-cover border-2 border-amber-600/35 shadow-md group-hover:border-amber-600 transition-all cursor-zoom-in bg-surface-2"
-                            title="点击放大查看高清立绘"
+                            className="w-10 h-10 rounded-full object-cover border border-amber-500/30 shadow-2xs group-hover/avatar:opacity-85 transition-opacity"
+                            onClick={() => openActorVisualModal(idx)}
                           />
+                        ) : (
                           <div
-                            onClick={() => setLightboxImageUrl(avatarUrl)}
-                            className="absolute inset-0 bg-black/35 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px] cursor-zoom-in font-sans pointer-events-auto"
-                          >
-                            <span>🔍 大图</span>
-                          </div>
-                          <button
-                            type="button"
                             onClick={() => openActorVisualModal(idx)}
-                            className="absolute -bottom-1 -right-1 px-1.5 py-0.2 rounded-full bg-amber-800 text-white text-[9px] font-sans shadow-md hover:bg-amber-700 transition-colors cursor-pointer border border-white/20"
-                            title="更换立绘或编辑外貌特征"
+                            className="w-10 h-10 rounded-full bg-amber-600/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 font-serif font-bold text-xs flex items-center justify-center group-hover/avatar:bg-amber-600/25 transition-colors"
                           >
-                            换图
-                          </button>
-                        </div>
-
-                        {/* 角色姓名、属性与外貌摘要 */}
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <div className="flex items-center justify-between gap-1 flex-wrap">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-serif font-bold text-sm text-[#2c2621] dark:text-[#f0eae0]">
-                                {actor.character_name}
-                              </span>
-
-                              {/* 性别徽章 */}
-                              {gender ? (
-                                <span
-                                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
-                                    gender === '男'
-                                      ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20'
-                                      : gender === '女'
-                                      ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20'
-                                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20'
-                                  }`}
-                                  title="角色生理与称谓性别"
-                                >
-                                  {gender === '男' ? '♂ 男' : gender === '女' ? '♀ 女' : gender}
-                                </span>
-                              ) : (
-                                <select
-                                  value=""
-                                  onChange={async (e) => {
-                                    const val = e.target.value;
-                                    if (!val) return;
-                                    if (charObj) {
-                                      await api.updateCharacter({ id: charObj.id, name: charObj.name, gender: val });
-                                      const updated = await api.listCharacters(activeNovel!.id);
-                                      setCharacters(updated);
-                                    } else {
-                                      updateActorField(idx, 'gender' as any, val);
-                                    }
-                                    showToast(`已设置【${actor.character_name}】性别为“${val}”`, 'success');
-                                  }}
-                                  className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1 py-0.2 outline-none cursor-pointer"
-                                  title="点击为该角色设定性别"
-                                >
-                                  <option value="" disabled>+ 设性别</option>
-                                  <option value="男">♂ 男</option>
-                                  <option value="女">♀ 女</option>
-                                  <option value="其他">⚧ 其他</option>
-                                </select>
-                              )}
-
-                              {idx === 0 && (
-                                <span className="text-[10px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-600 font-mono">
-                                  先手方
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              {actors.length > 2 && (
-                                <button
-                                  onClick={() => handleRemoveActor(idx)}
-                                  className="p-1 text-[#a39788] hover:text-rose-600 transition-colors cursor-pointer"
-                                  title="移出此角色"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
+                            {actor.character_name.slice(0, 1)}
                           </div>
-
-                          {/* 快捷操作胶囊 */}
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => openActorVisualModal(idx)}
-                              className="text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-medium flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                              title="点击查看/编辑 AI 理解的外貌特征"
-                            >
-                              <span>👗</span>
-                              <span>立绘外貌与AI识图</span>
-                              {visualSummary && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setLightboxImageUrl(avatarUrl)}
-                              className="text-[10px] px-2 py-0.5 rounded-full border border-stone-300 dark:border-stone-700 hover:bg-black/5 dark:hover:bg-white/5 text-stone-600 dark:text-stone-300 flex items-center gap-1 cursor-pointer transition-colors"
-                              title="全屏放大查看立绘"
-                            >
-                              <span>🔍</span>
-                              <span>大图</span>
-                            </button>
-                          </div>
-
-                          {/* 外貌速览卡片 */}
-                          {visualSummary ? (
-                            <p
-                              onClick={() => openActorVisualModal(idx)}
-                              className="text-[10px] text-stone-600 dark:text-stone-300 line-clamp-2 leading-relaxed bg-[#fbf8f2] dark:bg-[#1a1714] p-1.5 rounded-lg border border-[#ede5d4] dark:border-[#2f2924] cursor-pointer hover:border-amber-600/40 transition-colors"
-                              title="点击查看/修改完整外貌描摹"
-                            >
-                              <span className="text-amber-700 dark:text-amber-400 font-semibold mr-1">【视觉外貌】</span>
-                              {visualSummary}
-                            </p>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => openActorVisualModal(idx)}
-                              className="text-[10px] text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
-                            >
-                              <Sparkles className="w-3 h-3" />
-                              <span>点击运行【AI 识图】，自动生成外貌描写</span>
-                            </button>
-                          )}
-                        </div>
+                        )}
+                        <span
+                          onClick={() => openActorVisualModal(idx)}
+                          className="absolute -bottom-1 -right-1 px-1 py-0.2 rounded text-[9px] bg-black/60 text-white font-mono opacity-0 group-hover/avatar:opacity-100 transition-opacity"
+                        >
+                          换图
+                        </span>
                       </div>
-                    ) : (
-                      /* 未配置立绘时的紧凑行 */
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => openActorVisualModal(idx)}
-                            className="relative group cursor-pointer shrink-0 transition-transform active:scale-95"
-                            title="点击上传角色立绘贴图，支持AI识图理解外貌"
-                          >
-                            <div className="w-8 h-8 rounded-lg border border-dashed border-amber-600/40 hover:border-amber-600 bg-amber-500/5 hover:bg-amber-500/15 flex items-center justify-center text-amber-800 dark:text-amber-300 transition-all font-serif font-bold text-xs relative">
-                              <span>{String.fromCharCode(65 + idx)}</span>
-                              <span className="absolute -bottom-1 -right-1 text-[8px] leading-none bg-amber-600 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-xs">
-                                +
-                              </span>
-                            </div>
-                          </button>
 
-                          <span className="font-serif font-bold text-xs text-[#2c2621] dark:text-[#e8e2d8]">
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-serif font-bold text-sm text-[#2c2621] dark:text-[#f0eae0]">
                             {actor.character_name}
                           </span>
-
-                          {/* 性别徽章与快捷设置 */}
-                          <div className="flex items-center gap-1">
-                            {gender ? (
-                              <span
-                                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
-                                  gender === '男'
-                                    ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20'
-                                    : gender === '女'
-                                    ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20'
-                                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20'
-                                }`}
-                                title="角色生理与称谓性别"
-                              >
-                                {gender === '男' ? '♂ 男' : gender === '女' ? '♀ 女' : gender}
-                              </span>
-                            ) : (
-                              <select
-                                value=""
-                                onChange={async (e) => {
-                                  const val = e.target.value;
-                                  if (!val) return;
-                                  if (charObj) {
-                                    await api.updateCharacter({ id: charObj.id, name: charObj.name, gender: val });
-                                    const updated = await api.listCharacters(activeNovel!.id);
-                                    setCharacters(updated);
-                                  } else {
-                                    updateActorField(idx, 'gender' as any, val);
-                                  }
-                                  showToast(`已设置【${actor.character_name}】性别为“${val}”`, 'success');
-                                }}
-                                className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1 py-0.2 outline-none cursor-pointer"
-                                title="点击为该角色设定性别"
-                              >
-                                <option value="" disabled>+ 设性别</option>
-                                <option value="男">♂ 男</option>
-                                <option value="女">♀ 女</option>
-                                <option value="其他">⚧ 其他</option>
-                              </select>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => openActorVisualModal(idx)}
-                              className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 transition-all flex items-center gap-1 cursor-pointer shrink-0"
-                              title="点击上传立绘贴图，AI 自动理解人设外貌"
-                            >
-                              <span className="text-xs">🖼️</span>
-                              <span className="font-medium">+ 传立绘</span>
-                            </button>
-                          </div>
-
+                          {gender && (
+                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-medium ${
+                              gender === '女'
+                                ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
+                                : 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20'
+                            }`}>
+                              {gender === '女' ? '♀' : '♂'} {gender}
+                            </span>
+                          )}
                           {idx === 0 && (
-                            <span className="text-[10px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-600 font-mono">
+                            <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-600/15 text-amber-800 dark:text-amber-300 font-medium">
                               先手方
                             </span>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-1">
-                          {actors.length > 2 && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <button
+                            type="button"
+                            onClick={() => openActorVisualModal(idx)}
+                            className="text-[10px] text-teal-700 dark:text-teal-400 hover:underline flex items-center gap-1 bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20"
+                            title="配置立绘、外貌体态或点击进行多模态视觉识别"
+                          >
+                            <Image className="w-2.5 h-2.5 text-teal-600" />
+                            <span>立绘外貌与AI识图</span>
+                          </button>
+                          {avatarUrl && (
                             <button
-                              onClick={() => handleRemoveActor(idx)}
-                              className="p-1 text-[#a39788] hover:text-rose-600 transition-colors"
+                              type="button"
+                              onClick={() => setLightboxImageUrl(avatarUrl)}
+                              className="text-[10px] text-[#8a7f73] hover:text-amber-700 flex items-center gap-0.5"
+                              title="在新窗口查看大图"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Eye className="w-2.5 h-2.5" /> 大图
                             </button>
                           )}
                         </div>
                       </div>
-                    )}
+                    </div>
 
-                  {/* 扮演模式选择：AI 子代理 vs 作者亲演 */}
-                  <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[#efe9dc] dark:bg-[#201c18] border border-[#e0d6c2] dark:border-[#38312a] text-[10px]">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleRemoveActor(idx)}
+                        title="移出对戏阵容"
+                        className="p-1 rounded text-[#a39788] hover:text-rose-600 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 视觉外貌特征下锚摘要 */}
+                  {visualSummary ? (
+                    <div className="p-2 rounded-lg bg-teal-500/5 dark:bg-teal-950/20 border border-teal-500/20 text-[11px] text-teal-900 dark:text-teal-200/90 leading-relaxed space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-teal-700 dark:text-teal-400">
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="w-2.5 h-2.5" /> 视觉锚定 (推演与精修自动融入):
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openActorVisualModal(idx)}
+                          className="hover:underline flex items-center gap-0.5 text-teal-600 cursor-pointer"
+                        >
+                          <RotateCcw className="w-2.5 h-2.5" /> 重新提炼
+                        </button>
+                      </div>
+                      <p className="line-clamp-2">{visualSummary}</p>
+                    </div>
+                  ) : avatarUrl ? (
+                    <div className="flex items-center justify-between px-2 py-1 rounded bg-amber-500/10 text-[10px] text-amber-800 dark:text-amber-300">
+                      <span>已上传立绘，尚未生成视觉特征</span>
+                      <button
+                        type="button"
+                        onClick={() => openActorVisualModal(idx)}
+                        className="font-bold underline hover:text-amber-900 flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Sparkles className="w-2.5 h-2.5" /> 点击运行【AI 识图】，自动生成外貌描写
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {/* 亲演 / AI驱动 切换 */}
+                  <div className="grid grid-cols-2 p-0.5 rounded-lg border border-[#e2d9c5] dark:border-[#3a332d] bg-black/5 dark:bg-white/5 text-[11px]">
                     <button
                       type="button"
                       onClick={() => updateActorField(idx, 'is_human', false)}
-                      className={`flex-1 py-1 rounded text-center transition-all ${
+                      className={`py-1 rounded text-center transition-all ${
                         !actor.is_human
-                          ? 'bg-white dark:bg-[#2b2521] text-amber-900 dark:text-amber-300 shadow-2xs font-bold'
-                          : 'text-[#8a7f73] hover:text-[#4a4036]'
+                          ? 'bg-white dark:bg-[#201c19] text-amber-900 dark:text-amber-300 font-bold shadow-2xs'
+                          : 'text-[#8a7f73]'
                       }`}
                     >
-                      🤖 AI 子代理驱动
+                      🤖 AI 驱动
                     </button>
                     <button
                       type="button"
                       onClick={() => updateActorField(idx, 'is_human', true)}
-                      className={`flex-1 py-1 rounded text-center transition-all ${
+                      className={`py-1 rounded text-center transition-all ${
                         actor.is_human
-                          ? 'bg-amber-700 text-white shadow-2xs font-bold'
-                          : 'text-[#8a7f73] hover:text-[#4a4036]'
+                          ? 'bg-white dark:bg-[#201c19] text-amber-900 dark:text-amber-300 font-bold shadow-2xs'
+                          : 'text-[#8a7f73]'
                       }`}
                     >
                       👤 作者亲演
                     </button>
                   </div>
 
-                  {actor.is_human ? (
-                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-800 dark:text-amber-300 leading-relaxed">
-                      🎭 <strong>作者亲演接管中</strong>：轮到该角色时由您亲自输入微表情动作与正面对白，AI 对手将根据您的实时言辞作出独立反击！
-                    </div>
-                  ) : (
-                    /* 绑定模型选择 */
-                    <div className="grid grid-cols-2 gap-2">
+                  {/* 独立服务商与模型选择 */}
+                  {!actor.is_human && (
+                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                       <div>
                         <div className="flex items-center justify-between mb-0.5">
-                          <label className="text-[10px] text-[#8a7f73] block">服务商</label>
+                          <label className="text-[10px] text-[#8a7f73]">服务商</label>
                           <button
                             type="button"
                             onClick={() => setShowSettingsModal(true)}
-                            className="text-[9px] text-amber-700 dark:text-amber-400 hover:underline cursor-pointer"
-                            title="配置并添加新的 API Key 与服务商"
+                            className="text-[9px] text-amber-700 dark:text-amber-400 hover:underline"
                           >
                             配置API
                           </button>
@@ -2577,7 +2481,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                   {/* 私密动机 */}
                   <div>
                     <label className="text-[10px] text-amber-700 dark:text-amber-400 font-medium block mb-0.5">
-                      当场私密动机 (私密CoT，绝不泄漏)
+                      当场私密动机
                     </label>
                     <textarea
                       rows={2}
@@ -2591,21 +2495,540 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                   {/* 隐藏秘密 */}
                   <div>
                     <label className="text-[10px] text-rose-700 dark:text-rose-400 font-medium block mb-0.5">
-                      隐藏秘密与软肋 (绝不外露)
+                      隐藏秘密与软肋
                     </label>
                     <input
                       type="text"
                       value={actor.private_secret}
                       onChange={(e) => updateActorField(idx, 'private_secret', e.target.value)}
                       className="w-full text-[11px] px-2 py-1 rounded border border-[#e2d9c5] dark:border-[#3a332d] bg-white dark:bg-[#1c1916] focus:ring-1 focus:ring-amber-500 outline-none"
-                      placeholder="他身上藏着的绝密后手或不能提的往事"
+                      placeholder="暗藏的后手或不可告人的往事..."
                     />
                   </div>
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* TAB 2: 场景与交锋目标 */}
+        {configDrawerTab === 'scene' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-1 border-b border-[#eee7d8] dark:border-[#2e2823]">
+              <span className="text-xs font-serif font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5" /> 场景与目标
+              </span>
+              <div className="flex items-center gap-1.5">
+                {collabStatus === 'CONNECTED' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ok = sendSandboxSync({
+                        session_title: sessionTitle,
+                        scene_setting: sceneSetting,
+                        scene_goal: sceneGoal,
+                        actors,
+                        dialogue_history: dialogueHistory,
+                        branches,
+                        active_branch_id: activeBranchId,
+                      });
+                      if (ok) showToast('已将当前演武场设定同步给协作者！', 'success');
+                    }}
+                    className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium flex items-center gap-1"
+                    title="通过 P2P 广播当前演武场给协作者"
+                  >
+                    <Globe className="w-3 h-3" /> 同步给协作者
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleResetSceneAndActors}
+                  className="text-[11px] text-[#8a7f73] hover:text-rose-600 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="重置场景描述、交锋目标与出场角色的临时秘密动机"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>重置设定</span>
+                </button>
+                <button
+                  onClick={handleSaveSession}
+                  className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline font-medium cursor-pointer"
+                >
+                  保存演武场
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowImportBibleModal(true)}
+                  className="text-[11px] text-amber-800 dark:text-amber-300 font-bold hover:underline flex items-center gap-1 cursor-pointer bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30"
+                  title="从当前小说导入章节正文前情、大纲与世界观法则"
+                >
+                  <BookOpen className="w-3 h-3 text-amber-600" />
+                  <span>导入设定</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] text-[#8a7f73] dark:text-[#9e9284] block mb-1">对戏标题</label>
+              <input
+                type="text"
+                value={sessionTitle}
+                onChange={(e) => setSessionTitle(e.target.value)}
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2d9c5] dark:border-[#3a332d] bg-white dark:bg-[#141210] focus:ring-1 focus:ring-amber-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] text-[#8a7f73] dark:text-[#9e9284]">环境描写</label>
+                <span className="text-[10px] text-[#a39788]">{sceneSetting.length} 字</span>
+              </div>
+              <textarea
+                rows={3}
+                value={sceneSetting}
+                onChange={(e) => setSceneSetting(e.target.value)}
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2d9c5] dark:border-[#3a332d] bg-white dark:bg-[#141210] focus:ring-1 focus:ring-amber-500 outline-none resize-none leading-relaxed"
+                placeholder="深夜书房，窗外风雪大作，案上灯花微响..."
+              />
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <span className="text-[10px] text-[#8a7f73]">快速环境灵感:</span>
+                {[
+                  '深夜书房，残烛摇曳',
+                  '荒郊破庙，暴雨如注',
+                  '宫闱深处，暗香浮动',
+                  '喧闹茶肆，龙蛇混杂',
+                ].map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setSceneSetting((prev) => (prev ? `${prev}。${tag}` : tag))}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/20 transition-colors cursor-pointer"
+                  >
+                    + {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] text-[#8a7f73] dark:text-[#9e9284]">交锋目标</label>
+                <span className="text-[10px] text-[#a39788]">{sceneGoal.length} 字</span>
+              </div>
+              <textarea
+                rows={3}
+                value={sceneGoal}
+                onChange={(e) => setSceneGoal(e.target.value)}
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2d9c5] dark:border-[#3a332d] bg-white dark:bg-[#141210] focus:ring-1 focus:ring-amber-500 outline-none resize-none leading-relaxed"
+                placeholder="核心矛盾、试探底线与结局走向..."
+              />
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <span className="text-[10px] text-[#8a7f73]">高频交锋目标:</span>
+                {[
+                  '逼对方露出马脚',
+                  '试探彼此真正底线',
+                  '利益谈判暗藏杀机',
+                  '身份识破生死抉择',
+                ].map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setSceneGoal((prev) => (prev ? `${prev}；${tag}` : tag))}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-500/20 transition-colors cursor-pointer"
+                  >
+                    + {tag}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
+        )}
+
+        {/* TAB 3: 经典冲突情境库 */}
+        {configDrawerTab === 'presets' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between pb-1 border-b border-[#eee7d8] dark:border-[#2e2823]">
+              <span className="text-xs font-serif font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1">
+                <Compass className="w-3.5 h-3.5" /> 经典高冲突戏份模板
+              </span>
+              <span className="text-[10px] text-[#8a7f73]">
+                点击一键套用情境与攻防动机
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {SANDBOX_PRESET_TEMPLATES.map((tmpl) => (
+                <button
+                  key={tmpl.id}
+                  onClick={() => {
+                    applyPresetTemplate(tmpl);
+                    setConfigDrawerTab('actors');
+                  }}
+                  className="p-3 rounded-xl border border-[#e2d9c5] dark:border-[#3a332d] bg-white dark:bg-[#141210] hover:border-amber-500 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 text-left transition-all group cursor-pointer shadow-2xs flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="text-base">{tmpl.icon}</span>
+                      <span className="text-xs font-serif font-bold text-[#4a4036] dark:text-[#c4baa8] group-hover:text-amber-700 dark:group-hover:text-amber-400">
+                        {tmpl.name}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-[#8a7f73] dark:text-[#9e9284] line-clamp-2 leading-relaxed">
+                      {tmpl.scene_goal}
+                    </p>
+                  </div>
+                  <div className="mt-2.5 pt-1.5 border-t border-[#f0e8d8] dark:border-[#2d2722] flex items-center justify-between text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+                    <span>套用模板</span>
+                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 抽屉底栏 */}
+      <div className="p-3 border-t border-[#e6decc] dark:border-[#2d2824] bg-[#f7f2e7] dark:bg-[#201c19] flex items-center justify-between shrink-0">
+        <button
+          type="button"
+          onClick={handleResetSceneAndActors}
+          className="text-xs px-2.5 py-1.5 rounded-lg border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#201c19] text-[#6b5e51] dark:text-[#a89b8d] hover:text-rose-600 dark:hover:text-rose-400 transition-colors flex items-center gap-1 cursor-pointer"
+          title="重置场景描述、交锋目标与出场角色的临时秘密动机"
+        >
+          <RotateCcw className="w-3 h-3" />
+          <span>重置设定</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowConfigDrawer(false)}
+          className="px-3.5 py-1.5 text-xs rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-serif font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+        >
+          <span>进入推演舞台</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="w-full h-full flex flex-col bg-[#fdfbf7] dark:bg-[#181614] text-[#2c2621] dark:text-[#e8e2d8] select-none overflow-hidden font-sans">
+      {/* 顶栏 (单行防挤压、防折行排版架构，实体背景消除滚动掉帧) */}
+      <div className="h-14 px-3 sm:px-4 border-b border-[#e6decc] dark:border-[#2d2824] bg-[#f7f2e7] dark:bg-[#201c19] flex items-center justify-between shrink-0 z-10 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 mr-2">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-600/15 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shadow-xs shrink-0">
+            <Swords className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+          </div>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <h2 className="font-serif font-bold text-sm sm:text-base tracking-wide whitespace-nowrap shrink-0">角色对戏演武场</h2>
+            
+            {/* 会话切换器下拉 */}
+            <div className="relative shrink-0 max-w-[130px] sm:max-w-[170px]">
+              <button
+                onClick={() => setShowSessionDropdown(!showSessionDropdown)}
+                className="flex items-center justify-between gap-1.5 px-2 py-1 text-xs rounded-lg border border-[#e0d6c3] dark:border-[#38312a] bg-white dark:bg-[#201c19] hover:bg-amber-50 dark:hover:bg-amber-950/20 font-medium transition-colors w-full min-w-0 overflow-hidden"
+                title="切换或新建对戏沙盒"
+              >
+                <span className="truncate text-amber-900 dark:text-amber-300">
+                  {sessionTitle || '选择对戏会话'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-[#8a7f73] shrink-0" />
+              </button>
+
+              {showSessionDropdown && (
+                <div className="absolute left-0 top-full mt-1.5 w-64 bg-white dark:bg-[#1e1b18] rounded-xl shadow-md border border-[#ded5c2] dark:border-[#38322c] py-1.5 z-40 animate-in fade-in slide-in-from-top-1 duration-100">
+                  <div className="px-3 py-1.5 border-b border-[#eee7d8] dark:border-[#2e2823] flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#8a7f73] dark:text-[#9e9284]">
+                      历史对戏 ({sessions.length})
+                    </span>
+                    <button
+                      onClick={handleCreateNewSession}
+                      className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline font-bold flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> 新建对戏
+                    </button>
+                  </div>
+
+                  <div className="max-h-56 overflow-y-auto overscroll-contain py-1">
+                    {sessions.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-[#8a7f73] text-center">暂无保存的会话</div>
+                    ) : (
+                      sessions.map((sess) => {
+                        const isCur = activeSession?.id === sess.id;
+                        return (
+                          <div
+                            key={sess.id}
+                            onClick={() => {
+                              loadSession(sess);
+                              setShowSessionDropdown(false);
+                            }}
+                            className={`px-3 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                              isCur
+                                ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-300 font-bold'
+                                : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#4a4036] dark:text-[#c4baa8]'
+                            }`}
+                          >
+                            <div className="truncate pr-2">
+                              <p className="truncate">{sess.title}</p>
+                            </div>
+                            <button
+                              onClick={(e) => handleDeleteSession(sess.id, e)}
+                              title="删除此会话"
+                              className="p-1 rounded text-[#a39788] hover:text-rose-600 transition-colors shrink-0"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 🎭 剧本与阵容设定抽屉呼出按钮 */}
+            <button
+              type="button"
+              onClick={() => setShowConfigDrawer(!showConfigDrawer)}
+              className={`px-2 sm:px-2.5 py-1 text-xs rounded-lg border flex items-center gap-1.5 font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 shadow-2xs ${
+                showConfigDrawer
+                  ? 'bg-amber-600/15 border-amber-500/40 text-amber-900 dark:text-amber-300 font-bold'
+                  : 'border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#201c19] text-[#6b5e51] dark:text-[#a89b8d] hover:bg-amber-50 dark:hover:bg-amber-950/20'
+              }`}
+              title={showConfigDrawer ? '收起剧本设定抽屉' : '打开剧本设定抽屉：配置出场阵容、秘密动机、环境与交锋目标'}
+            >
+              <Sliders className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>剧本设定</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold shrink-0">
+                {actors.length}人
+              </span>
+            </button>
+
+            {/* 实时戏剧张力胶囊 (超大屏 3xl 下在顶栏透出，常规屏幕聚合于对戏走向栏，彻底杜绝排版挤压重叠) */}
+            {dialogueHistory.length > 0 && (
+              <div className={`hidden 3xl:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-medium whitespace-nowrap shrink-0 ${currentTension.colorClass}`}>
+                <Flame className="w-3.5 h-3.5 animate-pulse" />
+                <span>张力: {currentTension.label} ({currentTension.level}/10)</span>
+              </div>
+            )}
+
+            {/* 核心亮点副标: 纯单行内联展示，空间不足时平滑隐藏，绝不产生垂直折行外溢 */}
+            <span className="text-xs text-[#8a7f73] dark:text-[#9e9284] truncate hidden 2xl:inline-block border-l border-[#e0d6c3] dark:border-[#38312a] pl-2.5 whitespace-nowrap shrink">
+              零心理同质化 · 战争迷雾心路 (CoT) · 高光灵感捕捉
+            </span>
+          </div>
+        </div>
+
+        {/* 顶栏右侧功能区 (响应式紧凑弹性排版，自适应分栏与抽屉宽度) */}
+        <div className="flex items-center gap-1 sm:gap-1.5 relative shrink-0">
+          {/* 💡 灵感火花盒 */}
+          <button
+            type="button"
+            onClick={() => setShowInspirationDrawer(!showInspirationDrawer)}
+            className={`px-2 sm:px-2.5 py-1.5 text-xs rounded-lg border flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+              showInspirationDrawer || inspirationNotes.length > 0
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-800 dark:text-amber-300 font-bold'
+                : 'border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 text-[#6e6357] dark:text-[#a89d91]'
+            }`}
+            title="打开灵感火花盒，查看提炼的金句、微动作、心理暗流与反转线索"
+          >
+            <Lightbulb className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="hidden lg:inline">灵感盒</span>
+            {inspirationNotes.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold shrink-0">
+                {inspirationNotes.length}
+              </span>
+            )}
+          </button>
+
+          {/* 视角透视切换双分段胶囊 (内心戏 | 潜台词) */}
+          <div className="flex items-center p-0.5 rounded-lg border border-[#ded5c2] dark:border-[#38322c] bg-black/5 dark:bg-white/5 shrink-0 whitespace-nowrap">
+            <button
+              onClick={() => setShowPrivateThoughts(!showPrivateThoughts)}
+              className={`px-1.5 sm:px-2 py-1 text-xs rounded-md flex items-center gap-1 transition-all cursor-pointer ${
+                showPrivateThoughts
+                  ? 'bg-white dark:bg-[#201c19] text-amber-900 dark:text-amber-300 font-bold shadow-2xs'
+                  : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
+              }`}
+              title={showPrivateThoughts ? '当前：显示内心算盘独白' : '当前：隐藏内心独白'}
+            >
+              {showPrivateThoughts ? <Eye className="w-3.5 h-3.5 text-amber-600 shrink-0" /> : <EyeOff className="w-3.5 h-3.5 shrink-0" />}
+              <span className="hidden md:inline">内心戏</span>
+            </button>
+            <button
+              onClick={() => setShowSubtext(!showSubtext)}
+              className={`px-1.5 sm:px-2 py-1 text-xs rounded-md flex items-center gap-1 transition-all cursor-pointer ${
+                showSubtext
+                  ? 'bg-white dark:bg-[#201c19] text-purple-900 dark:text-purple-300 font-bold shadow-2xs'
+                  : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
+              }`}
+              title={showSubtext ? '当前：开启潜台词透视' : '当前：关闭潜台词透视'}
+            >
+              <MessageCircle className={`w-3.5 h-3.5 shrink-0 ${showSubtext ? 'text-purple-600' : ''}`} />
+              <span className="hidden md:inline">潜台词</span>
+            </button>
+          </div>
+
+          {/* 🌐 联机已连接状态指示胶囊 (仅在已建立 P2P 房间时常驻展示，常规未连接时收纳至导出/工具箱，消除排版拥挤与多端重叠) */}
+          {collabStatus === 'CONNECTED' && (
+            <button
+              onClick={() => setShowCollabModal(true)}
+              className="px-2 sm:px-2.5 py-1 text-xs rounded-lg border bg-emerald-600/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 font-medium flex items-center gap-1 sm:gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              title="当前正处于 P2P 互联网异地联机中，点击管理房间与协同设置"
+            >
+              <Globe className="w-3.5 h-3.5 text-emerald-600 animate-pulse shrink-0" />
+              <span className="hidden sm:inline">P2P:{collabRoomCode}</span>
+            </button>
+          )}
+
+          {/* 更多工具下拉菜单 (设定导入、P2P联机、API模型管理、导出剧本/排练纪要、双轨重置) */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="px-2 sm:px-2.5 py-1.5 text-xs rounded-lg border border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 font-medium flex items-center gap-1 transition-colors whitespace-nowrap shrink-0 text-[#6e6357] dark:text-[#a89d91] cursor-pointer"
+              title="工具箱与导出"
+            >
+              <Download className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="hidden sm:inline">导出/工具</span>
+              <ChevronDown className="w-3 h-3 text-[#8a7f73] shrink-0" />
+            </button>
+
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1.5 w-60 bg-white dark:bg-[#201c19] rounded-xl shadow-md border border-[#ded5c2] dark:border-[#38322c] py-1.5 z-40 animate-in fade-in slide-in-from-top-1 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    setShowImportBibleModal(true);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 text-[#4a4036] dark:text-[#c4baa8] cursor-pointer"
+                  title="从小说章节导入前情正文、大纲、世界观法则与角色羁绊"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>📖 从小说导入设定与前情</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    setShowCollabModal(true);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 text-[#4a4036] dark:text-[#c4baa8] cursor-pointer"
+                  title="开启/管理 6 位房间码 P2P 互联网异地联机对戏"
+                >
+                  <Globe className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>🌐 互联网联机协同对戏 (P2P)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    setShowSettingsModal(true);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 text-[#4a4036] dark:text-[#c4baa8] cursor-pointer"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>🔌 API 与模型配置管理</span>
+                </button>
+                <div className="my-1 border-t border-[#eee7d8] dark:border-[#2e2823]" />
+                <button
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    handleExportScript();
+                  }}
+                  disabled={dialogueHistory.length === 0}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 disabled:opacity-40 text-[#4a4036] dark:text-[#c4baa8] cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>导出为戏剧对白脚本 (.txt)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    handleExportRehearsalMarkdown();
+                  }}
+                  disabled={dialogueHistory.length === 0}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 disabled:opacity-40 text-[#4a4036] dark:text-[#c4baa8] cursor-pointer"
+                >
+                  <BookmarkPlus className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>导出上帝视角排练纪要 (.md)</span>
+                </button>
+                <div className="my-1 border-t border-[#eee7d8] dark:border-[#2e2823]" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    handleResetDialogue();
+                  }}
+                  disabled={dialogueHistory.length === 0}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 disabled:opacity-40 text-rose-700 dark:text-rose-400 cursor-pointer"
+                  title="清空当前所有对白记录，保留设定重新推演"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>🔄 重置推演对戏记录</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    handleResetSceneAndActors();
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 text-rose-700 dark:text-rose-400 cursor-pointer"
+                  title="清空场景描述、交锋目标与出场角色的临时秘密动机"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>🧹 重置场景与出场设定</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ✍️ 优化精修文段 (主高光按钮) */}
+          <button
+            onClick={() => handleSynthesizeProse()}
+            disabled={dialogueHistory.length === 0 || isSynthesizing}
+            className="px-2.5 sm:px-3 py-1.5 text-xs rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white font-medium flex items-center gap-1 sm:gap-1.5 shadow-xs transition-all whitespace-nowrap shrink-0 cursor-pointer"
+            title="将高光对手戏升华打磨为高质量小说描写文段（支持电影感/心理流/硬派多文风）"
+          >
+            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">{isSynthesizing ? '打磨中...' : '✍️ 优化精修文段'}</span>
+            <span className="sm:hidden">{isSynthesizing ? '打磨中' : '精修'}</span>
+          </button>
+
+          {/* 模态框关闭按钮 */}
+          {isModal && onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-[#73685d] shrink-0 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 主工作区 */}
+      <div className="flex-1 min-h-0 flex overflow-hidden relative">
+        {/* 🎭 剧本与角色阵容设定 (常驻固定侧边栏模式，点击抽屉顶部的图钉可固定) */}
+        {showConfigDrawer && isConfigDrawerPinned && (
+          <div className="w-88 md:w-96 border-r border-[#e6decc] dark:border-[#2d2824] bg-[#fbf8f0] dark:bg-[#1c1916] flex flex-col shrink-0 overflow-hidden z-20">
+            {renderConfigDrawerContent()}
+          </div>
+        )}
+
+        {/* 🎭 剧本与角色阵容设定 (悬浮抽屉 Slide-over Drawer + 遮罩层，默认模式) */}
+        {showConfigDrawer && !isConfigDrawerPinned && (
+          <>
+            {/* 抽屉背景蒙层（纯色半透明，移除高开销的 backdrop-blur 避免滚动掉帧） */}
+            <div
+              className="absolute inset-0 bg-black/40 dark:bg-black/60 z-30 animate-in fade-in duration-150 cursor-pointer"
+              onClick={() => setShowConfigDrawer(false)}
+            />
+            {/* 抽屉滑出容器（独立合成层硬件加速，确保抽屉内滚动与底层画布解耦达到 60FPS） */}
+            <div className="absolute left-0 top-0 bottom-0 w-full sm:w-[440px] md:w-[480px] max-w-[95vw] bg-[#fbf8f0] dark:bg-[#1c1916] border-r border-[#e6decc] dark:border-[#2d2824] shadow-2xl z-40 flex flex-col animate-in slide-in-from-left duration-200 overflow-hidden transform-gpu">
+              {renderConfigDrawerContent()}
+            </div>
+          </>
         )}
 
         {/* 右侧：对戏交锋大厅与气泡流 */}
@@ -2666,26 +3089,35 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
               ))}
             </div>
 
-            {/* 开辟分支按钮 */}
-            <button
-              onClick={() => handleOpenForkModal(dialogueHistory.length > 0 ? dialogueHistory.length - 1 : 0)}
-              disabled={dialogueHistory.length === 0}
-              className="px-2.5 py-1 rounded-lg text-xs font-serif border border-emerald-600/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-40 flex items-center gap-1 shrink-0 transition-colors"
-              title="从当前最新轮次开辟新的平行走向分支"
-            >
-              <Plus className="w-3 h-3" />
-              <span>开辟新分支</span>
-            </button>
+            {/* 右侧功能区：实时戏剧张力胶囊 + 开辟分支 */}
+            <div className="flex items-center gap-2 shrink-0">
+              {dialogueHistory.length > 0 && (
+                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium whitespace-nowrap shrink-0 shadow-2xs ${currentTension.colorClass}`}>
+                  <Flame className="w-3.5 h-3.5 animate-pulse" />
+                  <span>张力: {currentTension.label} ({currentTension.level}/10)</span>
+                </div>
+              )}
+
+              {/* 开辟分支按钮 */}
+              <button
+                onClick={() => handleOpenForkModal(dialogueHistory.length > 0 ? dialogueHistory.length - 1 : 0)}
+                disabled={dialogueHistory.length === 0}
+                className="px-2.5 py-1 rounded-lg text-xs font-serif border border-emerald-600/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-40 flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+                title="从当前最新轮次开辟新的平行走向分支"
+              >
+                <Plus className="w-3 h-3" />
+                <span>开辟新分支</span>
+              </button>
+            </div>
           </div>
-          {/* 对话消息滚动流 (原生硬件加速滚动 + content-visibility 视口懒计算，消除推演过程与回顾滚动时的掉帧卡顿) */}
+          {/* 对话消息滚动流 (原生硬件加速滚动 transform-gpu，消除推演过程与回顾滚动时的掉帧卡顿) */}
           <div
             ref={scrollRef}
             onScroll={handleScroll}
-            className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-4 overscroll-contain"
+            className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-4 overscroll-contain transform-gpu"
           >
             {/* 开场环境卡片 */}
             <div
-              style={{ contentVisibility: 'auto', containIntrinsicSize: '0 80px' }}
               className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 text-xs text-amber-900 dark:text-amber-200 font-serif leading-relaxed"
             >
               <span className="font-bold mr-1">【舞台起幕】</span>
@@ -2694,10 +3126,22 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
 
             {dialogueHistory.length === 0 ? (
               <div className="h-64 flex flex-col items-center justify-center text-center text-[#998d7f] dark:text-[#7d7265] space-y-2">
-                <Swords className="w-10 h-10 opacity-30 stroke-1" />
-                <p className="text-sm font-serif">舞台就绪，角色已各怀鬼胎。</p>
-                <p className="text-xs">点击下方【步进一轮 (Step)】或【连续推演 (Auto)】，观摩角色独立思考与唇枪舌剑！</p>
-                <p className="text-[11px] text-[#a89d91]">快捷提示：支持按 <kbd className="px-1.5 py-0.5 bg-black/5 dark:bg-white/10 rounded font-mono text-[10px]">Ctrl+Enter</kbd> 极速步进</p>
+                <Swords className="w-9 h-9 opacity-30 stroke-1 mb-1" />
+                <p className="text-sm font-serif text-[#4a4036] dark:text-[#d4cbbf]">对戏准备就绪，角色各持动机与秘密</p>
+                <p className="text-xs text-[#8a7f73]">
+                  点击下方【步进一轮】开始推演，支持快捷键 <kbd className="px-1.5 py-0.5 bg-black/5 dark:bg-white/10 rounded font-mono text-[10px]">Ctrl+Enter</kbd>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfigDrawer(true);
+                    setConfigDrawerTab('actors');
+                  }}
+                  className="mt-2 px-3.5 py-1.5 rounded-xl border border-amber-600/30 bg-amber-600/10 hover:bg-amber-600/20 text-amber-800 dark:text-amber-300 text-xs font-serif font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-amber-600" />
+                  <span>配置剧本场景与角色秘密 (抽屉)</span>
+                </button>
               </div>
             ) : (
               dialogueHistory.map((round, idx) => {
@@ -2705,7 +3149,6 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                   return (
                     <div
                       key={idx}
-                      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 60px' }}
                       className="mx-auto max-w-lg p-2.5 rounded-lg bg-stone-100 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800 text-center text-xs text-stone-600 dark:text-stone-400 font-serif"
                     >
                       <span className="font-bold text-amber-700 dark:text-amber-500 mr-1.5">⚡ 突发变故</span>
@@ -2726,7 +3169,6 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 return (
                   <div
                     key={idx}
-                    style={{ contentVisibility: 'auto', containIntrinsicSize: '0 160px' }}
                     className={`flex flex-col ${isEven ? 'items-start' : 'items-end'} max-w-2xl ${
                       isEven ? 'mr-auto' : 'ml-auto'
                     }`}
@@ -2766,7 +3208,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                         <div className="p-2.5 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 text-xs">
                           <div className="flex items-center justify-between text-[11px] font-bold text-amber-800 dark:text-amber-300 mb-1">
                             <span className="flex items-center gap-1">
-                              <Eye className="w-3 h-3" /> 私密内心独白 (对他人完全屏蔽)
+                              <Eye className="w-3 h-3" /> 私密心路独白
                             </span>
                           </div>
                           <p className="text-[#695d50] dark:text-[#c4baa8] font-serif leading-relaxed italic">
@@ -2863,37 +3305,46 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                               <button
                                 onClick={() => handleCopySingleRound(round)}
                                 className="text-[11px] text-[#8a7e70] hover:text-amber-700 flex items-center gap-1 transition-colors"
-                                title="一键复制本句台词与神态"
+                                title="复制本句台词与神态"
                               >
                                 <Copy className="w-3 h-3" />
-                                <span>复制本句</span>
+                                <span>复制</span>
                               </button>
 
                               <button
                                 onClick={() => handleCaptureInspiration(round, 'QUOTE')}
                                 className="text-[11px] text-amber-700 dark:text-amber-400 hover:text-amber-800 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/25 flex items-center gap-1 transition-colors font-medium cursor-pointer"
-                                title="捕获此句台词金句入灵感火花盒"
+                                title="将台词金句存入灵感盒"
                               >
                                 <Lightbulb className="w-3 h-3 text-amber-600" />
-                                <span>捕获灵感</span>
+                                <span>灵感</span>
                               </button>
 
                               <button
-                                onClick={() => handleSynthesizeProse('CINEMATIC', 'RECENT_3')}
+                                onClick={() => handleSynthesizeProse('CINEMATIC', 'FOCUSED_ROUND', idx)}
                                 className="text-[11px] text-[#8a7e70] hover:text-emerald-700 flex items-center gap-1 transition-colors cursor-pointer"
-                                title="将本节拍在内的高光片段打磨优化为精彩小说文段"
+                                title={`将第 ${idx + 1} 节拍交锋打磨为小说文段`}
                               >
                                 <Sparkles className="w-3 h-3 text-emerald-600" />
                                 <span>优化文段</span>
                               </button>
 
                               <button
+                                onClick={() => handleProbeNextActions(round.speaker_id)}
+                                className="text-[11px] text-[#8a7e70] hover:text-indigo-600 flex items-center gap-1 transition-colors cursor-pointer"
+                                title={`探测【${round.speaker_name}】在此刻的可能抉择路线`}
+                              >
+                                <Target className="w-3 h-3 text-indigo-600" />
+                                <span>探他抉择</span>
+                              </button>
+
+                              <button
                                 onClick={() => handleOpenForkModal(idx)}
                                 className="text-[11px] text-[#8a7e70] hover:text-emerald-700 flex items-center gap-1 transition-colors"
-                                title="以此回合为节点开辟新的平行走向分支"
+                                title="以此节拍开辟新的平行走向分支"
                               >
                                 <GitBranch className="w-3 h-3 text-emerald-600" />
-                                <span>开辟分支</span>
+                                <span>分支</span>
                               </button>
                             </div>
 
@@ -2906,7 +3357,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                                   title="撤销本句并让角色重新生成"
                                 >
                                   <RotateCcw className="w-3 h-3" />
-                                  <span>换个说法 (重掷)</span>
+                                  <span>重掷</span>
                                 </button>
                               )}
 
@@ -2918,7 +3369,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                                 }}
                                 className="text-[11px] text-[#8a7e70] hover:text-amber-700 flex items-center gap-1 transition-colors"
                               >
-                                <Edit2 className="w-3 h-3" /> 原地改词
+                                <Edit2 className="w-3 h-3" /> 改词
                               </button>
                             </div>
                           </div>
@@ -2928,6 +3379,45 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                   </div>
                 );
               })
+            )}
+
+            {/* 正在推演中动效卡片 (带一键暂停中断按钮) */}
+            {(isStepping || isRunning) && nextSpeaker && (
+              <div className="flex gap-3 animate-in fade-in slide-in-from-bottom-1 duration-150 py-1">
+                <div className="w-10 h-10 rounded-xl bg-amber-600/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                  {nextSpeaker.avatar_url ? (
+                    <img src={nextSpeaker.avatar_url} alt={nextSpeaker.character_name} className="w-full h-full object-cover rounded-xl" />
+                  ) : (
+                    <Users className="w-5 h-5 text-amber-700 dark:text-amber-400" />
+                  )}
+                </div>
+                <div className="flex-1 max-w-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/25 rounded-2xl p-3.5 space-y-2 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-serif font-bold text-xs text-amber-900 dark:text-amber-300">
+                        {nextSpeaker.character_name}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1">
+                        <Loader2 className="w-2.5 h-2.5 animate-spin text-amber-700 dark:text-amber-300" />
+                        正在暗自权衡利弊与构思台词...
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleStopDeduction}
+                      className="text-xs px-2.5 py-1 rounded-lg bg-rose-600/15 hover:bg-rose-600/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center gap-1 transition-colors cursor-pointer font-bold"
+                      title="立即中断并暂停本次推演 (Esc)"
+                    >
+                      <Pause className="w-3 h-3" />
+                      <span>暂停推演 (Esc)</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-[#8a7f73] italic">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                    <span>权衡利弊与博弈应对中...</span>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -2973,18 +3463,18 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
           )}
 
           {/* 作者亲演即兴台词发射坞 (当下一轮由作者肉身接管时弹出) */}
-          {isHumanTurn && !isRunning && (
+          {isHumanTurn && !isRunning && !isStepping && (
             <div className="p-3 bg-amber-50/95 dark:bg-amber-950/50 border-t border-amber-300 dark:border-amber-800/60 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-serif font-bold text-xs text-amber-900 dark:text-amber-300">
                   <span className="w-2 h-2 rounded-full bg-amber-600 animate-ping" />
-                  <span>🎭 轮到您亲身演绎【{nextSpeaker?.character_name}】发难/接招：</span>
+                  <span>🎭 亲演【{nextSpeaker?.character_name}】：</span>
                 </div>
                 <button
                   onClick={() => executeStep()}
                   className="text-[11px] text-[#8a7f73] hover:text-amber-700 hover:underline transition-colors"
                 >
-                  临时委托 AI 替我发言一次
+                  委托 AI 代发言
                 </button>
               </div>
 
@@ -3001,7 +3491,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-[10px] text-amber-800 dark:text-amber-400 font-bold block mb-0.5">
-                    正面对白台词 * (Enter / Ctrl+Enter 发射)
+                    正面对白 (Enter 发射)
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -3018,7 +3508,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                       disabled={!humanSpeech.trim()}
                       className="px-4 py-1.5 text-xs rounded-lg bg-amber-700 hover:bg-amber-800 disabled:opacity-40 text-white font-bold flex items-center gap-1 shadow-sm transition-all shrink-0"
                     >
-                      <Send className="w-3.5 h-3.5" /> 发射对白
+                      <Send className="w-3.5 h-3.5" /> 发送
                     </button>
                   </div>
                 </div>
@@ -3026,47 +3516,151 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
             </div>
           )}
 
-          {/* 底部控制栏 (纯色实体背景，严密防折行、防溢出遮挡架构) */}
-          <div className="h-16 px-4 border-t border-[#e6decc] dark:border-[#2d2824] bg-[#f7f2e7] dark:bg-[#201c19] flex items-center justify-between shrink-0 z-10 gap-3">
+          {/* 底部控制栏 (纯色实体背景，严密防折行、防溢出遮挡架构，推演中实时可暂停) */}
+          <div className="h-16 px-3 sm:px-4 border-t border-[#e6decc] dark:border-[#2d2824] bg-[#f7f2e7] dark:bg-[#201c19] flex items-center justify-between shrink-0 z-10 gap-2 min-w-0">
             {/* 左侧状态信息区 (严格 overflow-hidden 截断，杜绝溢出文本与右侧按钮重叠) */}
-            <div className="flex items-center gap-2.5 min-w-0 overflow-hidden shrink-0">
+            <div className="flex items-center gap-2 min-w-0 overflow-hidden shrink-0">
               <span className="text-xs text-[#8a7f73] dark:text-[#9e9284] whitespace-nowrap shrink-0">
-                累计对戏: <strong className="text-[#2c2621] dark:text-[#e8e2d8]">{dialogueHistory.length}</strong> 轮
+                对戏 <strong className="text-[#2c2621] dark:text-[#e8e2d8]">{dialogueHistory.length}</strong> 轮
               </span>
 
-              {/* 清空重来按钮 */}
-              {dialogueHistory.length > 0 && (
-                <button
-                  onClick={handleResetDialogue}
-                  disabled={isRunning}
-                  className="text-xs text-[#8a7f73] hover:text-rose-600 flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                  title="清空当前对戏记录，保留角色秘密重新推演"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>清空重开</span>
-                </button>
-              )}
+              {/* 重置推演按钮 (常驻显式呈现，用户随时可定位并一键重置对话实录) */}
+              <button
+                onClick={handleResetDialogue}
+                disabled={dialogueHistory.length === 0 || isRunning || isStepping}
+                className="text-xs px-2.5 py-1.5 rounded-lg border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#201c19] text-[#6b5e51] dark:text-[#a89b8d] hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-400/50 flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-35 disabled:cursor-not-allowed shadow-2xs group"
+                title={dialogueHistory.length === 0 ? "暂无推演对话记录" : "重置并清空对戏实录，保留角色设定重新推演"}
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-[#8a7f73] group-hover:text-rose-600 transition-colors" />
+                <span>重置推演</span>
+              </button>
 
+              {/* 推演中状态胶囊 */}
               {isRunning && (
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-medium animate-pulse whitespace-nowrap shrink-0">
-                  连续推演中... 剩余 {autoRunRoundsRemaining} 轮
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-medium animate-pulse whitespace-nowrap shrink-0 flex items-center gap-1.5">
+                  <Pause className="w-3 h-3 text-rose-600" />
+                  <span>连续推演中... 剩余 {autoRunRoundsRemaining} 轮</span>
                 </span>
               )}
 
-              {/* 超宽大屏补充提示 (严密截断保护，小屏与标准屏由按钮自带 kbd 提示) */}
-              <span className="hidden 2xl:inline text-[11px] text-[#a89d91] whitespace-nowrap truncate opacity-70">
-                · 按 Esc 可暂停推演
-              </span>
+              {isStepping && !isRunning && (
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-medium animate-pulse whitespace-nowrap shrink-0 flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
+                  <span>推演中...</span>
+                </span>
+              )}
+
+              {/* 实时暂停直达按钮 */}
+              {(isRunning || isStepping) && (
+                <button
+                  type="button"
+                  onClick={handleStopDeduction}
+                  className="text-xs text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1 font-bold cursor-pointer shrink-0"
+                  title="点此或按 Esc 立即暂停"
+                >
+                  <Pause className="w-3 h-3" />
+                  <span>按 Esc 立即暂停</span>
+                </button>
+              )}
             </div>
 
             {/* 右侧动作控制区 (高度稳固，防挤压) */}
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* 指定发言人下拉浮窗 */}
+              {/* 🎭 导演干预合并下拉菜单 (在分屏与常规屏幕 < 2xl 下优雅合并，释放 220px 空间，彻底杜绝按钮挤出截断) */}
+              <div className="relative 2xl:hidden shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowInterveneMenu(!showInterveneMenu)}
+                  disabled={isRunning || isStepping || actors.length === 0}
+                  className={`px-2.5 py-2 text-xs rounded-xl border flex items-center gap-1.5 font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-40 ${
+                    showInterveneMenu
+                      ? 'border-indigo-600/50 bg-indigo-600/15 text-indigo-900 dark:text-indigo-300'
+                      : 'border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#201c19] text-[#5a4f43] dark:text-[#c4baa8] hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+                  title="导演剧情干预：指定角色发言、插入外界旁白、🎯 抉择探针"
+                >
+                  <Target className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  <span>剧情干预</span>
+                  <ChevronDown className={`w-3 h-3 text-[#8a7f73] transition-transform ${showInterveneMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showInterveneMenu && (
+                  <div className="absolute bottom-full mb-1.5 right-0 w-52 bg-white dark:bg-[#1e1b18] rounded-xl shadow-xl border border-[#ded5c2] dark:border-[#38322c] py-1.5 z-40 animate-in fade-in slide-in-from-bottom-1 duration-100">
+                    <div className="px-3 py-1 text-[10px] text-[#8a7f73] border-b border-[#eee7d8] dark:border-[#2e2823] font-bold">
+                      剧情导演干预工具
+                    </div>
+                    {/* 1. 抉择探针 */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowInterveneMenu(false);
+                        handleProbeNextActions();
+                      }}
+                      disabled={isProbingActions}
+                      className="w-full px-3 py-2 text-left text-xs hover:bg-indigo-50 dark:hover:bg-indigo-950/30 flex items-center gap-2 text-indigo-900 dark:text-indigo-300 font-medium cursor-pointer"
+                    >
+                      <Target className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <span>{isProbingActions ? '探测中...' : '🎯 角色抉择探针'}</span>
+                    </button>
+                    {/* 2. 指定发言 */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowInterveneMenu(false);
+                        setShowSpeakerPicker(true);
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 text-[#4a4036] dark:text-[#d4cbbf] cursor-pointer"
+                    >
+                      <Users className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" />
+                      <span>指定角色发言</span>
+                    </button>
+                    {/* 3. 插入旁白 */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowInterveneMenu(false);
+                        setShowNarratorInput(true);
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 text-[#4a4036] dark:text-[#d4cbbf] cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" />
+                      <span>插入外界旁白</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 超宽大屏 (>= 2xl) 展开平铺独立干预按钮 */}
+              <div className="hidden 2xl:flex items-center gap-1.5 shrink-0">
+                {/* 插入旁白变故 */}
+                <button
+                  onClick={() => setShowNarratorInput(!showNarratorInput)}
+                  disabled={isRunning || isStepping}
+                  className="px-2.5 py-2 text-xs rounded-xl border border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 font-medium flex items-center gap-1.5 disabled:opacity-40 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  title="插入突发外界变故与天意干预"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                  <span>插入旁白</span>
+                </button>
+
+                {/* 🎯 探测角色此时会怎么做 */}
+                <button
+                  onClick={() => handleProbeNextActions()}
+                  disabled={isRunning || isStepping || actors.length === 0 || isProbingActions}
+                  className="px-3 py-2 text-xs rounded-xl border border-indigo-600/40 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-800 dark:text-indigo-300 font-bold flex items-center gap-1.5 disabled:opacity-40 transition-colors shadow-2xs cursor-pointer whitespace-nowrap shrink-0"
+                  title="推演主要人物在此时的可能抉择方案"
+                >
+                  <Target className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span>{isProbingActions ? '探测中...' : '🎯 抉择探针'}</span>
+                </button>
+              </div>
+
+              {/* 指定发言人浮窗 (支持独立或从干预菜单触发) */}
               <div className="relative shrink-0">
                 <button
                   onClick={() => setShowSpeakerPicker(!showSpeakerPicker)}
-                  disabled={isRunning || actors.length === 0}
-                  className="px-2.5 py-2 text-xs rounded-xl border border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 font-medium flex items-center gap-1 disabled:opacity-40 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                  disabled={isRunning || isStepping || actors.length === 0}
+                  className="hidden 2xl:flex px-2.5 py-2 text-xs rounded-xl border border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 font-medium items-center gap-1 disabled:opacity-40 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                   title="指定由哪位角色主动发言发难"
                 >
                   <span>指定发言</span>
@@ -3074,9 +3668,9 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 </button>
 
                 {showSpeakerPicker && (
-                  <div className="absolute bottom-full mb-1.5 left-0 w-48 bg-white dark:bg-[#1e1b18] rounded-xl shadow-md border border-[#ded5c2] dark:border-[#38322c] py-1 z-30 animate-in fade-in slide-in-from-bottom-1 duration-100">
+                  <div className="absolute bottom-full mb-1.5 right-0 w-48 bg-white dark:bg-[#1e1b18] rounded-xl shadow-md border border-[#ded5c2] dark:border-[#38322c] py-1 z-50 animate-in fade-in slide-in-from-bottom-1 duration-100">
                     <div className="px-3 py-1.5 text-[10px] text-[#8a7f73] border-b border-[#eee7d8] dark:border-[#2e2823] font-bold">
-                      让指定角色主动发起攻势
+                      指定发言角色
                     </div>
                     {actors.map((a) => (
                       <button
@@ -3099,55 +3693,43 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 )}
               </div>
 
-              {/* 插入旁白变故 */}
-              <button
-                onClick={() => setShowNarratorInput(!showNarratorInput)}
-                className="px-2.5 py-2 text-xs rounded-xl border border-[#ded5c2] dark:border-[#38322c] hover:bg-black/5 dark:hover:bg-white/5 font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-                title="插入突发外界变故与天意干预"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-                <span>插入旁白</span>
-              </button>
-
-              {/* 🎯 探测角色此时会怎么做 */}
-              <button
-                onClick={() => handleProbeNextActions()}
-                disabled={isRunning || actors.length === 0 || isProbingActions}
-                className="px-3 py-2 text-xs rounded-xl border border-indigo-600/40 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-800 dark:text-indigo-300 font-bold flex items-center gap-1.5 disabled:opacity-40 transition-colors shadow-2xs cursor-pointer whitespace-nowrap shrink-0"
-                title="结合当前局势与人设秘密，推演主要人物在此时此刻的3种典型行动与心理抉择方案"
-              >
-                <Target className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                <span>{isProbingActions ? '探测中...' : '🎯 抉择探针'}</span>
-                <span className="hidden md:inline font-normal text-[11px] opacity-80">(3选1)</span>
-              </button>
-
               {/* 步进一轮 (内嵌精美 kbd 快捷键，消除横向文本占位) */}
               <button
                 onClick={() => executeStep()}
-                disabled={isRunning || actors.length === 0}
+                disabled={isRunning || isStepping || actors.length === 0}
                 className="px-3 py-2 text-xs rounded-xl border border-amber-600/40 bg-amber-600/10 hover:bg-amber-600/20 text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1.5 disabled:opacity-40 transition-colors shadow-2xs cursor-pointer whitespace-nowrap shrink-0"
-                title="步进一轮对戏 (快捷键: Ctrl+Enter，连续推演时按 Esc 取消)"
+                title="步进一轮对戏 (快捷键: Ctrl+Enter，推演中按 Esc 取消)"
               >
-                <SkipForward className="w-3.5 h-3.5" />
-                <span>步进一轮</span>
-                <kbd className="hidden lg:inline-flex items-center px-1.5 py-0.2 rounded bg-amber-600/15 text-[10px] font-mono text-amber-900 dark:text-amber-200">
-                  Ctrl+↵
-                </kbd>
+                {isStepping && !isRunning ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                ) : (
+                  <SkipForward className="w-3.5 h-3.5" />
+                )}
+                <span>{isStepping && !isRunning ? '推演中...' : '步进一轮'}</span>
+                {!isStepping && (
+                  <kbd className="hidden lg:inline-flex items-center px-1.5 py-0.2 rounded bg-amber-600/15 text-[10px] font-mono text-amber-900 dark:text-amber-200">
+                    Ctrl+↵
+                  </kbd>
+                )}
               </button>
 
-              {/* 连续自动推演 */}
+              {/* 连续自动推演 / 立即暂停按钮 (单步或连续推演中均可一键暂停) */}
               <button
-                onClick={handleStartAuto}
+                onClick={isRunning || isStepping ? handleStopDeduction : handleStartAuto}
                 disabled={actors.length === 0}
                 className={`px-3.5 py-2 text-xs rounded-xl text-white font-medium flex items-center gap-1.5 transition-all shadow-sm whitespace-nowrap shrink-0 cursor-pointer ${
-                  isRunning
-                    ? 'bg-rose-700 hover:bg-rose-800'
+                  isRunning || isStepping
+                    ? 'bg-rose-700 hover:bg-rose-800 animate-pulse'
                     : 'bg-amber-700 hover:bg-amber-800 disabled:opacity-40'
                 }`}
-                title={isRunning ? '暂停自动连续推演 (Esc)' : '自动多轮对戏推演 (Esc 可随时暂停)'}
+                title={
+                  isRunning || isStepping
+                    ? '立即暂停推演 (快捷键: Esc)'
+                    : '连续自动推演多轮对手戏 (Esc 可随时暂停)'
+                }
               >
-                {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                <span>{isRunning ? '暂停推演' : '连续推演'}</span>
+                {isRunning || isStepping ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                <span>{isRunning || isStepping ? '暂停推演 (Esc)' : '连续推演'}</span>
               </button>
             </div>
           </div>
@@ -3157,107 +3739,614 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
       {/* ✍️ 高光文段精修打磨台 (Highlight Prose Polishing Studio) */}
       {showSynthesizedModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="relative w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden border border-[#ded5c2] dark:border-[#3a332d] bg-[#fbf9f5] dark:bg-[#1a1715] flex flex-col font-sans">
-            <div className="px-5 py-3.5 border-b border-[#e8dfcb] dark:border-[#2d2824] flex items-center justify-between bg-[#f4efe4] dark:bg-[#201c19]">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-emerald-600/15 text-emerald-700 dark:text-emerald-400 flex items-center justify-center">
-                  <Sparkles className="w-3.5 h-3.5" />
+          <div className="relative w-full max-w-5xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden border border-[#ded5c2] dark:border-[#3a332d] bg-[#fbf9f5] dark:bg-[#1a1715] flex flex-col font-sans">
+            {/* 顶栏：标题与视图模式切换 */}
+            <div className="px-5 py-3 border-b border-[#e8dfcb] dark:border-[#2d2824] flex items-center justify-between bg-[#f4efe4] dark:bg-[#201c19] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-emerald-600/15 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-serif font-bold text-sm text-[#2c2621] dark:text-[#f0eae0]">
-                    高光文段精修打磨台 (Prose Polishing Studio)
-                  </h3>
-                  <p className="text-[11px] text-[#857767]">提炼对戏交锋精髓 · 打磨高质感小说段落 · 激发写作灵感</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-serif font-bold text-sm text-[#2c2621] dark:text-[#f0eae0]">
+                      高光文段打磨台
+                    </h3>
+                    {polishingAnchorIndex !== null && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600/15 text-emerald-800 dark:text-emerald-300 font-medium border border-emerald-500/20">
+                        第 {polishingAnchorIndex + 1} 节拍
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <button
-                onClick={() => setShowSynthesizedModal(false)}
-                className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-[#857767]"
-              >
-                <X className="w-4 h-4" />
-              </button>
+
+              <div className="flex items-center gap-2">
+                {/* 视图切换胶囊: 纯享阅读 | 骨架对照 | 双版比对 | 原地编辑 */}
+                <div className="flex items-center p-0.5 rounded-lg border border-[#ded5c2] dark:border-[#38322c] bg-black/5 dark:bg-white/5 text-xs shrink-0">
+                  <button
+                    onClick={() => setPolishingStudioView('READ')}
+                    className={`px-2.5 py-1 rounded-md flex items-center gap-1 transition-all cursor-pointer ${
+                      polishingStudioView === 'READ'
+                        ? 'bg-white dark:bg-[#201c19] text-emerald-900 dark:text-emerald-300 font-bold shadow-2xs'
+                        : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
+                    }`}
+                    title="纯享阅读模式，支持逐段采纳与提取金句"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>纯享阅读</span>
+                  </button>
+                  <button
+                    onClick={() => setPolishingStudioView('COMPARE')}
+                    className={`px-2.5 py-1 rounded-md flex items-center gap-1 transition-all cursor-pointer ${
+                      polishingStudioView === 'COMPARE'
+                        ? 'bg-white dark:bg-[#201c19] text-emerald-900 dark:text-emerald-300 font-bold shadow-2xs'
+                        : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
+                    }`}
+                    title="骨架对照：左侧对戏记录 vs 右侧打磨文段"
+                  >
+                    <Split className="w-3.5 h-3.5" />
+                    <span>骨架对照</span>
+                  </button>
+                  <button
+                    onClick={() => setPolishingStudioView('DIFF')}
+                    className={`px-2.5 py-1 rounded-md flex items-center gap-1 transition-all cursor-pointer ${
+                      polishingStudioView === 'DIFF'
+                        ? 'bg-white dark:bg-[#201c19] text-emerald-900 dark:text-emerald-300 font-bold shadow-2xs'
+                        : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
+                    }`}
+                    title="双版比对：同屏比对两个版本的文采与措辞"
+                  >
+                    <GitCompare className="w-3.5 h-3.5" />
+                    <span>双版比对</span>
+                  </button>
+                  <button
+                    onClick={() => setPolishingStudioView('EDIT')}
+                    className={`px-2.5 py-1 rounded-md flex items-center gap-1 transition-all cursor-pointer ${
+                      polishingStudioView === 'EDIT'
+                        ? 'bg-white dark:bg-[#201c19] text-emerald-900 dark:text-emerald-300 font-bold shadow-2xs'
+                        : 'text-[#8a7f73] hover:text-[#4a4036] dark:hover:text-[#e8e2d8]'
+                    }`}
+                    title="原地编辑微调文段字词"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>原地编辑</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setShowSynthesizedModal(false)}
+                  className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-[#857767] cursor-pointer"
+                  title="关闭打磨台"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            {/* 文风风格切换与打磨范围 */}
-            <div className="px-5 py-2.5 border-b border-[#ede5d4] dark:border-[#2a2420] bg-stone-50/70 dark:bg-[#161412] flex items-center justify-between gap-3 flex-wrap text-xs">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[11px] font-bold text-stone-500 mr-1">打磨风格:</span>
-                {(
-                  [
-                    { key: 'CINEMATIC', label: '🎬 电影感镜头白描', desc: '微动作/光影声色/呼吸节拍' },
-                    { key: 'PSYCHOLOGICAL', label: '🧠 心理暗流深描', desc: '眼神对峙/言外之意/紧绷潜台词' },
-                    { key: 'HARDCORE_TENSE', label: '⚡ 硬派冷冽网文', desc: '短句留白/刺刀见红/去套话' },
-                  ] as const
-                ).map((item) => (
-                  <button
-                    key={item.key}
-                    onClick={() => handleSynthesizeProse(item.key)}
-                    disabled={isSynthesizing}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-serif transition-all cursor-pointer ${
-                      polishingStyle === item.key
-                        ? 'bg-emerald-700 text-white font-bold shadow-2xs'
-                        : 'bg-white dark:bg-[#221e1a] text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-800 hover:border-emerald-500'
-                    }`}
-                    title={item.desc}
+            {/* 登场人物视觉设定与外貌下锚栏 */}
+            {actors.length > 0 && (
+              <div className="px-5 py-1.5 border-b border-[#ede5d4] dark:border-[#2a2420] bg-stone-100/60 dark:bg-[#141210] flex items-center gap-2 overflow-x-auto shrink-0 text-xs">
+                <span className="text-[11px] font-bold text-stone-500 shrink-0 flex items-center gap-1">
+                  <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>视觉下锚:</span>
+                </span>
+                {actors.map((actor, aIdx) => (
+                  <div
+                    key={actor.character_id || aIdx}
+                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-[#e0d6c3] dark:border-[#38322c] bg-white dark:bg-[#1d1a17] shrink-0"
                   >
-                    {item.label}
-                  </button>
+                    {actor.avatar_url ? (
+                      <img
+                        src={actor.avatar_url}
+                        alt={actor.character_name}
+                        className="w-4 h-4 rounded-full object-cover border border-amber-600/30 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full bg-amber-600/15 text-amber-700 dark:text-amber-400 text-[10px] font-serif font-bold flex items-center justify-center shrink-0">
+                        {actor.character_name.slice(0, 1)}
+                      </div>
+                    )}
+                    <span className="font-serif font-bold text-stone-800 dark:text-stone-200 text-xs">
+                      {actor.character_name}
+                    </span>
+                    {actor.visual_summary ? (
+                      <span className="text-[10px] text-stone-500 dark:text-stone-400 max-w-[220px] truncate" title={actor.visual_summary}>
+                        {actor.visual_summary}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-stone-400 italic">未填外貌</span>
+                    )}
+                  </div>
                 ))}
               </div>
+            )}
 
-              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                <span>范围:</span>
+            {/* 控制条：文风流派 / 视角 / 范围 / 换写法重炼 */}
+            <div className="px-5 py-2.5 border-b border-[#ede5d4] dark:border-[#2a2420] bg-stone-50/70 dark:bg-[#161412] flex flex-col gap-2 shrink-0 text-xs">
+              {/* 第一行：五大文学流派文风 */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-bold text-stone-500 mr-1 shrink-0">文学文风:</span>
+                  {(
+                    [
+                      { key: 'CINEMATIC', label: '🎬 电影感白描', desc: '强化光影声色与微小动作' },
+                      { key: 'PSYCHOLOGICAL', label: '🧠 心理暗流', desc: '眼神暗战与隐秘动机权衡' },
+                      { key: 'HARDCORE_TENSE', label: '⚡ 硬派冷冽', desc: '语言凝练、短句高压' },
+                      { key: 'CLASSICAL_ELEGANT', label: '📜 古风留白', desc: '辞藻清雅沉凝、借景生杀' },
+                      { key: 'DARK_HUMOR_IRONY', label: '🎭 冷面讽刺', desc: '言不由衷、笑里藏刀' },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.key}
+                      onClick={() => handleSynthesizeProse(item.key)}
+                      disabled={isSynthesizing}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-serif transition-all cursor-pointer ${
+                        polishingStyle === item.key
+                          ? 'bg-emerald-700 text-white font-bold shadow-2xs'
+                          : 'bg-white dark:bg-[#221e1a] text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-800 hover:border-emerald-500'
+                      }`}
+                      title={item.desc}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 换个写法 (Re-roll) 按钮 */}
                 <button
-                  onClick={() => handleSynthesizeProse(polishingStyle, 'RECENT_3')}
+                  onClick={() => handleSynthesizeProse()}
                   disabled={isSynthesizing}
-                  className={`px-2 py-0.5 rounded text-[11px] cursor-pointer ${
-                    polishingRange === 'RECENT_3'
-                      ? 'bg-amber-600/15 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/30'
-                      : 'text-stone-500 hover:text-stone-700'
-                  }`}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 font-medium flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                  title="以此设定换一种全新的口吻重新打磨生成一个新版本"
                 >
-                  精修近3轮
-                </button>
-                <button
-                  onClick={() => handleSynthesizeProse(polishingStyle, 'ALL')}
-                  disabled={isSynthesizing}
-                  className={`px-2 py-0.5 rounded text-[11px] cursor-pointer ${
-                    polishingRange === 'ALL'
-                      ? 'bg-amber-600/15 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/30'
-                      : 'text-stone-500 hover:text-stone-700'
-                  }`}
-                >
-                  全场对局
+                  <Dices className={`w-3.5 h-3.5 ${isSynthesizing ? 'animate-spin' : ''}`} />
+                  <span>换个写法</span>
                 </button>
               </div>
 
-              {/* 细调指导输入 */}
-              <div className="w-full flex items-center gap-2 pt-1 border-t border-stone-200/60 dark:border-stone-800/60">
+              {/* 第二行：视点、打磨跨度与多版本切换 */}
+              <div className="flex items-center justify-between gap-3 flex-wrap text-[11px] pt-1 border-t border-stone-200/50 dark:border-stone-800/50">
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* 叙事视角 */}
+                  <div className="flex items-center gap-1 text-stone-500">
+                    <span className="font-medium">视点:</span>
+                    {(
+                      [
+                        { key: 'THIRD_LIMITED', label: '第三人称限制' },
+                        { key: 'THIRD_OMNISCIENT', label: '第三人称全知' },
+                        { key: 'FIRST_PERSON', label: '第一人称' },
+                      ] as const
+                    ).map((p) => (
+                      <button
+                        key={p.key}
+                        onClick={() => handleSynthesizeProse(undefined, undefined, undefined, p.key)}
+                        disabled={isSynthesizing}
+                        className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                          polishingPov === p.key
+                            ? 'bg-stone-300 dark:bg-stone-700 text-stone-900 dark:text-stone-100 font-bold'
+                            : 'hover:text-stone-800 dark:hover:text-stone-200'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 打磨范围 */}
+                  <div className="flex items-center gap-1 text-stone-500 border-l border-stone-200 dark:border-stone-800 pl-3">
+                    <span className="font-medium">范围:</span>
+                    {polishingAnchorIndex !== null && (
+                      <button
+                        onClick={() => handleSynthesizeProse(polishingStyle, 'FOCUSED_ROUND')}
+                        disabled={isSynthesizing}
+                        className={`px-2 py-0.5 rounded cursor-pointer ${
+                          polishingRange === 'FOCUSED_ROUND'
+                            ? 'bg-amber-600/15 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/30'
+                            : 'hover:text-stone-700'
+                        }`}
+                      >
+                        🎯 节拍 #{polishingAnchorIndex + 1}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleSynthesizeProse(polishingStyle, 'RECENT_3')}
+                      disabled={isSynthesizing}
+                      className={`px-2 py-0.5 rounded cursor-pointer ${
+                        polishingRange === 'RECENT_3'
+                          ? 'bg-amber-600/15 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/30'
+                          : 'hover:text-stone-700'
+                      }`}
+                    >
+                      ⚡ 近 3 轮
+                    </button>
+                    <button
+                      onClick={() => handleSynthesizeProse(polishingStyle, 'ALL')}
+                      disabled={isSynthesizing}
+                      className={`px-2 py-0.5 rounded cursor-pointer ${
+                        polishingRange === 'ALL'
+                          ? 'bg-amber-600/15 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/30'
+                          : 'hover:text-stone-700'
+                      }`}
+                    >
+                      📜 全场
+                    </button>
+                  </div>
+                </div>
+
+                {/* 多版本历史快照横向切换 */}
+                {polishedVariations.length > 1 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto">
+                    <span className="text-stone-400">历史版本:</span>
+                    {polishedVariations.map((v, i) => (
+                      <button
+                        key={v.id}
+                        onClick={() => {
+                          setActiveVariationId(v.id);
+                          setSynthesizedProse(v.text);
+                          if (v.style) setPolishingStyle(v.style as any);
+                          if (v.pov) setPolishingPov(v.pov as any);
+                        }}
+                        className={`px-2 py-0.5 rounded-full text-[10px] cursor-pointer transition-all ${
+                          activeVariationId === v.id
+                            ? 'bg-emerald-600 text-white font-bold shadow-2xs'
+                            : 'bg-black/5 dark:bg-white/10 text-stone-600 dark:text-stone-400 hover:bg-black/10'
+                        }`}
+                      >
+                        版本 {polishedVariations.length - i} ({v.wordCount}字)
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 第三行：细调指导输入 */}
+              <div className="w-full flex items-center gap-2 pt-1 border-t border-stone-200/50 dark:border-stone-800/50">
                 <input
                   type="text"
                   value={customPolishingGuidance}
                   onChange={(e) => setCustomPolishingGuidance(e.target.value)}
-                  placeholder="可选：给打磨师补充特别要求，例如：侧重眼神交锋与暴雨声、文笔更冷峻克制..."
-                  className="flex-1 text-xs px-2.5 py-1 rounded border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#141210] outline-none"
+                  placeholder="补充特别倾向，如：侧重眼神交锋、雨声氛围、语言冷峻克制..."
+                  className="flex-1 text-xs px-2.5 py-1 rounded-lg border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#141210] outline-none"
                   onKeyDown={(e) => e.key === 'Enter' && handleSynthesizeProse()}
                 />
                 <button
                   onClick={() => handleSynthesizeProse()}
                   disabled={isSynthesizing}
-                  className="px-2.5 py-1 text-xs rounded bg-stone-200 dark:bg-stone-800 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer"
+                  className="px-3 py-1 text-xs rounded-lg bg-stone-200 dark:bg-stone-800 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer shrink-0 font-medium"
                 >
-                  应用重打磨
+                  {isSynthesizing ? '打磨中...' : '重新打磨'}
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 p-6 overflow-y-auto font-serif text-sm md:text-base leading-relaxed text-[#231f1a] dark:text-[#f0eae0] space-y-4 whitespace-pre-wrap select-text">
-              {synthesizedProse}
+            {/* 主内容工作区 (根据视图模式切换，transform-gpu 硬件加速平滑滚动) */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 overscroll-contain transform-gpu">
+              {/* 模式 A：纯享文学阅读与逐段采纳 */}
+              {polishingStudioView === 'READ' && (
+                <div
+                  onMouseUp={handleStudioTextSelection}
+                  className="max-w-3xl mx-auto space-y-4"
+                >
+                  {/* 划选文字悬浮即时操作条 (纯色高对比度，消除 sticky 下 backdrop-blur 滚动重采样开销) */}
+                  {selectedProseSnippet && (
+                    <div className="sticky top-0 z-20 flex items-center justify-between gap-3 p-2.5 px-4 rounded-xl bg-amber-700 dark:bg-amber-800 text-white shadow-lg animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="flex items-center gap-2 text-xs truncate max-w-[55%]">
+                        <Sparkles className="w-4 h-4 shrink-0 text-amber-200" />
+                        <span className="truncate">已选 {selectedProseSnippet.length} 字：“{selectedProseSnippet}”</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 text-xs">
+                        <button
+                          onClick={handleCaptureSelectedSnippet}
+                          className="px-2.5 py-1 rounded-lg bg-white text-amber-900 font-bold hover:bg-amber-50 flex items-center gap-1 shadow-2xs cursor-pointer"
+                          title="将选中的句子单独存入灵感火花盒"
+                        >
+                          <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
+                          <span>存为灵感</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleInsertTextToEditor(selectedProseSnippet, `已将选中的 ${selectedProseSnippet.length} 字插入正文！`);
+                            setSelectedProseSnippet('');
+                            window.getSelection()?.removeAllRanges();
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-medium flex items-center gap-1 cursor-pointer"
+                          title="将选中的句子插入当前小说正文"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>插正文</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedProseSnippet);
+                            showToast(`已复制选中的 ${selectedProseSnippet.length} 字！`, 'success');
+                            setSelectedProseSnippet('');
+                            window.getSelection()?.removeAllRanges();
+                          }}
+                          className="px-2 py-1 rounded-lg bg-black/20 hover:bg-black/30 text-white flex items-center gap-1 cursor-pointer"
+                          title="复制所选文字"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>复制</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedProseSnippet('');
+                            window.getSelection()?.removeAllRanges();
+                          }}
+                          className="p-1 hover:bg-white/20 rounded cursor-pointer ml-1"
+                          title="取消选择"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {synthesizedProse.split('\n\n').filter((p) => p.trim()).map((para, pIdx) => (
+                    <div
+                      key={pIdx}
+                      className="group relative p-3 rounded-xl hover:bg-black/2.5 dark:hover:bg-white/2.5 transition-colors border border-transparent hover:border-[#e0d6c3]/50 dark:hover:border-[#3a322c]/50"
+                    >
+                      <p className="font-serif text-sm md:text-base leading-relaxed text-[#231f1a] dark:text-[#f0eae0] select-text indent-8">
+                        {para.trim()}
+                      </p>
+                      {/* 悬浮操作胶囊：复制本段 / 存为灵感 / 插入正文 */}
+                      <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white/95 dark:bg-[#201c19]/95 border border-[#ded5c2] dark:border-[#3a332d] shadow-xs rounded-lg p-1">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(para.trim());
+                            setCopiedParaIdx(pIdx);
+                            setTimeout(() => setCopiedParaIdx(null), 1500);
+                            showToast('已复制该段高光描写至剪贴板！', 'success');
+                          }}
+                          className="px-2 py-0.5 text-[11px] rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 flex items-center gap-1 cursor-pointer font-medium"
+                          title="复制该自然段至剪贴板"
+                        >
+                          {copiedParaIdx === pIdx ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedParaIdx === pIdx ? '已复制' : '复制此段'}</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            const newNote: InspirationNote = {
+                              id: `insp-para-${Date.now()}-${pIdx}`,
+                              type: para.includes('“') || para.includes('"') ? 'QUOTE' : 'ACTION',
+                              content: para.trim(),
+                              created_at: Date.now(),
+                            };
+                            const nextNotes = [newNote, ...inspirationNotes];
+                            setInspirationNotes(nextNotes);
+                            showToast('已将该段存入灵感火花盒！', 'success');
+                            if (activeSession) {
+                              api.updateSandboxSession({
+                                id: activeSession.id,
+                                inspiration_notes_json: JSON.stringify(nextNotes),
+                              }).catch(console.error);
+                            }
+                          }}
+                          className="px-2 py-0.5 text-[11px] rounded hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-800 dark:text-amber-300 flex items-center gap-1 cursor-pointer font-medium"
+                          title="将该自然段存入灵感火花盒"
+                        >
+                          <Lightbulb className="w-3 h-3 text-amber-600" />
+                          <span>存为灵感</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleInsertTextToEditor(para.trim(), '已将该段高光描写插入当前章节！');
+                          }}
+                          className="px-2 py-0.5 text-[11px] rounded hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-800 dark:text-blue-300 flex items-center gap-1 cursor-pointer font-medium"
+                          title="将该段插入当前小说草稿"
+                        >
+                          <BookOpen className="w-3 h-3 text-blue-600" />
+                          <span>插正文</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* 底部高光提炼卡片 */}
+                  <div className="mt-4 p-2.5 px-3.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 dark:bg-emerald-500/10 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>提炼文段中的微动作描写与对白金句至灵感盒</span>
+                    </div>
+                    <button
+                      onClick={handleExtractHighlightsToInspiration}
+                      className="px-3 py-1 text-xs rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-medium flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
+                    >
+                      <Lightbulb className="w-3.5 h-3.5" />
+                      <span>一键提取金句入盒</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 模式 B：骨架对照视图 (原对戏记录 vs 升华正文) */}
+              {polishingStudioView === 'COMPARE' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                  {/* 左栏：输入源 (原对戏骨架记录) */}
+                  <div className="border border-[#e2d9c5] dark:border-[#322c26] rounded-xl p-4 bg-white/70 dark:bg-[#151311] overflow-y-auto space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-stone-200 dark:border-stone-800">
+                      <span className="text-xs font-serif font-bold text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-amber-600" />
+                        原始对戏记录 ({comparedRounds.length} 节拍)
+                      </span>
+                    </div>
+
+                    {comparedRounds.map((r, i) => (
+                      <div key={r.round_index || i} className="p-2.5 rounded-lg border border-stone-200 dark:border-stone-800 bg-[#fbf9f5] dark:bg-[#1a1715] text-xs space-y-1.5">
+                        <div className="flex items-center justify-between font-bold text-stone-800 dark:text-stone-200">
+                          <span>【{r.speaker_name}】</span>
+                          <span className="text-[10px] text-stone-400 font-normal">节拍 #{r.round_index}</span>
+                        </div>
+                        {r.inner_thought && (
+                          <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-900 dark:text-amber-300 italic">
+                            <span className="font-bold mr-1">内心算盘:</span>
+                            {r.inner_thought}
+                          </div>
+                        )}
+                        {r.character_action && (
+                          <p className="text-[11px] text-stone-600 dark:text-stone-400 italic indent-2">
+                            （{r.character_action}）
+                          </p>
+                        )}
+                        {r.speech && (
+                          <p className="font-serif font-bold text-stone-900 dark:text-stone-100 pl-2 border-l-2 border-amber-500">
+                            “{r.speech}”
+                          </p>
+                        )}
+                        {r.subtext && (
+                          <div className="text-[10px] text-purple-700 dark:text-purple-300 font-medium">
+                            潜台词：{r.subtext}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 右栏：输出成果 (升华正文) */}
+                  <div className="border border-emerald-500/30 rounded-xl p-4 bg-emerald-500/5 dark:bg-emerald-500/5 overflow-y-auto space-y-3 font-serif">
+                    <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20 font-sans">
+                      <span className="text-xs font-serif font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        打磨小说文段
+                      </span>
+                    </div>
+
+                    <div className="text-sm md:text-base leading-relaxed text-[#231f1a] dark:text-[#f0eae0] space-y-3 whitespace-pre-wrap select-text">
+                      {synthesizedProse}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 模式 C：双版同屏比对 (DIFF) */}
+              {polishingStudioView === 'DIFF' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                  {/* 左侧版本 */}
+                  {(() => {
+                    const leftVar = polishedVariations.find((v) => v.id === diffLeftVariationId) || polishedVariations[0];
+                    return (
+                      <div className="border border-stone-300 dark:border-stone-800 rounded-xl p-4 bg-white/70 dark:bg-[#151311] overflow-y-auto space-y-3 flex flex-col font-serif">
+                        <div className="flex items-center justify-between pb-2 border-b border-stone-200 dark:border-stone-800 font-sans shrink-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-stone-700 dark:text-stone-300">版本 A:</span>
+                            <select
+                              value={leftVar?.id}
+                              onChange={(e) => setDiffLeftVariationId(e.target.value)}
+                              className="text-xs px-2 py-0.5 rounded border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#201c19] text-stone-800 dark:text-stone-200 outline-none"
+                            >
+                              {polishedVariations.map((v, i) => (
+                                <option key={v.id} value={v.id}>
+                                  版本 {polishedVariations.length - i} ({v.style} · {v.wordCount}字)
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {leftVar && (
+                            <div className="flex items-center gap-1 font-sans">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(leftVar.text);
+                                  showToast('已复制版本 A 全文！', 'success');
+                                }}
+                                className="px-2 py-0.5 text-[11px] rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 flex items-center gap-1 cursor-pointer"
+                                title="复制此版本"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>复制</span>
+                              </button>
+                              <button
+                                onClick={() => handleInsertTextToEditor(leftVar.text, '已将版本 A 插入正文！')}
+                                className="px-2 py-0.5 text-[11px] rounded bg-emerald-600/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-600/20 flex items-center gap-1 cursor-pointer font-medium"
+                                title="插入正文"
+                              >
+                                <BookOpen className="w-3 h-3 text-emerald-600" />
+                                <span>插正文</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 text-sm md:text-base leading-relaxed text-[#231f1a] dark:text-[#f0eae0] space-y-3 whitespace-pre-wrap select-text">
+                          {leftVar?.text || '暂无选定版本'}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 右侧版本 */}
+                  {(() => {
+                    const rightVar = polishedVariations.find((v) => v.id === diffRightVariationId) || polishedVariations[1] || polishedVariations[0];
+                    return (
+                      <div className="border border-emerald-500/30 rounded-xl p-4 bg-emerald-500/5 dark:bg-emerald-500/5 overflow-y-auto space-y-3 flex flex-col font-serif">
+                        <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20 font-sans shrink-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300">版本 B:</span>
+                            <select
+                              value={rightVar?.id}
+                              onChange={(e) => setDiffRightVariationId(e.target.value)}
+                              className="text-xs px-2 py-0.5 rounded border border-emerald-500/30 bg-white dark:bg-[#201c19] text-stone-800 dark:text-stone-200 outline-none"
+                            >
+                              {polishedVariations.map((v, i) => (
+                                <option key={v.id} value={v.id}>
+                                  版本 {polishedVariations.length - i} ({v.style} · {v.wordCount}字)
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {rightVar && (
+                            <div className="flex items-center gap-1 font-sans">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(rightVar.text);
+                                  showToast('已复制版本 B 全文！', 'success');
+                                }}
+                                className="px-2 py-0.5 text-[11px] rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 flex items-center gap-1 cursor-pointer"
+                                title="复制此版本"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>复制</span>
+                              </button>
+                              <button
+                                onClick={() => handleInsertTextToEditor(rightVar.text, '已将版本 B 插入正文！')}
+                                className="px-2 py-0.5 text-[11px] rounded bg-emerald-600/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-600/20 flex items-center gap-1 cursor-pointer font-medium"
+                                title="插入正文"
+                              >
+                                <BookOpen className="w-3 h-3 text-emerald-600" />
+                                <span>插正文</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 text-sm md:text-base leading-relaxed text-[#231f1a] dark:text-[#f0eae0] space-y-3 whitespace-pre-wrap select-text">
+                          {rightVar?.text || '暂无选定版本'}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* 模式 D：原地编辑微调 */}
+              {polishingStudioView === 'EDIT' && (
+                <div className="h-full flex flex-col space-y-2">
+                  <div className="flex items-center justify-between text-xs text-stone-500">
+                    <span>原地微调词句与标点：</span>
+                    <span>字数：{synthesizedProse.replace(/\s+/g, '').length} 字</span>
+                  </div>
+                  <textarea
+                    value={synthesizedProse}
+                    onChange={(e) => setSynthesizedProse(e.target.value)}
+                    className="flex-1 w-full p-4 rounded-xl border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#141210] font-serif text-sm md:text-base leading-relaxed text-[#231f1a] dark:text-[#f0eae0] outline-none focus:ring-1 focus:ring-emerald-500 resize-none select-text"
+                    placeholder="在此编辑打磨文段..."
+                  />
+                </div>
+              )}
             </div>
 
-            {/* 底部：核心强调“找灵感与复制优化”，并将“并入正文”弱化为低调的辅助操作 */}
-            <div className="px-5 py-3 border-t border-[#e8dfcb] dark:border-[#2d2824] bg-[#f4efe4] dark:bg-[#201c19] flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
+            {/* 底部操作栏：核心强调“找灵感与复制好句”，附加功能“随手归档” */}
+            <div className="px-5 py-3 border-t border-[#e8dfcb] dark:border-[#2d2824] bg-[#f4efe4] dark:bg-[#201c19] flex items-center justify-between gap-4 flex-wrap shrink-0">
+              {/* 主操作区：灵感利用与复制 */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-[#8a7f73]">
                   字数：{synthesizedProse.replace(/\s+/g, '').length} 字
                 </span>
@@ -3268,7 +4357,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                   }}
                   className="px-3.5 py-1.5 text-xs rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
-                  <Copy className="w-3.5 h-3.5" /> 复制精修文段
+                  <Copy className="w-3.5 h-3.5" /> 复制全文
                 </button>
                 <button
                   onClick={() => {
@@ -3289,12 +4378,28 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                     }
                   }}
                   className="px-3 py-1.5 text-xs rounded-lg border border-amber-600/40 bg-amber-600/10 hover:bg-amber-600/20 text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1.5 cursor-pointer"
+                  title="将文段存入灵感火花盒"
                 >
                   <Lightbulb className="w-3.5 h-3.5 text-amber-600" /> 存入灵感盒
                 </button>
                 <button
+                  onClick={handleExtractHighlightsToInspiration}
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-blue-500/40 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-medium flex items-center gap-1.5 cursor-pointer"
+                  title="自动提炼其中的高光描写与对白金句"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> 提炼金句
+                </button>
+                <button
+                  onClick={() => handleInsertTextToEditor(synthesizedProse, '已将打磨文段插入当前章节！')}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-blue-500/40 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-medium flex items-center gap-1.5 cursor-pointer"
+                  title="将此打磨段落插入当前章节草稿"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-blue-600" /> 插入正文
+                </button>
+                <button
                   onClick={handleSyncToMemoryEngine}
                   className="px-3 py-1.5 text-xs rounded-lg border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="将交锋事实与心境反哺至长期记忆引擎"
                 >
                   <Share2 className="w-3.5 h-3.5" /> 反哺长期记忆
                 </button>
@@ -3302,7 +4407,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
 
               {/* 次要辅助操作：随手归档到正文 */}
               <div className="flex items-center gap-1.5 text-[11px] border-l border-stone-300 dark:border-stone-700 pl-3">
-                <span className="text-[#8a7f73] mr-1 hidden sm:inline">📌 随手归档 (附加功能):</span>
+                <span className="text-[#8a7f73] mr-1 hidden sm:inline">正文草稿:</span>
                 <button
                   onClick={handleAppendToEditor}
                   className="px-2.5 py-1 text-xs rounded border border-[#ded5c2] dark:border-[#3a332d] hover:bg-black/5 dark:hover:bg-white/5 text-[#554b3f] dark:text-[#c4baa8] font-medium flex items-center gap-1 cursor-pointer"
@@ -3341,10 +4446,10 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 </div>
                 <div>
                   <h4 className="font-serif font-bold text-sm text-[#2c2621] dark:text-[#f0eae0]">
-                    探测此时主要人物会怎么做？· 【{probeSpeakerName}】
+                    抉择路线推演 · 【{probeSpeakerName}】
                   </h4>
                   <p className="text-[11px] text-[#8a7f73]">
-                    深入角色底层性格与私密软肋，推演当前情境下的 3 种典型抉择路线
+                    推演当前情境下的可能行动路线
                   </p>
                 </div>
               </div>
@@ -3360,7 +4465,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
               {isProbingActions ? (
                 <div className="h-48 flex flex-col items-center justify-center space-y-2 text-stone-500 text-xs">
                   <Target className="w-8 h-8 text-indigo-600 animate-spin opacity-60" />
-                  <p className="font-serif font-medium">正在深入【{probeSpeakerName}】的心理暗流与博弈算盘...</p>
+                  <p className="font-serif font-medium">正在推演【{probeSpeakerName}】的抉择路线...</p>
                 </div>
               ) : actionOptions.length === 0 ? (
                 <div className="p-4 text-center text-xs text-stone-500">
@@ -3381,25 +4486,62 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                           {opt.label}
                         </span>
                       </div>
-                      <button
-                        onClick={() => handleApplyActionOption(opt)}
-                        className="px-3 py-1 text-xs rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white font-bold flex items-center gap-1 shadow-2xs transition-transform active:scale-95 cursor-pointer"
-                      >
-                        <span>⚡ 采纳此路线步进</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            const note: InspirationNote = {
+                              id: `insp-probe-${Date.now()}-${i}`,
+                              type: 'PSYCHOLOGY',
+                              content: `【${probeSpeakerName}·${opt.label}】内心算盘：${opt.inner_motive}\n微表情动作：${opt.action_preview}\n台词话术：“${opt.speech_preview}”`,
+                              speaker_name: probeSpeakerName,
+                              created_at: Date.now(),
+                            };
+                            const nextNotes = [note, ...inspirationNotes];
+                            setInspirationNotes(nextNotes);
+                            showToast('已将该角色的抉择路线存入灵感盒！', 'success');
+                            if (activeSession) {
+                              api.updateSandboxSession({
+                                id: activeSession.id,
+                                inspiration_notes_json: JSON.stringify(nextNotes),
+                              }).catch(console.error);
+                            }
+                          }}
+                          className="px-2.5 py-1 text-xs rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1 cursor-pointer"
+                          title="存入灵感火花盒"
+                        >
+                          <Lightbulb className="w-3 h-3 text-amber-600" />
+                          <span>存为灵感</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleInsertTextToEditor(`（${opt.action_preview}）“${opt.speech_preview}”`, '已将此抉择行动插入正文！');
+                          }}
+                          className="px-2 py-1 text-xs rounded-lg border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-medium flex items-center gap-1 cursor-pointer"
+                          title="插入小说正文"
+                        >
+                          <BookOpen className="w-3 h-3 text-blue-600" />
+                          <span>插正文</span>
+                        </button>
+                        <button
+                          onClick={() => handleApplyActionOption(opt)}
+                          className="px-3 py-1 text-xs rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white font-bold flex items-center gap-1 shadow-2xs transition-transform active:scale-95 cursor-pointer"
+                        >
+                          <span>⚡ 采纳步进</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="text-xs space-y-1.5 pl-7">
                       <p className="text-[#6b5f52] dark:text-[#b8ad9f] leading-relaxed">
-                        <strong className="text-stone-700 dark:text-stone-300 font-semibold mr-1">🧠 此时内心算盘:</strong>
+                        <strong className="text-stone-700 dark:text-stone-300 font-semibold mr-1">🧠 内心盘算:</strong>
                         {opt.inner_motive}
                       </p>
                       <p className="text-[#6b5f52] dark:text-[#b8ad9f] leading-relaxed italic">
-                        <strong className="text-stone-700 dark:text-stone-300 font-semibold mr-1 not-italic">🎭 微表情与动作:</strong>
+                        <strong className="text-stone-700 dark:text-stone-300 font-semibold mr-1 not-italic">🎭 微动作:</strong>
                         {opt.action_preview}
                       </p>
                       <p className="text-[#2b241c] dark:text-[#ece4d8] font-serif font-medium leading-relaxed bg-amber-50/50 dark:bg-amber-950/20 p-2 rounded-lg border border-amber-200/40 dark:border-amber-900/30">
-                        <strong className="text-amber-800 dark:text-amber-400 mr-1">💬 话术方向:</strong>
+                        <strong className="text-amber-800 dark:text-amber-400 mr-1">💬 话术试探:</strong>
                         {opt.speech_preview}
                       </p>
                     </div>
@@ -3414,7 +4556,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 type="text"
                 value={customActionGuidance}
                 onChange={(e) => setCustomActionGuidance(e.target.value)}
-                placeholder="或者由您指定特别应对打算，例如：表面答应，暗中在茶里下药..."
+                placeholder="自定义应对打算，如：表面答应，暗中防备..."
                 className="flex-1 text-xs px-3 py-2 rounded-lg border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#141210] outline-none focus:ring-1 focus:ring-indigo-500"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && customActionGuidance.trim()) {
@@ -3435,7 +4577,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 disabled={!customActionGuidance.trim()}
                 className="px-4 py-2 text-xs rounded-lg bg-indigo-700 hover:bg-indigo-800 disabled:opacity-40 text-white font-bold shrink-0 transition-colors cursor-pointer"
               >
-                以此自定义路线步进
+                采纳自定义路线
               </button>
             </div>
           </div>
@@ -3452,9 +4594,8 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
               </div>
               <div>
                 <h3 className="font-serif font-bold text-sm text-[#2c2621] dark:text-[#f0eae0]">
-                  灵感火花盒 ({inspirationNotes.length})
+                  灵感盒 ({inspirationNotes.length})
                 </h3>
-                <p className="text-[10px] text-[#857767]">对戏交锋火花 · 刺骨金句 · 动作白描</p>
               </div>
             </div>
             <button
@@ -3471,10 +4612,10 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
               onClick={handleDistillInspirations}
               disabled={isDistillingInspirations || dialogueHistory.length === 0}
               className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-serif font-bold bg-amber-700 hover:bg-amber-800 disabled:opacity-40 text-white flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
-              title="自动提炼对戏中的金句台词、微表情动作、心理暗流与反转线索"
+              title="提炼对戏中的金句台词与微表情动作"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{isDistillingInspirations ? '正在全场提炼中...' : '✨ 一键提炼全场灵感'}</span>
+              <span>{isDistillingInspirations ? '提炼中...' : '提炼全场灵感'}</span>
             </button>
             <button
               onClick={handleExportInspirations}
@@ -3487,8 +4628,15 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
             </button>
             {inspirationNotes.length > 0 && (
               <button
-                onClick={() => {
-                  if (confirm('确定清空本场的灵感便签吗？')) {
+                onClick={async () => {
+                  const confirmed = await confirmDialog({
+                    title: '清空灵感盒',
+                    message: '确定清空本场的灵感便签吗？',
+                    tone: 'danger',
+                    confirmText: '清空便签',
+                    cancelText: '取消',
+                  });
+                  if (confirmed) {
                     setInspirationNotes([]);
                     if (activeSession) {
                       api.updateSandboxSession({
@@ -3534,11 +4682,11 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
           {/* 灵感列表 */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0">
             {inspirationNotes.length === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-center text-stone-400 text-xs space-y-2">
-                <Lightbulb className="w-8 h-8 opacity-40 stroke-1 text-amber-500" />
-                <p className="font-serif">灵感盒尚空</p>
-                <p className="text-[11px] max-w-[200px] leading-relaxed">
-                  在对戏过程中点击台词气泡下的【💡 捕获灵感】，或点击上方【一键提炼全场灵感】！
+              <div className="h-64 flex flex-col items-center justify-center text-center text-stone-400 text-xs space-y-1.5">
+                <Lightbulb className="w-8 h-8 opacity-40 stroke-1 text-amber-500 mb-1" />
+                <p className="font-serif text-[#4a4036] dark:text-[#d4cbbf]">灵感盒尚空</p>
+                <p className="text-[11px] max-w-[200px] leading-relaxed text-[#8a7f73]">
+                  在对戏中点击【灵感】或点击上方【提炼全场灵感】记录金句与动作
                 </p>
               </div>
             ) : (
@@ -3575,6 +4723,15 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                         </span>
                       )}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => {
+                            handleInsertTextToEditor(n.content, '已将灵感插入正文！');
+                          }}
+                          className="p-1 hover:text-blue-600 rounded cursor-pointer"
+                          title="插入小说正文"
+                        >
+                          <BookOpen className="w-3 h-3 text-blue-600" />
+                        </button>
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(n.content);
@@ -3628,7 +4785,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
             <div className="space-y-3 text-xs">
               <div className="p-2.5 rounded-lg bg-stone-100 dark:bg-[#201c19] border border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300">
                 <span className="font-bold text-emerald-700 dark:text-emerald-400 mr-1">
-                  分叉起点：第 {forkFromIndex + 1} 轮
+                  分叉节点：第 {forkFromIndex + 1} 节拍
                 </span>
                 {dialogueHistory[forkFromIndex] && (
                   <p className="mt-1 line-clamp-2 italic font-serif text-[11px] text-[#554c41] dark:text-[#b0a597]">
@@ -3646,7 +4803,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                   value={forkBranchName}
                   onChange={(e) => setForkBranchName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleConfirmFork()}
-                  placeholder="例如：分支A：坦白解药所在 / 分支B：拔剑先发制人"
+                  placeholder="分支名称，如：坦白解药所在 / 拔剑先发制人"
                   className="w-full text-xs px-3 py-2 rounded-lg border border-[#d8cdb8] dark:border-[#3d3630] bg-white dark:bg-[#12100e] focus:ring-2 focus:ring-emerald-500 outline-none"
                   autoFocus
                 />
@@ -3666,7 +4823,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 className="px-4 py-1.5 rounded-lg text-xs font-serif font-bold bg-emerald-700 hover:bg-emerald-800 text-white disabled:opacity-40 flex items-center gap-1 shadow-sm transition-all"
               >
                 <GitBranch className="w-3.5 h-3.5" />
-                <span>确认开辟分支</span>
+                <span>开辟分支</span>
               </button>
             </div>
           </div>
@@ -3685,13 +4842,13 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 </div>
                 <div>
                   <h4 className="font-serif font-bold text-sm text-[#2c2621] dark:text-[#f0eae0] flex items-center gap-2">
-                    <span>【{actors[selectedActorIndex].character_name}】角色立绘与外貌理解</span>
+                    <span>【{actors[selectedActorIndex].character_name}】立绘与外貌</span>
                     <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 font-mono">
                       {modalGender}
                     </span>
                   </h4>
                   <p className="text-[10px] text-[#857767]">
-                    上传立绘贴图，AI 视觉大模型深度理解衣着神态，并注入对戏微动作与正文推演
+                    上传立绘或输入外貌特征，作为对戏微动作与正文白描的物理下锚点
                   </p>
                 </div>
               </div>
@@ -3752,6 +4909,14 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                         </button>
                         <button
                           type="button"
+                          onClick={() => setShowAvatarGenModal(true)}
+                          className="px-2.5 py-1 rounded text-[10px] border border-amber-600/40 bg-amber-500/10 text-primary dark:text-amber-300 font-medium hover:bg-amber-500/20 transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <Sparkles className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          <span>AI 生成立绘</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setModalAvatarUrl('')}
                           className="px-2.5 py-1 rounded text-[10px] text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
                         >
@@ -3768,7 +4933,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                     <div className="text-[11px] text-stone-600 dark:text-stone-300 font-serif">
                       选择角色本地立绘插画或粘贴图片直链
                     </div>
-                    <div className="flex items-center justify-center gap-2 pt-1">
+                    <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
                       <button
                         type="button"
                         onClick={() => actorFileInputRef.current?.click()}
@@ -3776,6 +4941,14 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                       >
                         <Upload className="w-3.5 h-3.5" />
                         <span>选择本地图片</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAvatarGenModal(true)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] font-serif font-bold border border-amber-700/60 bg-amber-500/10 hover:bg-amber-500/20 text-primary dark:text-amber-300 shadow-2xs transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>✨ AI 生成立绘</span>
                       </button>
                     </div>
                     <div className="pt-2">
@@ -3803,10 +4976,10 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                 <div className="min-w-0">
                   <div className="font-serif font-bold text-xs text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                    <span>多模态 AI 识图理解</span>
+                    <span>AI 识图</span>
                   </div>
                   <p className="text-[10px] text-amber-800/80 dark:text-amber-300/80 mt-0.5">
-                    自动识别发型发色、五官神态、服饰配饰与手持武器，生成文学级外貌描写
+                    自动提炼发饰、衣着与武器配饰，生成文学级外貌描写
                   </p>
                 </div>
                 <button
@@ -3851,10 +5024,10 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[11px] font-serif font-bold text-[#443b33] dark:text-[#d5ccbe]">
-                    人设外貌描摹（注入推演与小说正文）
+                    外貌描摹（注入微动作与白描）
                   </label>
                   <span className="text-[10px] text-stone-400">
-                    可手动润色调整
+                    可手动调整
                   </span>
                 </div>
                 <textarea
@@ -3865,7 +5038,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                   className="w-full text-xs p-2.5 rounded-xl border border-[#ded5c2] dark:border-[#38322c] bg-white dark:bg-[#141210] text-[#2c2621] dark:text-[#e8e2d8] focus:border-amber-600 outline-none resize-none leading-relaxed"
                 />
                 <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">
-                  💡 <strong>强因果约束</strong>：此处描写的衣着佩饰（如长剑、步摇、长袍）将强制成为该角色发言时微动作与对手戏的基准。
+                  💡 提示：此处描写的衣着佩饰将作为该角色发言微动作的下锚基准。
                 </p>
               </div>
 
@@ -3878,7 +5051,7 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
                     onChange={(e) => setSyncToNovelDb(e.target.checked)}
                     className="rounded border-[#ded5c2] text-amber-700 focus:ring-0 cursor-pointer"
                   />
-                  <span>同步更新/收录至当前小说的【人物设定】库</span>
+                  <span>同步更新至小说人物设定库</span>
                 </label>
               </div>
             </div>
@@ -3971,6 +5144,25 @@ export const CharacterSandboxPanel: React.FC<CharacterSandboxPanelProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* 角色立绘 AI 创绘模态框 */}
+      {showAvatarGenModal && (
+        <CharacterAvatarModal
+          isOpen={showAvatarGenModal}
+          onClose={() => setShowAvatarGenModal(false)}
+          character={{
+            name: selectedActorIndex !== null && actors[selectedActorIndex] ? actors[selectedActorIndex].character_name : '演练角色',
+            gender: modalGender,
+            visual_summary: modalVisualSummary,
+            avatar_url: modalAvatarUrl,
+          }}
+          genre={activeNovel?.genre_profile}
+          onApplyAvatar={(newUrl) => {
+            setModalAvatarUrl(newUrl);
+            showToast('已生成新立绘！点击【应用并保存】即可写入演练角色', 'success');
+          }}
+        />
       )}
     </div>
   );

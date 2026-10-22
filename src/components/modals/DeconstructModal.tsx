@@ -554,7 +554,7 @@ export const DeconstructModal: React.FC<Props> = ({ isOpen, onClose, embedded = 
             )}
 
             {/* 报告内容区 */}
-            <div className="flex-1 overflow-y-auto mt-3 p-3.5 rounded-xl border border-line/60 dark:border-[#38332e]/60 bg-surface dark:bg-[#151311] select-text space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto mt-3 p-3.5 rounded-xl border border-line/60 dark:border-[#38332e]/60 bg-surface dark:bg-[#151311] select-text space-y-4">
               {streamMarkdown || report ? (
                 <>
                   <div className="text-xs sm:text-sm font-serif leading-relaxed whitespace-pre-wrap text-stone-800 dark:text-stone-200">

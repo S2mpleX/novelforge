@@ -3,6 +3,7 @@ import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
 import { confirmDialog } from '@/utils/dialog';
 import type { Character } from '@/types';
+import { optimizeImageFileToDataUrl } from '@/utils/imageOptimizer';
 
 const showToast = (title: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
   window.dispatchEvent(
@@ -26,6 +27,7 @@ import {
   X,
 } from 'lucide-react';
 import { CharacterFlowView } from './CharacterFlowView';
+import { CharacterAvatarModal } from '@/components/modals/CharacterAvatarModal';
 
 export const CharactersView: React.FC = () => {
   const activeNovel = useNovelStore((s) => s.activeNovel);
@@ -46,6 +48,18 @@ export const CharactersView: React.FC = () => {
   const [charVisualSummary, setCharVisualSummary] = useState('');
   const [isAnalyzingVisual, setIsAnalyzingVisual] = useState(false);
   const [appearanceTags, setAppearanceTags] = useState<string[]>([]);
+
+  // AI 角色立绘创绘状态
+  const [showAvatarGenerator, setShowAvatarGenerator] = useState(false);
+  const [avatarGeneratorTarget, setAvatarGeneratorTarget] = useState<{
+    id?: string;
+    name: string;
+    gender?: string;
+    personality?: string;
+    motivation?: string;
+    visual_summary?: string;
+    avatar_url?: string;
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -94,28 +108,21 @@ export const CharactersView: React.FC = () => {
     setShowAddChar(true);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      showToast('请选择有效的图片文件 (PNG, JPG, WEBP)', 'warning');
-      return;
+    try {
+      const optimized = await optimizeImageFileToDataUrl(file, {
+        maxDimension: 1024,
+        quality: 0.88,
+        maxFileSizeBytes: 10 * 1024 * 1024,
+      });
+      setCharAvatarUrl(optimized);
+      showToast('角色立绘已载入并自动完成高清优化，可点击【AI 识图】提取人设！', 'info');
+    } catch (err: any) {
+      showToast(err?.message || '读取立绘图片失败', 'error');
     }
-
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('图片尺寸建议不超过 10MB', 'warning');
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      if (base64) {
-        setCharAvatarUrl(base64);
-        showToast('角色立绘贴图已载入，可点击【AI 识图理解外貌】自动提取人设！', 'info');
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleAiAnalyzeAvatar = async () => {
@@ -292,17 +299,39 @@ export const CharactersView: React.FC = () => {
                     <div className="flex items-center justify-between pb-2 border-b border-line">
                       <div className="flex items-center gap-2.5">
                         {/* 角色立绘贴图 / 头像 */}
-                        {c.avatar_url ? (
-                          <img
-                            src={c.avatar_url}
-                            alt={c.name}
-                            className="w-14 h-18 rounded-xl object-cover border-2 border-amber-800/30 shadow-xs shrink-0 bg-surface-2 transition-transform hover:scale-[1.03]"
-                          />
-                        ) : (
-                          <div className="w-14 h-18 rounded-xl bg-amber-800/10 text-primary flex items-center justify-center font-bold text-base font-serif border border-dashed border-amber-800/25 shrink-0">
-                            {c.name.slice(0, 1)}
-                          </div>
-                        )}
+                        <div className="relative group shrink-0">
+                          {c.avatar_url ? (
+                            <img
+                              src={c.avatar_url}
+                              alt={c.name}
+                              className="w-14 h-18 rounded-xl object-cover border-2 border-amber-800/30 shadow-xs shrink-0 bg-surface-2 transition-transform hover:scale-[1.03]"
+                            />
+                          ) : (
+                            <div className="w-14 h-18 rounded-xl bg-amber-800/10 text-primary flex items-center justify-center font-bold text-base font-serif border border-dashed border-amber-800/25 shrink-0">
+                              {c.name.slice(0, 1)}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAvatarGeneratorTarget({
+                                id: c.id,
+                                name: c.name,
+                                gender: c.gender || '男',
+                                personality: c.personality || '',
+                                motivation: c.motivation || '',
+                                visual_summary: c.visual_summary || '',
+                                avatar_url: c.avatar_url || '',
+                              });
+                              setShowAvatarGenerator(true);
+                            }}
+                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex flex-col items-center justify-center text-amber-300 text-[10px] font-medium cursor-pointer"
+                            title="AI 生成/重新定制立绘"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 mb-0.5 text-amber-400" />
+                            <span>AI立绘</span>
+                          </button>
+                        </div>
                         <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-ink text-sm font-serif">{c.name}</span>
@@ -452,7 +481,7 @@ export const CharactersView: React.FC = () => {
                       accept="image/*"
                       className="hidden"
                     />
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
@@ -460,6 +489,26 @@ export const CharactersView: React.FC = () => {
                       >
                         <Upload className="w-3 h-3 text-amber-700" />
                         本地图片上传
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarGeneratorTarget({
+                            id: editingCharId || undefined,
+                            name: charName || '主角',
+                            gender: charGender,
+                            personality: charPersonality,
+                            motivation: charMotivation,
+                            visual_summary: charVisualSummary,
+                            avatar_url: charAvatarUrl,
+                          });
+                          setShowAvatarGenerator(true);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg border border-amber-700/60 bg-amber-500/10 hover:bg-amber-500/20 text-xs text-primary dark:text-amber-300 font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs active:scale-95"
+                        title="呼叫 AI 绘图模型生成角色立绘"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        ✨ AI 生成立绘
                       </button>
                       {charAvatarUrl && (
                         <button
@@ -623,6 +672,34 @@ export const CharactersView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* 角色立绘 AI 创绘模态框 */}
+      {showAvatarGenerator && avatarGeneratorTarget && (
+        <CharacterAvatarModal
+          isOpen={showAvatarGenerator}
+          onClose={() => {
+            setShowAvatarGenerator(false);
+            setAvatarGeneratorTarget(null);
+          }}
+          character={avatarGeneratorTarget}
+          genre={activeNovel?.genre_profile}
+          onApplyAvatar={async (newUrl) => {
+            if (showAddChar) {
+              setCharAvatarUrl(newUrl);
+              showToast('立绘已生成并载入编辑表单，保存即可持久化！', 'success');
+            } else if (avatarGeneratorTarget.id) {
+              await api.updateCharacter({
+                id: avatarGeneratorTarget.id,
+                name: avatarGeneratorTarget.name,
+                avatar_url: newUrl,
+              });
+              await loadCharacters();
+              window.dispatchEvent(new CustomEvent('novelforge:reload-story-bible'));
+              showToast(`角色【${avatarGeneratorTarget.name}】的立绘已成功更新！`, 'success');
+            }
+          }}
+        />
       )}
     </div>
   );

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { confirmDialog, alertDialog } from '@/utils/dialog';
+import { api } from '@/utils/tauriBridge';
+import { optimizeImageFileToDataUrl } from '@/utils/imageOptimizer';
 import {
   X,
   Palette,
@@ -12,6 +14,11 @@ import {
   Copy,
   Info,
   CheckCircle2,
+  Loader2,
+  AlertCircle,
+  Sliders,
+  Layers,
+  RefreshCw,
 } from 'lucide-react';
 import {
   BookCoverView,
@@ -32,7 +39,7 @@ export const BookCoverModal: React.FC<BookCoverModalProps> = ({
 }) => {
   const { activeNovel, updateNovel } = useNovelStore();
 
-  const [activeTab, setActiveTab] = useState<'PRESETS' | 'UPLOAD' | 'URL' | 'AI_PROMPT'>('PRESETS');
+  const [activeTab, setActiveTab] = useState<'PRESETS' | 'UPLOAD' | 'URL' | 'AI_GENERATE'>('PRESETS');
   const [selectedPresetId, setSelectedPresetId] = useState<string>('preset:xuan_ink');
   const [customTitle, setCustomTitle] = useState<string>('');
   const [customSubtitle, setCustomSubtitle] = useState<string>('');
@@ -44,6 +51,16 @@ export const BookCoverModal: React.FC<BookCoverModalProps> = ({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [copiedPrompt, setCopiedPrompt] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // AI 封面生成专属状态
+  const [aiCoverStyle, setAiCoverStyle] = useState<string>('xianxia');
+  const [aiCoverModel, setAiCoverModel] = useState<string>('dall-e-3');
+  const [customCoverModel, setCustomCoverModel] = useState<string>('');
+  const [aiCoverSize, setAiCoverSize] = useState<string>('1024x1024');
+  const [aiCoverPrompt, setAiCoverPrompt] = useState<string>('');
+  const [isGeneratingCover, setIsGeneratingCover] = useState<boolean>(false);
+  const [generatedCoverUrl, setGeneratedCoverUrl] = useState<string>('');
+  const [coverGenerationError, setCoverGenerationError] = useState<string | null>(null);
 
   // 初始化已有数据
   useEffect(() => {
@@ -82,56 +99,85 @@ export const BookCoverModal: React.FC<BookCoverModalProps> = ({
     if (activeTab === 'URL' && inputUrl) {
       return inputUrl;
     }
+    if (activeTab === 'AI_GENERATE' && generatedCoverUrl) {
+      return generatedCoverUrl;
+    }
     return selectedPresetId;
   };
 
-  // 处理本地图片选择
+  // 处理本地图片选择并执行本地内存高清优化压缩
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      await alertDialog('请选择有效的图片文件（JPG、PNG、WebP）！');
-      return;
+    try {
+      const optimizedDataUrl = await optimizeImageFileToDataUrl(file, {
+        maxDimension: 1200,
+        quality: 0.9,
+        maxFileSizeBytes: 10 * 1024 * 1024,
+      });
+      setUploadedDataUrl(optimizedDataUrl);
+      setFeedback('封面图片已载入并自动完成高清优化压缩！');
+      setTimeout(() => setFeedback(null), 2500);
+    } catch (err: any) {
+      await alertDialog(err?.message || '读取并优化封面图片失败');
     }
-
-    // 限制单张图片小于 5MB
-    if (file.size > 5 * 1024 * 1024) {
-      await alertDialog('图片文件过大，请选择 5MB 以内的图片！');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setUploadedDataUrl(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
-  // 生成 AI 封面提示词 (针对当前小说流派与梗概)
-  const generateAiPrompt = () => {
+  const COVER_STYLE_PRESETS: { id: string; label: string; snippet: string }[] = [
+    { id: 'xianxia', label: '🎋 国风水墨', snippet: 'Traditional Chinese ink wash painting, ethereal Taoist landscape, poetic atmosphere, elegant brushwork' },
+    { id: 'fantasy', label: '🌌 东方玄幻', snippet: 'Epic Eastern fantasy illustration, golden glowing runes, grand mythical landscape, cinematic volumetric lighting, Unreal Engine 5' },
+    { id: 'cyberpunk', label: '⚡ 赛博科幻', snippet: 'Sci-fi concept art, deep space nebula, interstellar starship, futuristic neon lighting, ultra-detailed' },
+    { id: 'suspense', label: '🕯️ 悬疑惊悚', snippet: 'Dark noir illustration, mysterious foggy night, dramatic rim light, moody suspense atmosphere, chiaroscuro' },
+    { id: 'romance', label: '🌸 古风言情', snippet: 'Delicate Chinese ancient romance watercolor, soft pastel tones, blossoming peach flowers, gentle breeze' },
+    { id: 'modern', label: '🏢 都市质感', snippet: 'Modern urban literature aesthetic, minimalist typography layout, architectural geometry, artistic photography' },
+  ];
+
+  const assembleCoverPrompt = (styleId: string) => {
+    const s = COVER_STYLE_PRESETS.find((x) => x.id === styleId) || COVER_STYLE_PRESETS[0];
     const genre = activeNovel.genre_profile || '玄幻';
     const title = activeNovel.title;
-    const desc = activeNovel.description || '宏大的东方玄幻世界';
-
-    let styleDescriptor = 'Chinese ink wash painting, master composition, cinematic lighting';
-    if (genre.includes('科幻')) {
-      styleDescriptor = 'Sci-fi concept art, deep space nebula, interstellar starship, futuristic lighting, ultra-detailed';
-    } else if (genre.includes('悬疑')) {
-      styleDescriptor = 'Dark noir illustration, mysterious foggy night, dramatic rim light, moody suspense atmosphere';
-    } else if (genre.includes('奇幻')) {
-      styleDescriptor = 'Epic high fantasy art, ancient runes and arcane magical glow, breathtaking landscape, detailed oil painting';
-    }
-
-    const promptEn = `Book cover illustration for "${title}", a ${genre} novel. Theme: ${desc}. ${styleDescriptor}, highly aesthetic, dramatic composition, centered, no text, clean borders, 8k resolution, artstation trending --ar 3:4 --v 6.0`;
-    const promptZh = `《${title}》精美中文小说封面插画，题材：${genre}。核心意象：${desc}。风格：${styleDescriptor}，构图大气，留白雅致，电影级光影质感，8k高清，画作无文字，比例 3:4。`;
-
-    return { promptEn, promptZh };
+    const desc = activeNovel.description || '宏大的世界观';
+    return `Book cover illustration for "${title}", a ${genre} novel. Theme: ${desc}. Art style: ${s.snippet}, highly aesthetic, dramatic composition, centered, no text on artwork, 8k resolution, masterpiece.`;
   };
 
-  const { promptEn, promptZh } = generateAiPrompt();
+  useEffect(() => {
+    if (activeNovel && !aiCoverPrompt) {
+      setAiCoverPrompt(assembleCoverPrompt(aiCoverStyle));
+    }
+  }, [activeNovel?.id, aiCoverStyle]);
+
+  const handleGenerateCover = async () => {
+    if (!aiCoverPrompt.trim()) return;
+    setIsGeneratingCover(true);
+    setCoverGenerationError(null);
+    try {
+      const modelName = customCoverModel.trim() || aiCoverModel;
+      const res = await api.generateImage({
+        prompt: aiCoverPrompt.trim(),
+        model_name: modelName,
+        size: aiCoverSize,
+        style: 'vivid',
+      });
+      if (res && res.image_url) {
+        setGeneratedCoverUrl(res.image_url);
+        setFeedback('AI 封面原画生成成功！左侧已实时呈现 3D 书卷装帧效果');
+        setTimeout(() => setFeedback(null), 3000);
+      } else {
+        setCoverGenerationError('生图服务未返回有效图片结果');
+      }
+    } catch (err: any) {
+      console.error('生图错误:', err);
+      const msg = err?.message || String(err);
+      setCoverGenerationError(
+        msg.includes('未配置')
+          ? '请先前往【设置 / 模型网关】配置支持绘图的 API Key（如 OpenAI、SiliconFlow、智谱等）'
+          : `封面生成异常: ${msg}`
+      );
+    } finally {
+      setIsGeneratingCover(false);
+    }
+  };
 
   const handleCopyPrompt = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -320,20 +366,20 @@ export const BookCoverModal: React.FC<BookCoverModalProps> = ({
             </button>
 
             <button
-              onClick={() => setActiveTab('AI_PROMPT')}
+              onClick={() => setActiveTab('AI_GENERATE')}
               className={`pb-2.5 px-3 text-xs font-medium flex items-center gap-1.5 border-b-2 transition cursor-pointer ${
-                activeTab === 'AI_PROMPT'
+                activeTab === 'AI_GENERATE'
                   ? 'border-amber-800 text-primary dark:text-amber-400 dark:border-amber-400 font-bold'
                   : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>✨ AI 提示词</span>
+              <span>✨ AI 原画生图</span>
             </button>
           </div>
 
           {/* Tab 内容区 */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
             {/* Tab 1: 典雅艺术封皮选择 */}
             {activeTab === 'PRESETS' && (
               <div className="space-y-4">
@@ -544,59 +590,175 @@ export const BookCoverModal: React.FC<BookCoverModalProps> = ({
               </div>
             )}
 
-            {/* Tab 4: AI 封面提示词助手 */}
-            {activeTab === 'AI_PROMPT' && (
+            {/* Tab 4: AI 封面原画生成 */}
+            {activeTab === 'AI_GENERATE' && (
               <div className="space-y-4">
-                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs text-primary dark:text-amber-300 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <span className="font-medium">
-                      已依据《{activeNovel.title}》的【{activeNovel.genre_profile}】题材自动生成 Midjourney / SDXL 级提示词
-                    </span>
+                {coverGenerationError && (
+                  <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+                    <div className="leading-relaxed">{coverGenerationError}</div>
+                  </div>
+                )}
+
+                {/* 1. 流派风格选择 */}
+                <div>
+                  <span className="text-xs font-bold text-stone-800 dark:text-stone-200 flex items-center gap-1.5 mb-2">
+                    <Palette className="w-3.5 h-3.5 text-primary" />
+                    装帧流派意境 (6 款文学原画预设)
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {COVER_STYLE_PRESETS.map((style) => {
+                      const isSelected = aiCoverStyle === style.id;
+                      return (
+                        <div
+                          key={style.id}
+                          onClick={() => {
+                            setAiCoverStyle(style.id);
+                            setAiCoverPrompt(assembleCoverPrompt(style.id));
+                          }}
+                          className={`p-2.5 rounded-xl border transition cursor-pointer flex flex-col justify-between ${
+                            isSelected
+                              ? 'border-amber-700 bg-amber-500/10 dark:bg-amber-400/10 shadow-xs'
+                              : 'border-line dark:border-[#38332e] hover:border-amber-700/50 bg-[#faf5ec]/40 dark:bg-[#1f1b17]'
+                          }`}
+                        >
+                          <div className="font-semibold text-xs text-stone-800 dark:text-stone-200 flex items-center justify-between">
+                            <span>{style.label}</span>
+                            {isSelected && <Check className="w-3 h-3 text-primary dark:text-amber-400" />}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* 英文提示词 */}
+                {/* 2. 画幅规格与模型选择 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1.5 mb-1.5">
+                      <Layers className="w-3 h-3 text-primary" />
+                      画幅比例
+                    </label>
+                    <select
+                      value={aiCoverSize}
+                      onChange={(e) => setAiCoverSize(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg text-xs border border-line dark:border-[#38332e] bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-amber-700 cursor-pointer"
+                    >
+                      <option value="1024x1024">1024×1024 (标准正方)</option>
+                      <option value="1024x1792">1024×1792 (竖屏全画幅)</option>
+                      <option value="768x1024">768×1024 (3:4 书卷黄金比例)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1.5 mb-1.5">
+                      <Sliders className="w-3 h-3 text-primary" />
+                      绘图模型网关
+                    </label>
+                    <select
+                      value={aiCoverModel}
+                      onChange={(e) => setAiCoverModel(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg text-xs border border-line dark:border-[#38332e] bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-amber-700 cursor-pointer"
+                    >
+                      <option value="dall-e-3">OpenAI DALL-E 3 (高精度理解)</option>
+                      <option value="black-forest-labs/FLUX.1-schnell">FLUX.1-schnell (极速/高性价比)</option>
+                      <option value="black-forest-labs/FLUX.1-dev">FLUX.1-dev (顶级画质)</option>
+                      <option value="cogview-3-plus">智谱 CogView-3 (中文友好)</option>
+                      <option value="wanx-v1">阿里通义万相 (国风原画)</option>
+                      <option value="custom">⚙️ 自定义其他模型...</option>
+                    </select>
+                    {aiCoverModel === 'custom' && (
+                      <input
+                        type="text"
+                        placeholder="输入模型标识符"
+                        value={customCoverModel}
+                        onChange={(e) => setCustomCoverModel(e.target.value)}
+                        className="mt-1.5 w-full px-2.5 py-1 text-[11px] rounded-lg border border-line dark:border-[#38332e] bg-white dark:bg-stone-900"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. 提示词与一键生成 */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
-                      Midjourney / DALL-E / Flux 英文提示词
+                    <label className="text-xs font-semibold text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-primary" />
+                      封面原画提示词 (Prompt)
                     </label>
-                    <button
-                      onClick={() => handleCopyPrompt(promptEn)}
-                      className="px-2 py-0.5 rounded text-xs border border-line dark:border-[#38332e] hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 flex items-center gap-1 transition"
-                    >
-                      {copiedPrompt ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedPrompt ? '已复制' : '复制英文 Prompt'}</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAiCoverPrompt(assembleCoverPrompt(aiCoverStyle))}
+                        className="text-[10px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-300 flex items-center gap-1 transition"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>重置初始</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPrompt(aiCoverPrompt)}
+                        className="text-[10px] text-primary dark:text-amber-400 hover:underline flex items-center gap-1"
+                      >
+                        {copiedPrompt ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedPrompt ? '已复制' : '复制 Prompt'}</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-3 rounded-xl border border-line dark:border-[#38332e] bg-[#fbf9f5] dark:bg-[#181513] text-xs font-mono text-stone-700 dark:text-stone-300 leading-relaxed select-all">
-                    {promptEn}
-                  </div>
+                  <textarea
+                    value={aiCoverPrompt}
+                    onChange={(e) => setAiCoverPrompt(e.target.value)}
+                    rows={3}
+                    placeholder="在此自由微调封面景致、光影氛围或象征意象..."
+                    className="w-full p-2.5 rounded-xl border border-line dark:border-[#38332e] bg-[#faf5ec]/30 dark:bg-stone-900 text-xs font-mono leading-relaxed focus:outline-none focus:ring-1 focus:ring-amber-700 resize-none"
+                  />
                 </div>
 
-                {/* 中文提示词 */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
-                      国内生图大模型 (通义万相/文心一格) 中文提示词
-                    </label>
-                    <button
-                      onClick={() => handleCopyPrompt(promptZh)}
-                      className="px-2 py-0.5 rounded text-xs border border-line dark:border-[#38332e] hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 flex items-center gap-1 transition"
-                    >
-                      <Copy className="w-3 h-3" />
-                      <span>复制中文 Prompt</span>
-                    </button>
-                  </div>
-                  <div className="p-3 rounded-xl border border-line dark:border-[#38332e] bg-[#fbf9f5] dark:bg-[#181513] text-xs font-serif text-stone-700 dark:text-stone-300 leading-relaxed select-all">
-                    {promptZh}
-                  </div>
+                {/* 触发生成按钮 */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900">
+                  <span className="text-[11px] text-primary dark:text-amber-300">
+                    点击生成后，左侧 3D 实体书卷将实时呈现新封套装帧！
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleGenerateCover}
+                    disabled={isGeneratingCover}
+                    className="px-4 py-2 rounded-xl bg-amber-800 hover:bg-amber-900 text-white font-medium text-xs flex items-center gap-2 shadow-sm transition cursor-pointer active:scale-95 disabled:opacity-50"
+                  >
+                    {isGeneratingCover ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>正在极速绘制封面...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                        <span>立即 AI 生成新封面</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
-                <p className="text-[11px] text-stone-500 leading-relaxed">
-                  使用流程：复制上方 Prompt 粘贴至各大绘图工具生成后，下载图片并切换到本弹窗的【本地原画上传】栏上传即可！
-                </p>
+                {/* 已生成的图片状态与外置工具提示词折叠 */}
+                {generatedCoverUrl && (
+                  <div className="p-3 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <img
+                        src={generatedCoverUrl}
+                        alt="AI生成封面"
+                        className="w-12 h-16 object-cover rounded shadow-xs border border-emerald-400"
+                      />
+                      <div>
+                        <div className="font-semibold text-xs text-emerald-800 dark:text-emerald-300">
+                          ✨ 封面原画已生成就绪
+                        </div>
+                        <div className="text-[10px] text-stone-500">
+                          已自动载入左侧 3D 书卷，点击下方【保存并应用封面】即可完成全书装帧
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -606,7 +768,13 @@ export const BookCoverModal: React.FC<BookCoverModalProps> = ({
             <span className="text-[11px] text-stone-500">
               当前装帧方案：
               <span className="font-semibold text-stone-800 dark:text-stone-200 ml-1">
-                {activeTab === 'PRESETS' ? '内置艺术封皮' : activeTab === 'UPLOAD' ? '本地 Base64 原画' : '网络图片直连'}
+                {activeTab === 'PRESETS'
+                  ? '内置艺术封皮'
+                  : activeTab === 'UPLOAD'
+                  ? '本地 Base64 原画'
+                  : activeTab === 'URL'
+                  ? '网络图片直连'
+                  : 'AI 原画艺术生成'}
               </span>
             </span>
 

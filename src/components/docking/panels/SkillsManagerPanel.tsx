@@ -3,7 +3,7 @@ import { SkillsManagerView } from '@/features/skills/components/SkillsManagerVie
 
 export const SkillsManagerPanel: React.FC = () => {
   return (
-    <div className="w-full h-full overflow-hidden">
+    <div className="w-full h-full overflow-y-auto overscroll-contain">
       <SkillsManagerView />
     </div>
   );

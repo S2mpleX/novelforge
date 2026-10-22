@@ -364,7 +364,7 @@ export const NovelistToolboxModal: React.FC<NovelistToolboxModalProps> = ({
           </div>
 
           {/* 中间：输入与设定上下文配置 */}
-          <div className="flex-1 p-5 overflow-y-auto space-y-4 border-r border-border/60 flex flex-col">
+          <div className="flex-1 min-h-0 p-5 overflow-y-auto space-y-4 border-r border-border/60 flex flex-col">
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
@@ -495,8 +495,8 @@ export const NovelistToolboxModal: React.FC<NovelistToolboxModalProps> = ({
           </div>
 
           {/* 右侧：生成成果与落地打磨区 */}
-          <div className="w-[45%] p-5 bg-muted/5 flex flex-col justify-between overflow-hidden">
-            <div className="flex items-center justify-between mb-2">
+          <div className="w-[45%] p-5 bg-muted/5 flex flex-col min-h-0 overflow-y-auto space-y-3">
+            <div className="flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-500" />
                 <span className="text-xs font-semibold text-foreground">推演结果（支持原地编辑修改）</span>
@@ -506,7 +506,7 @@ export const NovelistToolboxModal: React.FC<NovelistToolboxModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCopy}
-                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-foreground transition-all"
+                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-foreground transition-all cursor-pointer"
                   >
                     {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                     {copied ? '已复制' : '复制'}
@@ -515,7 +515,7 @@ export const NovelistToolboxModal: React.FC<NovelistToolboxModalProps> = ({
                     type="button"
                     onClick={handleGenerate}
                     disabled={isGenerating}
-                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-foreground transition-all"
+                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-foreground transition-all cursor-pointer"
                   >
                     <RefreshCw className={`w-3 h-3 ${isGenerating ? 'animate-spin' : ''}`} />
                     重新生成
@@ -525,7 +525,7 @@ export const NovelistToolboxModal: React.FC<NovelistToolboxModalProps> = ({
             </div>
 
             {/* 结果编辑框 */}
-            <div className="flex-1 min-h-[300px] mb-3">
+            <div className="flex-1 min-h-[180px]">
               <textarea
                 value={resultText}
                 onChange={(e) => setResultText(e.target.value)}
@@ -536,7 +536,7 @@ export const NovelistToolboxModal: React.FC<NovelistToolboxModalProps> = ({
 
             {/* 快捷落地按钮群 */}
             {resultText ? (
-              <div className="space-y-2 pt-2 border-t border-border/60">
+              <div className="space-y-2 pt-2 border-t border-border/60 shrink-0 mt-auto">
                 <div className="text-[11px] font-medium text-muted-foreground">一键落地到小说工程：</div>
                 <div className="grid grid-cols-2 gap-2">
                   <button

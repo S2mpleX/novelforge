@@ -11,6 +11,8 @@ import type {
   StoryPhase,
   StoryArc,
   Scene,
+  CreateSceneInput,
+  UpdateSceneInput,
   StoryEvent,
   WorldRule,
   PlotThread,
@@ -86,6 +88,8 @@ import type {
   DistillSandboxInspirationsResult,
   AnalyzeCharacterAppearanceInput,
   AnalyzeCharacterAppearanceResult,
+  GenerateImageInput,
+  GenerateImageResult,
 } from '@/types';
 
 /**
@@ -335,14 +339,14 @@ export const api = {
 
   listScenes: (chapterId: string) =>
     safeInvoke<Scene[]>('list_scenes', { chapterId }),
-  createScene: (input: {
-    chapter_id: string;
-    sequence: number;
-    objective: string;
-    outline: string;
-    pov_character_id?: string;
-    location_id?: string;
-  }) => safeInvoke<Scene>('create_scene', { input }),
+  getScene: (id: string) =>
+    safeInvoke<Scene>('get_scene', { id }),
+  createScene: (input: CreateSceneInput) =>
+    safeInvoke<Scene>('create_scene', { input }),
+  updateScene: (input: UpdateSceneInput) =>
+    safeInvoke<Scene>('update_scene', { input }),
+  deleteScene: (id: string) =>
+    safeInvoke<void>('delete_scene', { id }),
   updateSceneStatus: (id: string, status: string) =>
     safeInvoke<void>('update_scene_status', { id, status }),
 
@@ -691,4 +695,6 @@ export const api = {
     safeInvoke<SynthesizeSandboxProseResult>('synthesize_sandbox_dialogue_to_prose', { input }),
   analyzeCharacterAppearance: (input: AnalyzeCharacterAppearanceInput) =>
     safeInvoke<AnalyzeCharacterAppearanceResult>('analyze_character_appearance', { input }),
+  generateImage: (input: GenerateImageInput) =>
+    safeInvoke<GenerateImageResult>('generate_image', { input }),
 };

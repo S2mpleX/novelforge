@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
+import { StoryBibleExportService } from '@/services/StoryBibleExportService';
 import type { DatabaseHealthReport } from '@/types';
 import {
   X,
@@ -15,6 +16,8 @@ import {
   RefreshCw,
   CheckCircle2,
   Archive,
+  Sparkles,
+  Printer,
 } from 'lucide-react';
 
 interface PublishingModalProps {
@@ -156,6 +159,63 @@ export const PublishingModal: React.FC<PublishingModalProps> = ({ onClose }) => 
     }
   };
 
+  // 5. Export Story Bible Visual Booklet (HTML / PDF)
+  const handleExportStoryBibleHtml = async () => {
+    if (!activeNovel) return;
+    setLoading(true);
+    try {
+      const html = await StoryBibleExportService.exportStoryBibleHtml(activeNovel.id);
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeTitle = getSafeTitle(activeNovel.title);
+      a.download = `《${safeTitle}》_故事圣经全景设定集.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showNotification('🎉 典藏故事圣经 · 全景设定画册导出成功！支持双击离线查阅或 Ctrl+P 打印为 PDF。');
+    } catch (e: any) {
+      showNotification(`设定集导出失败: ${e.message || e}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 6. Direct Print / Save as PDF Story Bible
+  const handlePrintPreviewStoryBible = async () => {
+    if (!activeNovel) return;
+    setLoading(true);
+    try {
+      const html = await StoryBibleExportService.exportStoryBibleHtml(activeNovel.id);
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+        showNotification('🎉 已唤起故事圣经画报打印与 PDF 保存窗口。在打印预览中选择「另存为 PDF」即可导出高清画册。');
+      } else {
+        // Fallback for pop-up blocker: download HTML
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeTitle = getSafeTitle(activeNovel.title);
+        a.download = `《${safeTitle}》_故事圣经全景设定集.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showNotification('已下载 HTML 设定集，双击打开后按 Ctrl+P 即可直接打印或存为 PDF。');
+      }
+    } catch (e: any) {
+      showNotification(`打印画报失败: ${e.message || e}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 5. Import Archive
   const handleImportArchive = async () => {
     if (!importJsonText.trim()) {
@@ -287,7 +347,7 @@ export const PublishingModal: React.FC<PublishingModalProps> = ({ onClose }) => 
         )}
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-surface">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 bg-surface">
           {activeTab === 'EXPORT' && (
             <div className="space-y-6">
               {activeNovel ? (
@@ -426,11 +486,58 @@ export const PublishingModal: React.FC<PublishingModalProps> = ({ onClose }) => 
                   <button
                     onClick={handleExportArchiveJson}
                     disabled={loading || !activeNovel}
-                    className="w-full py-2 bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] rounded-lg text-xs font-serif font-medium flex items-center justify-center gap-1.5 transition disabled:opacity-50 shadow-xs"
+                    className="w-full py-2 bg-[#854d0e] hover:bg-[#713f12] text-[#fdfbf7] rounded-lg text-xs font-serif font-medium flex items-center justify-center gap-1.5 transition disabled:opacity-50 shadow-xs cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     导出工程归档快照
                   </button>
+                </div>
+
+                {/* 5. Story Bible Visual Booklet (HTML5 / PDF) */}
+                <div className="md:col-span-2 bg-gradient-to-br from-[#faf6ee] to-[#f4ebe0] dark:from-[#25201b] dark:to-[#1d1915] p-5 rounded-xl border-2 border-amber-600/40 hover:border-amber-600 transition space-y-3 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-3 right-3 px-2 py-0.5 rounded text-[10px] font-sans font-bold bg-amber-600 text-white tracking-wide">
+                    ✨ 典藏全景图文画报
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg bg-amber-600 text-white shadow-xs">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-serif font-bold text-ink flex items-center gap-2">
+                        典藏故事圣经 · 全景设定画册 (.html / 打印画报)
+                      </h4>
+                      <p className="text-[11px] text-ink-2 font-serif">
+                        全书人物立绘画册、世界观真理正典、剧情弧大纲、伏笔因果链与卷章总目
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-ink-2 font-serif leading-relaxed max-w-2xl">
+                    一键排版导出为唯美宋韵温润宣纸画报。内嵌角色高精立绘与外貌特征、世界观权威法则分级、伏笔线索追踪与分卷字数统计。支持任意手机/电脑免网双击畅览，亦可直接通过浏览器 <strong>Ctrl+P</strong> 完美打印转存为实体 PDF 设定集。
+                  </p>
+                  <div className="pt-1 flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={handleExportStoryBibleHtml}
+                      disabled={loading || !activeNovel}
+                      className="px-4 py-2.5 bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-800 hover:to-amber-900 text-white rounded-lg text-xs font-serif font-medium flex items-center justify-center gap-2 transition disabled:opacity-50 shadow-sm cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      导出全景设定集 (.html)
+                    </button>
+
+                    <button
+                      onClick={handlePrintPreviewStoryBible}
+                      disabled={loading || !activeNovel}
+                      className="px-4 py-2.5 bg-surface-2 hover:bg-surface-3 text-ink border border-line rounded-lg text-xs font-serif font-medium flex items-center justify-center gap-1.5 transition disabled:opacity-50 cursor-pointer shadow-2xs"
+                      title="直接弹出画报打印预览窗口，可选择「另存为 PDF」导出典藏画册"
+                    >
+                      <Printer className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                      打印画报 / 存为 PDF
+                    </button>
+
+                    <span className="text-[11px] text-stone-500 font-sans">
+                      💡 提示：支持离线双击畅览，或按 Ctrl+P 存为高精 PDF 画册
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

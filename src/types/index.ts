@@ -118,6 +118,24 @@ export interface AnalyzeCharacterAppearanceResult {
   body_type?: string;
 }
 
+export interface GenerateImageInput {
+  prompt: string;
+  model_name?: string;
+  size?: string;
+  style?: string;
+  provider_id?: string;
+  custom_base_url?: string;
+  custom_api_key?: string;
+  response_format?: 'url' | 'b64_json';
+}
+
+export interface GenerateImageResult {
+  image_url: string;
+  b64_json?: string;
+  revised_prompt?: string;
+  model: string;
+}
+
 export interface WorldRule {
   id: string;
   novel_id: string;
@@ -218,12 +236,47 @@ export interface Scene {
   id: string;
   chapter_id: string;
   sequence: number;
+  order_index?: number;
+  title?: string;
+  scene_number?: number;
   objective: string;
   outline: string;
   pov_character_id?: string;
   location_id: string;
+  content?: string;
+  word_count?: number;
+  time_anchor?: string;
+  conflict_target?: string;
   status: string;
   created_at: number;
+}
+
+export interface CreateSceneInput {
+  chapter_id: string;
+  sequence: number;
+  order_index?: number;
+  title?: string;
+  scene_number?: number;
+  objective: string;
+  outline: string;
+  pov_character_id?: string;
+  location_id?: string;
+  content?: string;
+  time_anchor?: string;
+  conflict_target?: string;
+}
+
+export interface UpdateSceneInput {
+  id: string;
+  title?: string;
+  sequence?: number;
+  scene_number?: number;
+  objective?: string;
+  outline?: string;
+  pov_character_id?: string;
+  location_id?: string;
+  conflict_target?: string;
+  status?: string;
 }
 
 export interface StoryEvent {
@@ -1113,8 +1166,8 @@ export interface ExecuteSandboxStepResult {
 export interface SynthesizeSandboxProseInput {
   session_id: string;
   custom_guidance?: string;
-  pov_mode?: string;
-  polishing_style?: 'CINEMATIC' | 'PSYCHOLOGICAL' | 'HARDCORE_TENSE';
+  pov_mode?: 'THIRD_LIMITED' | 'THIRD_OMNISCIENT' | 'FIRST_PERSON' | string;
+  polishing_style?: 'CINEMATIC' | 'PSYCHOLOGICAL' | 'HARDCORE_TENSE' | 'CLASSICAL_ELEGANT' | 'DARK_HUMOR_IRONY' | string;
   start_round_index?: number;
   end_round_index?: number;
 }

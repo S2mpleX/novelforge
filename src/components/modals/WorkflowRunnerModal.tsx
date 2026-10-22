@@ -352,7 +352,7 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
           </div>
 
           {/* 右侧：当前工作流流水线视图 */}
-          <div className="flex-1 p-6 overflow-y-auto flex flex-col justify-between custom-scrollbar">
+          <div className="flex-1 min-h-0 p-6 overflow-y-auto space-y-6 custom-scrollbar">
             {currentRunDetails ? (
               <div className="space-y-6">
                 {/* 状态横幅 */}

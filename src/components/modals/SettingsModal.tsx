@@ -280,7 +280,7 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className={`w-full ${activeTab === 'SKILLS' ? 'max-w-5xl' : activeTab === 'UPDATER' ? 'max-w-3xl' : 'max-w-xl'} bg-surface dark:bg-[#1c1917] border border-line dark:border-[#2e2a27] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]`}>
+      <div className={`w-full ${activeTab === 'SKILLS' ? 'max-w-5xl h-[88vh]' : activeTab === 'UPDATER' ? 'max-w-3xl max-h-[90vh]' : 'max-w-xl max-h-[90vh]'} bg-surface dark:bg-[#1c1917] border border-line dark:border-[#2e2a27] rounded-2xl shadow-2xl overflow-hidden flex flex-col`}>
         {/* Header */}
         <div className="p-4 border-b border-line dark:border-[#2e2a27] flex items-center justify-between bg-surface-2 dark:bg-[#201c1a]">
           <div className="flex items-center gap-3">
@@ -338,15 +338,15 @@ export const SettingsModal: React.FC<Props> = ({ onClose, initialTab = 'MODEL' }
 
         {/* Content Body */}
         {activeTab === 'SKILLS' ? (
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
             <SkillsManagerView />
           </div>
         ) : activeTab === 'UPDATER' ? (
-          <div className="p-6 overflow-y-auto bg-surface dark:bg-[#1c1917]">
+          <div className="flex-1 min-h-0 p-6 overflow-y-auto bg-surface dark:bg-[#1c1917]">
             <UpdateCenter />
           </div>
         ) : (
-          <div className="p-6 overflow-y-auto space-y-5 bg-surface dark:bg-[#1c1917]">
+          <div className="flex-1 min-h-0 p-6 overflow-y-auto space-y-5 bg-surface dark:bg-[#1c1917]">
             {/* Privacy Note */}
             <div className="p-3.5 rounded-xl bg-surface-2/80 dark:bg-[#24201c] border border-line dark:border-[#38332f] text-xs text-ink-2 dark:text-[#d6d3d1] flex items-start gap-3">
               <Lock className="w-4 h-4 text-primary dark:text-amber-500 shrink-0 mt-0.5" />

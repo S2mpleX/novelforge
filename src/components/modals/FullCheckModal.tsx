@@ -213,7 +213,7 @@ export const FullCheckModal: React.FC<Props> = ({ isOpen, onClose, embedded = fa
         )}
 
         {/* 主体报告列表 */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-surface dark:bg-[#1a1714]">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-surface dark:bg-[#1a1714]">
           {report ? (
             filteredIssues.length > 0 ? (
               filteredIssues.map((issue) => (

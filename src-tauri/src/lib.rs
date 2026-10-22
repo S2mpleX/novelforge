@@ -100,7 +100,9 @@ pub fn run() {
             commands::delete_story_arc,
             // Scenes & Events (Phase 2)
             commands::list_scenes,
+            commands::get_scene,
             commands::create_scene,
+            commands::update_scene,
             commands::update_scene_status,
             commands::list_story_events,
             commands::create_story_event,
@@ -211,6 +213,7 @@ pub fn run() {
             commands::distill_sandbox_inspirations,
             commands::synthesize_sandbox_dialogue_to_prose,
             commands::analyze_character_appearance,
+            commands::generate_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovelForge AI application");

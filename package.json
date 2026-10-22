@@ -1,7 +1,7 @@
 {
   "name": "novelforge-ai",
   "private": true,
-  "version": "2.6.3",
+  "version": "2.7.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,9 @@
     "test:humanizer": "tsx tests/test-humanizer-engine.ts",
     "test:arena": "tsx tests/test-model-arena.ts",
     "test:sandbox": "tsx tests/test-character-sandbox.ts",
+    "test:sandbox:pause": "tsx tests/test-sandbox-deduction-pause.ts",
+    "test:sandbox:polisher": "tsx tests/test-sandbox-prose-polisher.ts",
+    "test:sandbox:header": "tsx tests/test-sandbox-header-layout.ts",
     "test:sandbox:api": "tsx tests/test-sandbox-multi-api-and-gender.ts",
     "test:sandbox:inspiration": "tsx tests/test-sandbox-inspiration-and-actions.ts",
     "test:character:visual": "tsx tests/test-character-avatar-and-visual-understanding.ts",
@@ -26,7 +29,13 @@
     "test:cohort3": "tsx tests/test-third-cohort-engines.ts",
     "test:bugfixes": "tsx tests/test-bugfixes-verification.ts",
     "test:zen": "tsx tests/test-zen-studio-modes.ts",
+    "test:tri-modes": "tsx tests/test-workspace-tri-modes.ts",
+    "test:editor:inline": "tsx tests/test-editor-inline-workflow.ts",
+    "test:image-generation": "tsx tests/test-image-generation.ts",
+    "test:image-optimizer": "tsx tests/test-image-optimizer.ts",
+    "test:beats-bible": "tsx tests/test-scene-beats-and-story-bible.ts",
     "test:header": "tsx tests/test-header-window-controls.ts",
+    "test:skills": "tsx tests/test-skills-manager.ts",
     "check:version": "tsx scripts/check-version-consistency.ts",
     "test:db": "node scripts/tauri-runner.js -- cargo run --manifest-path src-tauri/Cargo.toml --bin db_test"
   },

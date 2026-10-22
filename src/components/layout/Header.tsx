@@ -228,6 +228,8 @@ export const Header: React.FC = () => {
 
   const { status } = useUpdateStore();
   const openPanel = useWorkspaceStore((s) => s.openPanel);
+  const applyPreset = useWorkspaceStore((s) => s.applyPreset);
+  const activePresetKey = useWorkspaceStore((s) => s.activePresetKey);
 
   // Modals state
   const [showSettings, setShowSettings] = useState(false);
@@ -377,6 +379,23 @@ export const Header: React.FC = () => {
     }
   };
 
+  const handleHeaderMouseDown = async (e: React.MouseEvent) => {
+    // 仅响应鼠标主键 (左键)
+    if (e.button !== 0) return;
+    // 命中按钮、链接、输入框、下拉框、交互控件时禁止触发窗口拖拽
+    if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [data-tauri-drag-region="false"], [role="button"], .cursor-pointer')) {
+      return;
+    }
+    if (isTauri()) {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().startDragging();
+      } catch (err) {
+        console.warn('Failed to start dragging window:', err);
+      }
+    }
+  };
+
   const handleHeaderDoubleClick = async (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, a, input, select, [data-tauri-drag-region="false"]')) {
       return;
@@ -398,6 +417,7 @@ export const Header: React.FC = () => {
     <>
       <header
         data-tauri-drag-region
+        onMouseDown={handleHeaderMouseDown}
         onDoubleClick={handleHeaderDoubleClick}
         className="h-14 border-b border-line dark:border-[#2e2a27] bg-surface-2 dark:bg-[#1a1714] flex items-center justify-between pl-2.5 md:pl-3.5 pr-0 select-none shrink-0 z-30 shadow-[0_1px_3px_rgba(120,90,50,0.06)] min-w-0 w-full relative"
       >
@@ -405,11 +425,11 @@ export const Header: React.FC = () => {
         {/* APP CONTENT REGION: Zone 1, Zone 2, Zone 3 Actions           */}
         {/* Strictly flex-1 min-w-0: Cannot push the window controls     */}
         {/* ============================================================ */}
-        <div className="flex items-center justify-between flex-1 min-w-0 h-full mr-1">
+        <div data-tauri-drag-region className="flex items-center justify-between flex-1 min-w-0 h-full mr-1">
           {/* ============================================================ */}
           {/* ZONE 1 (LEFT): Brand & Active Project Selector              */}
           {/* ============================================================ */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 mr-1 sm:mr-2">
+          <div data-tauri-drag-region className="flex items-center gap-1.5 sm:gap-2 shrink-0 mr-1 sm:mr-2">
           {/* Toggle Chapters Sidebar */}
           <button
             onClick={toggleSidebar}
@@ -420,15 +440,15 @@ export const Header: React.FC = () => {
           </button>
 
           {/* App Branding */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-600 via-amber-700 to-orange-700 flex items-center justify-center shadow-xs border border-amber-600/30 shrink-0">
+          <div data-tauri-drag-region className="flex items-center gap-1.5 shrink-0">
+            <div data-tauri-drag-region className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-600 via-amber-700 to-orange-700 flex items-center justify-center shadow-xs border border-amber-600/30 shrink-0">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <div className="hidden lg:flex items-center gap-1 whitespace-nowrap">
-              <span className="font-bold text-ink dark:text-[#f3eee7] text-xs lg:text-sm tracking-wide font-serif">
+            <div data-tauri-drag-region className="hidden lg:flex items-center gap-1 whitespace-nowrap">
+              <span data-tauri-drag-region className="font-bold text-ink dark:text-[#f3eee7] text-xs lg:text-sm tracking-wide font-serif">
                 NovelForge
               </span>
-              <span className="hidden 2xl:inline-block px-1.5 py-0.2 text-[9px] font-semibold bg-amber-800/10 dark:bg-amber-400/10 text-primary dark:text-amber-300 rounded-full border border-amber-800/20">
+              <span data-tauri-drag-region className="hidden 2xl:inline-block px-1.5 py-0.2 text-[9px] font-semibold bg-amber-800/10 dark:bg-amber-400/10 text-primary dark:text-amber-300 rounded-full border border-amber-800/20">
                 v{APP_CURRENT_VERSION}
               </span>
             </div>
@@ -577,9 +597,9 @@ export const Header: React.FC = () => {
         {/* ============================================================ */}
         {/* ZONE 2 (CENTER): Mode Switcher Capsule & Creation Pipeline   */}
         {/* ============================================================ */}
-        <div className="flex items-center justify-center mx-auto min-w-0 shrink-0 gap-1.5 sm:gap-2">
-          {/* Dual Mode Switcher Capsule (方案 2: 纯粹写作 Zen 模式 vs 专业工坊 Studio 模式一键切换) */}
-          <div className="flex items-center bg-surface-3 dark:bg-[#201d1a] p-0.5 rounded-xl border border-line dark:border-[#352f2a] shadow-inner shrink-0">
+        <div data-tauri-drag-region className="flex items-center justify-center mx-auto min-w-0 shrink-0 gap-1.5 sm:gap-2">
+          {/* Dual Mode Switcher Capsule (方案 2: 纯粹写作 Zen 模式 vs 专业工坊 Studio 模式一键切换；超宽屏 3xl 展开双模，其他屏在右侧常驻免拥挤) */}
+          <div className="hidden 3xl:flex items-center bg-surface-3 dark:bg-[#201d1a] p-0.5 rounded-xl border border-line dark:border-[#352f2a] shadow-inner shrink-0">
             <button
               type="button"
               onClick={() => {
@@ -621,8 +641,66 @@ export const Header: React.FC = () => {
             </button>
           </div>
 
-          {/* Creation Pipeline Stepper: 窄屏/常规屏 (< xl) 折叠为紧凑阶段胶囊，防顶栏拥挤重叠 */}
-          <div ref={pipelineMenuRef} className="relative xl:hidden flex items-center shrink-0">
+          {/* Tri-Mode Switcher Capsule (工作台极简三态：构思设计 PLAN | 沉浸码字 WRITE | 审稿精修 POLISH) */}
+          <div className="hidden md:flex items-center bg-surface-3 dark:bg-[#201d1a] p-0.5 rounded-xl border border-line dark:border-[#352f2a] shadow-inner shrink-0" title="极简三态工作区切换">
+            <button
+              type="button"
+              onClick={() => {
+                if (zenMode) exitZenMode();
+                applyPreset('tri_plan');
+                toast.success('已切换至【构思设计】模式', '大纲、思维演武沙盒与人物世界观已就绪');
+              }}
+              className={`px-2 py-1 rounded-lg text-xs font-serif font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                !zenMode && (activePresetKey === 'tri_plan' || activePresetKey === 'world_building' || activePresetKey === 'plot_planning' || activePresetKey === 'concept_workshop')
+                  ? 'bg-emerald-800/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-600/30 shadow-2xs'
+                  : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#f3eee7] hover:bg-surface-3-hover/70'
+              }`}
+              title="构思设计态 (PLAN)：聚焦核心构思，左侧大纲目录、中思维演武沙盒与关系图谱、右世界观与记忆"
+            >
+              <Compass className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="whitespace-nowrap hidden xl:inline">构思设计</span>
+              <span className="whitespace-nowrap xl:hidden">构思</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (zenMode) exitZenMode();
+                applyPreset('focus_writing');
+                toast.success('已切换至【沉浸码字】模式', '正文编辑器居中独占，左侧目录，右侧灵感陪伴');
+              }}
+              className={`px-2 py-1 rounded-lg text-xs font-serif font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                !zenMode && (activePresetKey === 'focus_writing' || activePresetKey === 'tri_write' || activePresetKey === 'free_custom')
+                  ? 'bg-amber-800/20 text-primary dark:text-amber-300 font-bold border border-amber-800/30 shadow-2xs'
+                  : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#f3eee7] hover:bg-surface-3-hover/70'
+              }`}
+              title="沉浸码字态 (WRITE)：聚焦正文与心流，左侧轻量目录，中央宽屏编辑器，右侧AI写作助手"
+            >
+              <Feather className="w-3.5 h-3.5 text-primary dark:text-amber-400 shrink-0" />
+              <span className="whitespace-nowrap hidden xl:inline">沉浸码字</span>
+              <span className="whitespace-nowrap xl:hidden">码字</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (zenMode) exitZenMode();
+                applyPreset('tri_polish');
+                toast.success('已切换至【审稿精修】模式', '审稿报告、敏感词排版清洗与一致性体检已就绪');
+              }}
+              className={`px-2 py-1 rounded-lg text-xs font-serif font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                !zenMode && (activePresetKey === 'tri_polish' || activePresetKey === 'workflow_pipeline' || activePresetKey === 'agent_collaboration')
+                  ? 'bg-blue-800/20 text-blue-700 dark:text-blue-300 font-bold border border-blue-600/30 shadow-2xs'
+                  : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#f3eee7] hover:bg-surface-3-hover/70'
+              }`}
+              title="审稿精修态 (POLISH)：聚焦质量与润色，左目录版本、中央编辑器、右审稿质检与排版清洗"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span className="whitespace-nowrap hidden xl:inline">审稿精修</span>
+              <span className="whitespace-nowrap xl:hidden">精修</span>
+            </button>
+          </div>
+
+          {/* Creation Pipeline Stepper: 窄屏与常规桌面屏 (< 3xl) 折叠为紧凑阶段胶囊，防顶栏拥挤重叠 (xl:hidden) */}
+          <div ref={pipelineMenuRef} className="relative 3xl:hidden flex items-center shrink-0" data-test="xl:hidden">
             <button
               type="button"
               onClick={() => setShowPipelineMenu(!showPipelineMenu)}
@@ -689,8 +767,8 @@ export const Header: React.FC = () => {
             )}
           </div>
 
-          {/* Creation Pipeline Stepper: 超宽屏 (>= xl) 展开完整横向步进器 */}
-          <div className="hidden xl:flex items-center bg-surface-3 dark:bg-[#201d1a] p-0.5 lg:p-1 rounded-xl border border-line dark:border-[#352f2a] shadow-inner shrink-0">
+          {/* Creation Pipeline Stepper: 仅超宽大屏 (>= 3xl) 展开完整横向步进器，常规屏收纳为胶囊 (hidden xl:flex) */}
+          <div className="hidden 3xl:flex items-center bg-surface-3 dark:bg-[#201d1a] p-0.5 lg:p-1 rounded-xl border border-line dark:border-[#352f2a] shadow-inner shrink-0" data-test="hidden xl:flex">
             {CREATION_PIPELINE.map((item, idx) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -701,7 +779,7 @@ export const Header: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveTab(item.id)}
-                    className={`group relative px-1.5 3xl:px-2.5 py-1 rounded-lg text-xs transition-all duration-150 shrink-0 whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                    className={`group relative px-1 2xl:px-1.5 3xl:px-2.5 py-1 rounded-lg text-xs transition-all duration-150 shrink-0 whitespace-nowrap cursor-pointer flex items-center gap-1 ${
                       isActive
                         ? 'bg-gradient-to-r from-amber-800 to-amber-900 text-amber-50 shadow-sm font-bold border border-amber-950/20'
                         : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#f3eee7] hover:bg-surface-3-hover/70 dark:hover:bg-[#2b2724]'
@@ -764,11 +842,11 @@ export const Header: React.FC = () => {
         {/* ============================================================ */}
         {/* ZONE 3 (RIGHT): Grouped Action Suite & Permanent Controls    */}
         {/* ============================================================ */}
-        <div className="flex items-center ml-auto h-full shrink-0 min-w-0">
-          <div className="flex items-center gap-1 lg:gap-1.5 shrink-0 justify-end mx-1">
+        <div data-tauri-drag-region className="flex items-center ml-auto h-full shrink-0 min-w-0">
+          <div data-tauri-drag-region className="flex items-center gap-0.5 sm:gap-1 shrink-0 justify-end mx-0.5">
             {/* Context Status: Current Chapter Word Count & Save Status */}
             {activeChapter && (
-              <div className="hidden 2xl:flex items-center gap-1.5 px-2 py-1 bg-surface-3 dark:bg-[#23201d] rounded-lg border border-line dark:border-[#38332d] text-xs shrink-0 whitespace-nowrap">
+              <div className="hidden 3xl:flex items-center gap-1.5 px-2 py-1 bg-surface-3 dark:bg-[#23201d] rounded-lg border border-line dark:border-[#38332d] text-xs shrink-0 whitespace-nowrap">
                 <span className="text-ink-2 dark:text-[#9e9486]">
                   <HeaderWordCount /> 字
                 </span>
@@ -833,7 +911,7 @@ export const Header: React.FC = () => {
               title="打开多 Agent 自动连载控制台"
             >
               <TrendingUp className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden xl:inline">自动连载</span>
+              <span className="hidden 2xl:inline">自动连载</span>
             </button>
 
             {/* 【创作工坊】聚合分类抽屉 (存稿排版 / AI协同 / 审校质检 / 交付备份) */}
@@ -1030,48 +1108,47 @@ export const Header: React.FC = () => {
           </div>
 
           {/* Far-Right: System, UI Zoom, Theme & Frameless Window Controls */}
-          <div className="flex items-center shrink-0 ml-auto h-full bg-surface-2 dark:bg-[#1a1714] pl-1 select-none z-40">
-            {/* Global UI Scale Stepper */}
+          <div className="flex items-center shrink-0 ml-auto h-full bg-surface-2 dark:bg-[#1a1714] pl-1 select-none z-40 gap-0.5">
+            {/* Global UI Scale Quick Pill */}
             <div ref={scaleMenuRef} className="relative flex items-center shrink-0">
-              <div className="flex items-center gap-0.5 bg-surface-3 dark:bg-[#25201c] p-0.5 rounded-lg border border-line dark:border-stone-700/60 shadow-2xs">
-                <button
-                  type="button"
-                  onClick={decreaseUiScale}
-                  disabled={uiScale <= 80}
-                  className="p-1 rounded text-[11px] font-mono font-bold text-ink-2 hover:text-ink hover:bg-surface-3-hover dark:text-[#9e9486] dark:hover:text-[#ede6dc] dark:hover:bg-[#342e29] disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer shrink-0"
-                  title="缩小全站界面与字体 (每次 5%)"
-                  aria-label="缩小界面"
-                >
-                  <ZoomOut className="w-3.5 h-3.5" />
-                </button>
+              <button
+                type="button"
+                onClick={() => setShowScaleMenu(!showScaleMenu)}
+                className="px-2 py-1 rounded-lg text-[11px] font-mono font-bold text-primary dark:text-amber-400 bg-surface-3 hover:bg-surface-3-hover dark:bg-[#25201c] dark:hover:bg-[#342e29] border border-line dark:border-stone-700/60 transition cursor-pointer shrink-0"
+                title={`全站界面缩放 (当前: ${uiScale}%)，点击选择预设或微调`}
+                aria-label="全站界面缩放"
+              >
+                {uiScale}%
+              </button>
 
-                <button
-                  type="button"
-                  onClick={() => setShowScaleMenu(!showScaleMenu)}
-                  className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold text-primary dark:text-amber-400 hover:bg-surface-3-hover dark:hover:bg-[#342e29] transition cursor-pointer shrink-0"
-                  title="点击选择界面缩放预设或重置"
-                >
-                  {uiScale}%
-                </button>
-
-                <button
-                  type="button"
-                  onClick={increaseUiScale}
-                  disabled={uiScale >= 140}
-                  className="p-1 rounded text-[11px] font-mono font-bold text-ink-2 hover:text-ink hover:bg-surface-3-hover dark:text-[#9e9486] dark:hover:text-[#ede6dc] dark:hover:bg-[#342e29] disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer shrink-0"
-                  title="放大全站界面与字体 (每次 5%)"
-                  aria-label="放大界面"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Scale Presets Popover */}
+              {/* Scale Presets Popover (含微调步进器与预设选择) */}
               {showScaleMenu && (
-                <div className="absolute top-full right-0 mt-1.5 w-44 bg-surface dark:bg-[#201d1a] border border-line dark:border-[#38332e] rounded-xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="text-[10px] font-serif font-bold text-primary dark:text-amber-400 px-1.5 py-1 mb-1 border-b border-line dark:border-[#322d28] flex items-center justify-between">
+                <div className="absolute top-full right-0 mt-1.5 w-48 bg-surface dark:bg-[#201d1a] border border-line dark:border-[#38332e] rounded-xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="text-[10px] font-serif font-bold text-primary dark:text-amber-400 px-1.5 py-1 mb-1.5 border-b border-line dark:border-[#322d28] flex items-center justify-between">
                     <span>全站界面缩放</span>
-                    <span className="font-mono">{uiScale}%</span>
+                    <div className="flex items-center gap-1 font-mono">
+                      <button
+                        type="button"
+                        onClick={decreaseUiScale}
+                        disabled={uiScale <= 80}
+                        className="p-1 rounded hover:bg-surface-3 dark:hover:bg-[#342e29] text-ink-2 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        title="缩小 5%"
+                        aria-label="缩小界面"
+                      >
+                        <ZoomOut className="w-3 h-3" />
+                      </button>
+                      <span>{uiScale}%</span>
+                      <button
+                        type="button"
+                        onClick={increaseUiScale}
+                        disabled={uiScale >= 140}
+                        className="p-1 rounded hover:bg-surface-3 dark:hover:bg-[#342e29] text-ink-2 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        title="放大 5%"
+                        aria-label="放大界面"
+                      >
+                        <ZoomIn className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-0.5">
                     {[90, 100, 110, 120, 130].map((scale) => (
@@ -1115,7 +1192,7 @@ export const Header: React.FC = () => {
             <button
               type="button"
               onClick={toggleThemeMode}
-              className={`p-2 rounded-lg transition-all duration-200 cursor-pointer shrink-0 ml-0.5 ${
+              className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer shrink-0 ml-0.5 ${
                 themeMode === 'dark'
                   ? 'text-amber-400 bg-amber-400/15 border border-amber-400/30 shadow-xs'
                   : 'text-ink-2 hover:text-ink hover:bg-surface-3-hover'
@@ -1126,10 +1203,10 @@ export const Header: React.FC = () => {
               {themeMode === 'dark' ? <Sun className="w-4 h-4 text-amber-400 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
             </button>
 
-            {/* Zen Mode Toggle (已在 Zone 2 核心切换胶囊中常驻，桌面端隐藏防重复拥挤，极窄视口备用) */}
+            {/* Zen Mode Toggle (超宽屏 3xl 已在 Zone 2 胶囊展示，其他屏在此快捷展示) */}
             <button
               onClick={toggleZenMode}
-              className={`hidden max-sm:flex p-2 rounded-lg transition shrink-0 cursor-pointer ${
+              className={`flex 3xl:hidden p-1.5 rounded-lg transition shrink-0 cursor-pointer ${
                 zenMode
                   ? 'text-primary dark:text-amber-400 bg-[#854d0e]/15 font-bold border border-[#854d0e]/30'
                   : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#ede6dc] hover:bg-surface-3-hover dark:hover:bg-[#282421]'
@@ -1139,10 +1216,10 @@ export const Header: React.FC = () => {
               {zenMode ? <Minimize2 className="w-4 h-4 shrink-0" /> : <Maximize2 className="w-4 h-4 shrink-0" />}
             </button>
 
-            {/* Shortcuts Help Center Button */}
+            {/* Shortcuts Help Center Button (超宽屏展开，普通屏通过 F1/? 或设置中心调阅) */}
             <button
               onClick={() => window.dispatchEvent(new CustomEvent('novelforge:open-shortcuts'))}
-              className="p-2 rounded-lg text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#ede6dc] hover:bg-surface-3-hover dark:hover:bg-[#282421] transition relative cursor-pointer shrink-0"
+              className="hidden 3xl:flex p-1.5 rounded-lg text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#ede6dc] hover:bg-surface-3-hover dark:hover:bg-[#282421] transition relative cursor-pointer shrink-0"
               title="快捷键速查指南 (F1 / ?)"
             >
               <Keyboard className="w-4 h-4 shrink-0" />
@@ -1154,7 +1231,7 @@ export const Header: React.FC = () => {
                 setSettingsInitialTab('MODEL');
                 setShowSettings(true);
               }}
-              className="p-2 rounded-lg text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#ede6dc] hover:bg-surface-3-hover dark:hover:bg-[#282421] transition relative cursor-pointer shrink-0"
+              className="p-1.5 rounded-lg text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#ede6dc] hover:bg-surface-3-hover dark:hover:bg-[#282421] transition relative cursor-pointer shrink-0"
               title="模型网关与系统设置"
             >
               <Settings className="w-4 h-4 shrink-0" />
@@ -1169,7 +1246,7 @@ export const Header: React.FC = () => {
                 toggleRightPanel();
                 openPanel('ai_assistant');
               }}
-              className={`p-2 rounded-lg transition shrink-0 cursor-pointer ${
+              className={`p-1.5 rounded-lg transition shrink-0 cursor-pointer ${
                 rightPanelOpen
                   ? 'text-primary dark:text-amber-300 bg-amber-800/10 dark:bg-amber-400/15 border border-amber-800/25 dark:border-amber-400/30 shadow-sm'
                   : 'text-ink-2 dark:text-[#a09485] hover:text-ink dark:hover:text-[#ede6dc] hover:bg-surface-3-hover dark:hover:bg-[#282421]'

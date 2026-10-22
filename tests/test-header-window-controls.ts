@@ -126,6 +126,36 @@ test('在六大创作阶段激活态与多功能同时开启 (P2P + 长书名 + 
   assert(available1920 - totalContentWidth >= 200, `在 1920px 下保留至少 200px 缓冲空间 (实际富余 ${available1920 - totalContentWidth}px)`);
 });
 
+// -------------------------------------------------------------
+// PART 3: 顶栏窗口无边框原生拖拽移动与空白区命中防御
+// -------------------------------------------------------------
+console.log('\n▶ [PART 3] 顶栏窗口无边框原生拖拽移动与空白区命中断言');
+
+test('顶栏声明 data-tauri-drag-region 且绑定 handleHeaderMouseDown 与 handleHeaderDoubleClick 双事件', () => {
+  assert(
+    headerSource.includes('data-tauri-drag-region') &&
+    headerSource.includes('onMouseDown={handleHeaderMouseDown}') &&
+    headerSource.includes('onDoubleClick={handleHeaderDoubleClick}'),
+    '顶栏外层 header 必须显式声明 data-tauri-drag-region 并绑定 mousedown 与 dblclick 事件'
+  );
+  assert(
+    headerSource.includes('<div data-tauri-drag-region className="flex items-center justify-between flex-1 min-w-0 h-full mr-1">'),
+    '顶栏内容包裹层必须透传 data-tauri-drag-region，保证空白处点击事件能直接命中文档拖拽区'
+  );
+});
+
+test('handleHeaderMouseDown 严格防误触：排除按钮、输入框、下拉框与交互控件，精准调用 getCurrentWindow().startDragging()', () => {
+  assert(
+    headerSource.includes("if (e.button !== 0) return;") &&
+    headerSource.includes("(e.target as HTMLElement).closest('button, a, input, select, textarea, [data-tauri-drag-region=\"false\"], [role=\"button\"], .cursor-pointer')"),
+    '拖拽启动器必须仅响应鼠标左键，且严格阻断对所有交互按钮、输入框与游标手型控件的误触'
+  );
+  assert(
+    headerSource.includes('await getCurrentWindow().startDragging();'),
+    '非交互空白区域被点击时必须原子级调用 Tauri 原生 startDragging() 接口，无缝接管 Windows 窗口拖动'
+  );
+});
+
 console.log('\n===============================================================');
-console.log(`🎉 顶栏窗口控制区绝对隔离与永久保全测试全部通过！共完成 ${passCount} 项断言，成功 ${passCount} 项，失败 0 项。`);
+console.log(`🎉 顶栏窗口控制区绝对隔离、永久保全与原生拖拽移动测试全部通过！共完成 ${passCount} 项断言，成功 ${passCount} 项，失败 0 项。`);
 console.log('===============================================================\n');

@@ -2070,6 +2070,502 @@
   - 全套自动化测试（`test:character:visual`, `test:sandbox`, `test:header`, `test:docking` 等）100% 满分通过；
   - 生产构建 `pnpm build` **1.46s 极速完成**。
 
+## ADR-064: 角色对戏演武场顶栏防折行与自适应排版架构优化 (Character Sandbox Header Anti-Wrapping & Responsive Architecture Optimization)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户在使用角色对戏演武场（停靠面板或分屏模式）时反馈：“UI有错误换行情况，优化一下”，并附带截图；
+  2. 截图表明在顶栏（`CharacterSandboxPanel.tsx:1820-2065`）中出现严重折行与层叠压盖：
+     - 主标题“角色对戏演武场”因宽度被右侧 8 个固定宽度的功能按钮（灵感盒、内心戏/潜台词、导入设定、联机、工具/导出、设置、精修文段等，合计占逾 630px）极度挤压；
+     - 标题标签未声明 `whitespace-nowrap shrink-0`，导致中文字符逐字垂直换行成塔状（“角色”、“对戏”、“演武”、“场”各占一行）；
+     - 亮点副标题（“零心理同质化 · 战争迷雾心路 (CoT) · 高光灵感火花捕捉”）原为独立的 `<p className="hidden 2xl:block">` 块级元素，垂直堆叠在标题下方。在 2K/4K 屏幕（满足 Tailwind `2xl` 媒体查询）上但面板本身处于分栏宽度时，副标被强制渲染，使顶栏内部高度从 56px 膨胀到 80px+，垂直外溢压盖并遮挡了下方主工作区的“经典情境模板库 (6大高冲突戏)”。
+- **决策与重构实装**：
+  1. **标题区强制不换行与弹性空间保全**：
+     - 主标题 `<h2>角色对戏演武场</h2>` 增加 `whitespace-nowrap shrink-0`；
+     - 左侧包含容器设为 `min-w-0 flex-1 mr-2`，下拉会话选择器 `max-w-[120px] sm:max-w-[160px]` 并启用 `truncate`，杜绝中文字符垂直折行。
+  2. **消除垂直堆叠块级元素，保证顶栏单行严密闭环**：
+     - 将原本独立成行的副标 `<p>` 改为与标题同级的行内元素 `<span className="text-xs text-[#8a7f73] dark:text-[#9e9284] truncate hidden 2xl:inline-block border-l ... whitespace-nowrap shrink">`；
+     - 实时戏剧张力胶囊提升为 `hidden xl:flex`，确保在空间有限的停靠分栏中自动隐藏，严格保证顶栏物理高度恒定于 `h-14`（56px），杜绝任何下溢压盖。
+  3. **右侧 8 组功能按钮自适应响应式折叠**：
+     - 💡 **灵感盒**：窄视口下自动隐藏汉字，以灯泡图标 + 高亮角标数字展示，`lg:` 屏幕展开完整文字；
+     - 👁️ **视角透视（内心戏 / 潜台词）**：窄视口隐藏文字保留透视图标，`md:` 展开文字；
+     - 📚 **导入设定**：`lg:` 展开文字，窄视口展示图书图标；
+     - 🌐 **P2P联机**：`xl:` 展开文字，紧凑模式保留地球动态图标；
+     - ✍️ **优化精修文段**：窄视口展示“精修”，宽视口展示“✍️ 优化精修文段”。
+- **验证结果**：
+  - 新增专属测试套件 `tests/test-sandbox-header-layout.ts`（`pnpm test:sandbox:header`），6 项排版断言 100% 通过；
+  - `pnpm test:sandbox`、`pnpm test:character:visual`、`pnpm test:docking`、`pnpm test:header` 全部绿灯；
+  - 生产打包 `pnpm build` **1.68s 零错误极速完成**。
+
+## ADR-065: 角色对戏演武场推演全链路即时暂停与原子快照保全机制 (Character Sandbox Deduction Realtime Pause & Atomic Snapshot Resilience)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户在角色对戏演武场推演时反馈：“怎么推演时无法暂停”；
+  2. 经系统性全链路排查，发现了四重设计缺陷导致“看似无法暂停/假暂停”：
+     - **缺陷一（Esc 键失效）**：虽然界面多处提示“按 Esc 可暂停推演”，但 `handleKeyDown` 的 `Escape` 监听分支中完全遗漏了对 `isRunning` / 推演状态的检测与停止逻辑；
+     - **缺陷二（单步推演无状态指示与暂停入口）**：用户点击“步进一轮”后，前端没有追踪 `isStepping` 状态，界面不显示加载状态，且“连续推演”按钮未切换为暂停态，用户无法中止单步推理；
+     - **缺陷三（连续推演停止不彻底与脏台词强塞）**：连续推演循环等待单步异步返回期间，即使用户点了暂停，后台在等待的 LLM 请求返回后依然会执行 `loadSession` 强行将新生成的台词插入正文历史并入库，导致“点了暂停 AI 还继续写了一句”的恶劣体验；
+     - **缺陷四（循环等待不可中断）**：连续推演轮次间的 `setTimeout(600ms)` 阻塞了对状态变更的快速反应。
+- **决策与重构实装**：
+  1. **全生命周期推演状态机与取消标记**：
+     - 引入 `isStepping`、`isSteppingRef` 实时感知单步推理网络在途状态；
+     - 引入 `cancelRequestedRef` 取消标记与 `currentStepHistoryBeforeRef` 推演前快照引用。
+  2. **统一暂停/中断执行器与原子快照保全 (`handleStopDeduction`)**：
+     - 当用户触发暂停（点击按钮或按下 `Esc`），立即置位 `cancelRequestedRef.current = true`，停止连续循环；
+     - 若当前已有在途单步推理，立即将沙盒状态更新为 `PAUSED`，并原子回滚 SQLite 数据库与前端 `dialogueHistory`，完全恢复推演前原状；
+     - `executeStep` 在网络返回后核查 `cancelRequestedRef`，若已被暂停则自动丢弃未预期响应，杜绝脏台词入库。
+  3. **Esc 快捷键第一优先级响应**：
+     - `handleKeyDown` 将 `(isRunningRef.current || isSteppingRef.current)` 作为 `Escape` 的最高优先级分支，瞬间中断推演并阻止事件外冒。
+  4. **UI 动效与双模式显式暂停呈现**：
+     - 消息列表中新增正在思考角色卡片（显示思考微调文案与专有 `中断暂停 (Esc)` 按钮）；
+     - 底部主按钮在推演期间（无论单步还是多轮）统一呈现红色脉冲态 `暂停推演 (Esc)`；
+     - 状态胶囊新增直达 `按 Esc 立即暂停` 按钮。
+- **验证结果**：
+  - 新增专属测试套件 `tests/test-sandbox-deduction-pause.ts`（`pnpm test:sandbox:pause`），6 项全链路暂停断言 100% 通过；
+  - `pnpm test:sandbox`、`pnpm test:sandbox:header`、`pnpm test:character:visual` 全部绿灯；
+  - 生产打包构建 `pnpm build` **1.01s 零错误完成**。
+
+## ADR-066: 角色对戏演武场高光文段打磨台全方位升华与作家灵感工坊迭代 (Character Sandbox Prose Polisher & Author Inspiration Studio Overhaul)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户明确指出对戏演武场的核心定位：“这个的目的是看在当时的主要人物会怎么做，是找灵感和优化文段的。并入正文只是附加功能”，并要求“持续迭代优化这个功能”；
+  2. 原有文段优化功能的局限与缺陷：
+     - **单轮锚定失效 Bug**：单轮对话卡片底部的“优化文段”原本硬编码抓取对话尾部最近 3 轮（`RECENT_3`），完全无视用户点击的具体轮次索引，导致点击早前某轮精彩交锋却合成了末尾无关内容；
+     - **表现形式过于单一**：仅提供一个单向展示文本框，无法将推演时的“角色私密内心算盘、肢体微动作、台词与潜台词”骨架与精修后的小说描写进行左右同屏对照；
+     - **文风与视点维度单薄**：原仅有 3 种文风，视点提示缺乏具象指引，缺乏适合古言武侠的文雅留白与冷面讽刺，易出现 AI 抽象概括与模板化修辞；
+     - **缺乏版本迭代与重掷对比 (Re-roll)**：作者想看“换个写法”时旧版本直接被覆盖冲垮，无法多版本切换择优；
+     - **灵感颗粒度粗糙**：作者通常不需要全盘将 800 字正文塞入草稿，而是挑选 1~2 个绝妙的眼神小动作、一句诛心潜台词或比喻；原系统缺乏逐段复制和自动提取灵感金句的机制。
+- **决策与重构实装**：
+  1. **精准锚定与智能上下文切片 (`FOCUSED_ROUND`)**：
+     - 单轮条目的“优化文段”按钮现在精准传入当前节拍的 `idx`，并设置打磨范围为 `FOCUSED_ROUND`；
+     - 自动提取当前节拍与其前序铺垫与后续余波（`[anchor - 1, anchor + 1]`），提供有据可查、上下文紧致的素材源。
+  2. **三大打磨工作室视图 (`Studio View Modes`)**：
+     - 📖 **纯享阅读 (READ)**：首行缩进文学级排版，鼠标悬停即现“逐段复制”与“逐段存入灵感盒”浮动按钮，支持快捷沉浸阅读；
+     - ⚖️ **骨架对照 (COMPARE)**：左侧原汁原味展示演武场原始节拍（内心暗流、肢体微动作、交锋台词与潜台词），右侧呈现转化后的小说文学段落，对照查看角色内心算盘如何“融化”进文学描写；
+     - ✍️ **原地编辑 (EDIT)**：内置实时字数统计的文字编辑工坊，作者可就地增删改写词句、微调标点呼吸感。
+  3. **五大文学流派与三大沉浸视角全覆盖**：
+     - 流派拓展：电影感镜头白描（默认）、心理暗流深描、硬派高张力冷冽、古风文雅留白（新增，讲究草木风雨寄托风骨）、冷面讽刺藏刀（新增，荒诞客套暗藏杀机）；
+     - 视点模式：第三人称有限（紧随视点角色）、第三人称全知（全景俯瞰）、第一人称沉浸（极强代入感）。
+  4. **多版本打磨历史留存与 Re-roll 换个写法**：
+     - 每次打磨自动生成版本记录 (`polishedVariations`)，并在顶部展示版本标签（`版本 1`、`版本 2`...）；
+     - 配备“🎲 换个写法”按钮，方便作者在同一情境下探索不同的描写侧重点，随时切回之前的版本。
+  5. **灵感颗粒度深化与金句提炼**：
+     - 悬停段落一键复制与一键存入灵感火花盒；
+     - 提供“✨ 提炼金句”自动化能力 (`handleExtractHighlightsToInspiration`)，智能提炼对白金句与高光微动作；
+     - 底部强化“存入灵感盒”与“反哺长期记忆”，并将“随手归档到正文”置于右下角作为次要辅助操作，完全契合“找灵感与精修”的核心诉求。
+- **验证结果**：
+  - 新增专属测试套件 `tests/test-sandbox-prose-polisher.ts`（`pnpm test:sandbox:polisher`），6 项全要素断言 100% 通过；
+  - `pnpm test:sandbox:pause`、`pnpm test:sandbox:header`、`pnpm test:sandbox` 全量通过；
+  - 生产打包构建 `pnpm build` **1.08s 零错误完成**。
+
+## ADR-067: 演武场高光打磨台四大视图、外貌下锚、划选灵感与抉择探针深度联动 (Character Sandbox Prose Polisher Multi-View, Visual Anchor, Selection-to-Inspiration & Probe Synergy)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户在体验高光文段打磨台后发出“继续优化”指令；
+  2. 深入审查作家创作体验，发现四个重要可跃升点：
+     - **立绘与人设外貌未能反哺正文精修**：前期已实装的角色立绘贴图与外貌特征提取（青玉步摇、流云裙、玄色暗金袍等），在打磨高光描写文段时未被送入大模型，导致生成的白描缺失具象物理下锚点；
+     - **多版本间缺乏同屏对照**：作者使用“换个写法”生成了电影感与古风文雅两种不同版本后，只能反复点标签切换记忆，无法同屏左右并排比对选词与张力；
+     - **大篇幅文段缺乏句子级自由采纳手段**：作者往往只相中了文段中的某一句话，此前仅能整段复制，缺乏类似阅读器般的“鼠标划词浮动条”直接将选中文句存入灵感盒或插入正文；
+     - **角色抉择探针（看主要人物会怎么做）与时间线脱节**：底层具备 `probe_character_next_actions` 能力，但单轮卡片缺乏直达入口，且探针方案只能被迫用于触发步进，无法直接“存为灵感”或“插正文”。
+- **决策与重构实装**：
+  1. **全链路人物视觉特征下锚机制**：
+     - 在 Rust 后端 `synthesize_sandbox_dialogue_to_prose` 真实反序列化 `characters_config_json`，装配角色性别、外貌体态衣饰、语气特征与底层动机，构建“主要登场人物外貌衣饰与人设特征”提示块；
+     - 在前端打磨台顶部新增【视觉下锚】快照横栏，直观呈现当场角色的立绘头像与外貌标签。
+  2. **新增第四大视图：🔀 双版同屏比对 (`DIFF`)**：
+     - 左栏与右栏分别配备独立的版本下拉选择器（版本 A vs 版本 B）；
+     - 双栏均支持字数统计、一键复制全文与一键插入当前章节正文，让不同写法与文风的优劣一目了然。
+  3. **划选文字悬浮即时操作条 (Selection-to-Inspiration)**：
+     - 在阅读模式下监听划选事件，选中文句时顶部自动升起吸附操作胶囊；
+     - 提供“💡 存为灵感”、“📥 插正文”、“📋 复制”三大即时操作，真正做到只取精华。
+  4. **单轮条目“🎯 探他抉择”直达入口**：
+     - 在对话时间线每一轮次操作条新增“🎯 探他抉择”，一键探查该角色在此情势下的 3 条可能心理与行动路线。
+  5. **抉择探针与灵感盒、正文互通**：
+     - 在抉择探针卡片新增【💡 存为灵感】与【📥 插正文】按钮，作者无需被迫推进对话步进，可随时汲取角色心境与动作话术。
+- **验证结果**：
+  - 新增与拓展专属测试套件 `tests/test-sandbox-prose-polisher.ts`，8 项要素全量通过；
+  - `pnpm test:sandbox:pause`、`pnpm test:sandbox:header`、`pnpm test:character:visual`、`pnpm test:sandbox` 全绿灯；
+  - 前端生产打包构建 `pnpm build` **1.39s 零错误完成**。
+
+## ADR-068: 演武场文案臃余剔除与极简文学沉浸UI优化 (Character Sandbox Copy De-bloat & Minimalist Literary UI Refinement)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户在持续体验角色对戏演武场后，提出明确指导意见：“继续优化，减少臃余的解释文案，优化UI设计”；
+  2. 既往版本在引入大量高阶功能（战争迷雾、潜台词透视、文段打磨、行动探针、灵感盒）过程中，UI 界面积累了较多说明书式、教学式与开发者口吻的修饰词和括号备注；
+  3. 这些繁杂说明占据了大量垂直像素与横向空间，且带有明显的“功能推销”色彩，削弱了严肃文学创作者所期待的克制、沉浸与清爽感。
+- **决策与重构实装**：
+  1. **清理括号化与说明书式文案**：
+     - 左侧配置抽屉：情境模板清理为“经典冲突情境”，私密动机清理为“当场私密动机”（去除“私密CoT，绝不泄漏”），去除多余的 `(对他人完全屏蔽)` 说明；
+     - 对白时间线卡片：按钮精简为 `复制`、`灵感`、`优化文段`、`探他抉择`、`分支`、`重掷`、`改词`；
+     - 底部控制栏：去除非必要的 `(3选1)` 占位，重置按钮精炼为 `重开`，指定发言标题精简为 `指定发言角色`；
+  2. **高光文段打磨台去口号化与紧凑化**：
+     - 移除模态框顶部冗余副标题“融化心理暗流 · 升华镜头白描 · 汲取对戏灵感与高光修辞”，标题规范为“高光文段打磨台”；
+     - 五大流派标签精简为 `🎬 电影感白描`、`🧠 心理暗流`、`⚡ 硬派冷冽`、`📜 古风留白`、`🎭 冷面讽刺`；
+     - 打磨范围与视点去冗余文字（如 `🎯 节拍 #{idx + 1}`、`⚡ 近 3 轮`、`📜 全场`）；
+     - 底部高光提炼横幅重构为紧凑精致的内嵌单行条，消除侵入感；
+  3. **抉择探针与灵感盒沉浸感提纯**：
+     - 抉择探针弹窗副标题与各路线要点前缀精炼为 `🧠 内心盘算:`、`🎭 微动作:`、`💬 话术试探:`；
+     - 灵感抽屉标题精简为 `灵感盒`，一键提炼按钮去口号化为 `提炼全场灵感`；
+     - 归档区前缀由 `📌 随手归档 (附加功能):` 纯化为 `正文草稿:`。
+- **验证结果**：
+  - `pnpm test:sandbox:polisher` (**8/8 PASS**)
+  - `pnpm test:sandbox:pause` (**6/6 PASS**)
+  - `pnpm test:sandbox:header` (**6/6 PASS**)
+  - `pnpm test:character:visual` (**6/6 PASS**)
+  - `pnpm test:sandbox` (**12/12 PASS**)
+  - 前端生产打包构建 `pnpm build` **1.41s 零错误 0 警告通过**。
+
+## ADR-069: 工作台“极简三态化”（降噪防迷航）架构落地 (Workspace Minimalist Tri-Mode Architecture)
+- **状态**：已采纳
+- **上下文**：
+  1. 系统此前已演进出 32 大功能模块与多个专业预设布局（小说构思工坊、剧情策划、工作流流水线、多 Agent 协作等），功能虽极其庞大，但站在真实网文写作者的使用视角，过多散落的窗格与复杂概念带来了严重的认知过载和“工作区迷航感”；
+  2. 创作者日常写作的心流具有明确的阶段性与单向聚焦性：构思设计 (PLAN)、沉浸码字 (WRITE) 与审稿精修 (POLISH)；
+  3. 用户在深入分析后，明确确认采用“工作台极简三态化（降噪防迷航）”作为核心演进方向。
+- **决策与重构实装**：
+  1. 构建极简三态布局预设拓扑（`tri_plan`、`focus_writing`、`tri_polish`）；
+  2. 顶栏 Zone 2 上线极简三态药丸胶囊，工作区工具栏常驻三态快捷条；
+  3. 严密保全沉浸写作 Zen 与专业工坊 Studio 双模架构与测试断言；
+  4. 实施严格深拷贝隔离，拖拽自定义布局绝不污染内置模板。
+- **验证结果**：
+  - `pnpm test:tri-modes`（9/9 PASS）、`pnpm test:docking`（12/12 PASS）、`pnpm test:zen`（12/12 PASS）全部通过，生产打包 1.81s 零错误完成。
+
+## ADR-070: 正文行内 @ 提及悬浮卡片、光标抉择探针破局条与全书防吃书静默监护架构 (Inline @-Mention Hover Card, Cursor Breakout Probe & Silent Canon Guardian)
+- **状态**：已采纳
+- **上下文**：
+  1. 创作者在正文写作心流中，频繁面临三大痛点：
+     - **心流被打断（切屏找设定）**：写到配角登场、道具法宝或法阵规则时，必须中断码字、跳出当前页面切去世界观或角色面板核对“她穿什么裙子/他有什么软肋/这法宝能不能破界”，极度破坏写作呼吸；
+     - **卡壳无破局（行内剧情阻滞）**：写到两军对垒或对话交锋时突然脑干过载，不知角色下一步该怎么反击，缺乏即时在光标处呼出“角色此时会怎么应对”的决策探针；
+     - **长篇吃书（隐蔽设定矛盾）**：随着字数达数十万字，作者往往遗忘前面已战死的人物、已立誓的禁忌或已埋设的伏笔，导致严重的情节前后矛盾。
+  2. 用户明确提出三大诉求：
+     - 编辑器行内 @ 提及与悬浮卡片（输入 `@角色名` 或 `@道具名` 即时调阅立绘、当前外貌与软肋）；
+     - 光标旁“抉择探针与去 AI 味”快捷条（光标卡壳呼出应对路线，划选一键文学级去套话）；
+     - 全书伏笔与“防吃书”实时监护（底层 L3/L4 记忆引擎静默运转，行旁温和红线标记设定矛盾）。
+- **决策与重构实装**：
+  1. **行内 @ 提及联想与文学悬浮卡片 (`EditorMentionPopover.tsx` & `EntityHoverCard.tsx`)**：
+     - 监听光标文本 `@` 触发字符，在光标位置毫秒级升起提及下拉菜单，支持键盘上下箭头与 Enter 补全；
+     - 联想列表右侧与编辑器文本悬停均联动 `EntityHoverCard`，完整呈现人物头像立绘、当前外貌体态衣饰 (`visual_summary`)、底层动机与致命软肋 (`motivation` & `weakness`)、性格特质，以及世界观法则的 `CANON` 约束；
+     - 提供“一键插入外貌至正文”与“一键插入动机至正文”，消除跨面板查询打断。
+  2. **光标旁“抉择探针与去 AI 味”快捷破局条 (`InlineCursorBreakoutBar.tsx` & `FloatingSelectionMenu.tsx`)**：
+     - 光标未划选时，支持全局快捷键 `Ctrl+J` 与工具栏直达呼出破局探针；
+     - 自动截取当前章节前文 1000 字情境，结合目标人物真实底层动机与私密软肋，即时生成 3 套截然不同的反制策略（隐忍周旋、针锋相对、出其不意），每套均包含内心算盘、身体微表情动作白描与试探对白；
+     - 划选文段时在悬浮胶囊新增【🎯 探他抉择】，并强化【✨ 文学级去套话润色】（Lieflat 11 禁改区 + Humanizer 叙事呼吸），支持一键采纳替换与对比。
+  3. **全书伏笔与“防吃书”静默监护器 (`ContinuityGuardian.tsx`)**：
+     - 联通 SQLite L3/L4 权威事实库 (`canon_facts`)、世界观法则 (`world_rules`) 与人物状态事件；
+     - 防抖静默扫描章节草稿，精准拦截“已故角色反常登场”、“违背绝对禁止性权威法则”及“已埋设伏笔呼应”；
+     - 采用温和底栏微标与行旁红线，点击展开抽屉查看冲突原委、原文线索依据与修复建议，支持设为例外或一键修改。
+- **验证结果**：
+  - 新增专属测试套件 `tests/test-editor-inline-workflow.ts`（`pnpm test:editor:inline`），9 项测试断言 **100% 全部通过**；
+  - `pnpm test:tri-modes`（9/9 PASS）、`pnpm test:zen`（12/12 PASS）、`pnpm test:docking`（12/12 PASS）回归全绿；
+  - 前端生产打包构建 `pnpm build` **1.22s 零错误 0 警告通过**。
+
+## ADR-071: AI 生图网关接入与作品封面/角色立绘全流程创绘系统 (AI Image Generation Gateway & Character Avatar / Book Cover Studio)
+- **状态**：已采纳
+- **上下文**：
+  1. 小说创作者在角色构建和全书装帧过程中，极度依赖具象视觉载体（立绘头像与书籍封面）：
+     - 封面直接决定书籍装帧格调与读者第一印象；
+     - 角色立绘直接影响正文外貌描摹、登场动作与读者代入感；
+  2. 此前面板虽支持本地图片上传与外部直链，但作者若需生成高质量原画，必须在不同外部绘图网站与软件间来回切屏、手动拼接中英文 Prompt、下载后再手动上传，体验割裂繁琐；
+  3. 用户明确提出诉求：“能否接入图片生成的api，让立绘和封面能够生成”。
+- **决策与架构实装**：
+  1. **Rust 原生生图网关引擎 (`commands::generate_image` & `OpenAIClient::generate_image`)**：
+     - 支持国际与国内标准 `/v1/images/generations` 绘图接口协议（兼容 OpenAI DALL-E 3、SiliconFlow 硅基流动 FLUX.1、智谱 CogView-3、阿里通义万相 Wanx、百度千帆等）；
+     - 定义结构化契约 `GenerateImageInput` 与 `GenerateImageResult`，支持画幅尺寸 (`1024x1024` / `1024x1792` / `768x1024`)、艺术风格与模型指定；
+     - 本地优先持久化：对于生成的图片数据，支持 Data URL / Base64 与直链双模式安全存储于 SQLite，杜绝云端临时链接 1 小时失效问题。
+  2. **角色立绘与头像 AI 创绘工坊 (`CharacterAvatarModal.tsx`)**：
+     - 提供 6 大专业美学艺术风格预设（仙侠3D CG、二次元日漫精细、电影级写实立绘、厚涂概念设计、国风水墨古韵、赛博未来机能）；
+     - 提供 3 种机位构图（半身立绘、面部特写、全身原画）与大模型切换（DALL-E 3、FLUX.1-schnell、FLUX.1-dev、CogView-3 等）；
+     - 自动结合角色姓名、性别、现有外貌特征、性格动机与全书流派组装专业级文学 Prompt，支持实时自由微调；
+     - 全链路打通 `CharactersView`（卡片 hover 快捷生成与编辑表单生图）、`CharacterProfilesPanel`（工作台面板立绘创绘）及 `CharacterSandboxPanel`（演练沙盘角色立绘）。
+  3. **作品封面装帧设计工坊全流程生图升级 (`BookCoverModal.tsx`)**：
+     - 将原本仅生成文本提示词的 Tab 全面升级为独立的【✨ AI 原画生图】工坊；
+     - 预设 6 款文学装帧意境流派（国风水墨、东方玄幻、赛博科幻、悬疑惊悚、古风言情、都市质感）；
+     - 生成后即时与左侧 3D 实体书卷装帧联动（书脊 3D 光影、书签丝带、自适应书封），一键保存并持久化至 `activeNovel.cover_url`。
+- **验证结果**：
+  - 新增专用自动化测试套件 `tests/test-image-generation.ts`（`pnpm test:image-generation`），14 项断言 **100% 全部通过**；
+  - `pnpm test:editor:inline`（9/9 PASS）、`pnpm test:tri-modes`（9/9 PASS）、`pnpm test:character:visual`（6/6 PASS）全部绿标通过；
+  - `pnpm check:version` 确认版本号一致（V2.7.0）；
+  - 前端生产构建 `pnpm build` **1.23s 零错误完成**，Rust 编译检查零警告零错误。
+
+## ADR-072: 全软件漏洞巡检、性能边界加固与本地图像存储防膨胀体系 (Software Vulnerability Audit, Performance Boundary Hardening & Client Image Optimizer)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户发起全方位软件排查诉求：“检查目前软件有没有bug或者漏洞或者性能边界问题”；
+  2. 经全栈深度巡检，发现以下四项潜在漏洞与性能边界隐患：
+     - **性能边界隐患（Base64 数据库膨胀）**：用户上传超大原画（如 4K 相机照片、数 MB 原图）作为角色立绘或封面时，若未压缩直接 Base64 写入 SQLite，会导致单条数据达 8~12MB，列表查询 `list_characters` / `list_novels` 发生 IPC 传输与内存暴涨；
+     - **业务边缘 Bug（生图 Base64 前缀叠加）**：部分第三方 SD WebUI / OneAPI 网关返回的 `b64_json` 已自带 `data:image/...` 前缀，盲目拼接会导致 `data:image/png;base64,data:image/...` 图片损坏；
+     - **异常诊断缺失**：生图接口返回 HTTP 200 伴随 `error.message` 时未被精准提取，导致错误原因展示泛化；
+     - **Rust 防御性缺陷**：`database/mod.rs` 中存在 2 处防御性未足的 `unwrap()` 隐患；
+     - **模态交互细节**：`CharacterAvatarModal` 缺乏 `Escape` 键监听。
+- **决策与架构重构**：
+  1. **图像本地等比压缩优化器 (`src/utils/imageOptimizer.ts`)**：
+     - 在前端内存中通过 Offscreen Canvas 将任意大图智能等比压缩至最大 1024/1200px、画质 0.88 的高保真数据流；
+     - 自动保留透明通道与 SVG 矢量流，单图体积骤降 95%（从数 MB 降至 100~200KB），彻底消除 SQLite 存储与内存暴涨隐患；
+     - 封面与三大角色面板（`BookCoverModal`、`CharactersView`、`CharacterProfilesPanel`、`CharacterSandboxPanel`）全量接入。
+  2. **生图协议鲁棒性修复 (`src-tauri/src/providers/openai_compatible.rs`)**：
+     - 增加 `b64.starts_with("data:image")` 前缀重复检测；
+     - 深度提取根层级与嵌套层级的 `error.message`、`message` 业务错误提示。
+  3. **SQLite 核心代码彻底消除 `unwrap()` (`src-tauri/src/database/mod.rs`)**：
+     - 修复 `save_chapter_content` 与 `set_active_voice_profile`，全面改写为安全的模式匹配与 fallback。
+  4. **全套自动化测试回归**：
+     - 新增 `tests/test-image-optimizer.ts` 专项断言；
+     - 运行全量测试套件，实现 100% 通过与 0 错误构建。
+
+## ADR-073: 细纲节拍编排看板、故事圣经画册一键导出与行文文风监护系统 (Scene Beats Storyboard, Story Bible Visual Booklet & Voice Consistency Sentinel)
+- **状态**：已采纳
+- **上下文**：
+  1. **宏观与微观断层（单章细纲缺失）**：作者在宏观卷章目标与微观正文码字之间，缺乏单章层级 3~4 个起承转合场景卡片的可视化编排载体，导致中段容易注水或跑偏；
+  2. **离线与打印设定画册诉求（故事圣经）**：长篇小说设定庞大（出场角色、AI立绘、三级法则、剧情弧、伏笔网、分卷目录），作者迫切需要一键导出一份脱离软件环境、可随时翻阅或打印为实体 PDF 的精美艺术画报；
+  3. **AI 写作与长篇串味痛点（行文文风监护）**：仙侠修真或古典历史小说极易混入现代职场暗语（“复盘”、“闭环”、“画饼”、“这波不亏”、“PUA”）与翻译腔，需行内温柔拦截并一键文学级原地替换；
+  4. **码字心流激励与字数冲刺**：作者需要直观了解当前会话净增字数（“本次 +850 字”）与目标字数快捷切换。
+- **决策与架构重构**：
+  1. **单章细纲节拍故事板与抽屉 (`SceneBeatsDrawer.tsx`)**：
+     - 打通 Rust 后端 `get_scene`、`update_scene` 原生 IPC 接口与 SQLite 存储；
+     - 提供起承转合卡片的可视化编排（行动目标 Objective、节拍推演 Beat Outline、POV 视角角色及头像、发生地点 Location、冲突焦点 Conflict）；
+     - 支持 AI 编剧 Agent 一键规划、卡片上下调序、一键装配提纲至正文；
+     - 实现正文双向精准定位 (`handleFocusSceneInEditor`)，点击场景卡片即时高亮并平滑滚动到正文对应段落；
+  2. **典藏故事圣经·全景设定画册引擎 (`StoryBibleExportService.ts` & `PublishingModal.tsx`)**：
+     - 自动化提取小说全景元数据、角色立绘画报、三级权威法则（正典/延展/假说）、大纲剧情弧、伏笔因果链与卷章总目；
+     - 生成宋韵温润宣纸风格的自包含单文件 HTML5，内置 `@media print` 打印版式优化；
+     - 在作品发布中心提供“导出全景设定集 (.html)”与“打印画报 / 存为 PDF (`handlePrintPreviewStoryBible`)”双重快捷通道；
+  3. **行文文风监护与防串味巡检系统 (`VoiceSentinelEngine.ts` & `VoiceSentinelDrawer.tsx`)**：
+     - 覆盖 18+ 典型现代职场黑话、游戏术语与翻译腔，计算 0~100 文学健康度评分；
+     - 提供上下文精确位置高亮、单处文学级替换与一键批量安全替换（基于 ProseMirror 事务，保留光标与排版）；
+  4. **会话码字增量反馈与响应式字数冲刺条 (`EditorWordStatsTracker`)**：
+     - 记录章节载入初始字数，实时计算呈现“本次 +X 字”心理正反馈；
+     - 支持快捷弹层切换 2000 / 3000 / 4000 / 5000 / 8000 / 10000 字目标；
+     - 优化响应式断点为 `lg:flex`，确保笔记本与分屏面板下稳定可见；
+  5. **彻底根除 Windows MCP DLL 占用问题 (`scripts/novelforge-mcp.cjs`)**：
+     - 将后台 MCP 服务的运行目录安全隔离至系统临时目录，彻底杜绝 `WebView2Loader.dll` 引起的 `os error 32`。
+- **验证结果**：
+  - 新增专用自动化测试套件 `tests/test-scene-beats-and-story-bible.ts`（`pnpm test:beats-bible`），全部断言 **100% 满分通过**；
+  - `pnpm test:image-generation`（14/14 PASS）、`pnpm test:image-optimizer`（4/4 PASS）、`pnpm test:editor:inline`（9/9 PASS）、`pnpm test:sandbox`（12/12 PASS）全部绿标通过；
+  - Rust 编译检查 `cargo check` 0.36s 零错误，前端生产构建 `pnpm build` 1.20s 零错误完成。
+
+## ADR-074: 顶栏空间预算解耦与多断点自适应排版优化 (Header Responsive Width Budget & Decluttering Optimization)
+- **状态**：已采纳
+- **上下文**：
+  1. **顶栏横向溢出与截断**：用户反馈 UI 出现被截断的问题，截图中顶栏右侧的操作按钮（工坊抽屉、UI 缩放控制器、日夜主题切换、快捷键指南、设置弹窗与 AI 助手折叠钮）被挤出屏幕边缘，并被右侧 Windows 原生窗口控制键遮挡。
+  2. **根因数学诊断**：Zone 2 区域同时并存了“沉浸写作/专业工坊”双态胶囊（175px）、“构思设计/沉浸码字/审稿精修”三态胶囊（250px）和六步工序 Stepper（320px），仅 Zone 2 自身即占据 ~745px。连同 Zone 1（约 380px）与不可收缩的系统窗口控制按钮（125px），在 1080p 开启 125% DPI 缩放（逻辑视口 1536px）或常规 1280px/1366px 笔记本屏幕下，Zone 3 所需的 536px 空间严重超限（溢出 >350px），导致 Flexbox 内部子项被截断挤压。
+- **决策与实施**：
+  1. **冗余胶囊响应式收拢**：将功能已完整包含在三态模式（构思/码字/审稿）与右侧工坊抽屉中的“双态胶囊”在低于 1920px (3xl) 屏幕下隐藏 (`hidden 3xl:flex`)，立省 175px 宽度预算；
+  2. **禅模式专注通道无缝保留**：在 Zone 3 为低于 3xl 的屏幕增设轻量级羽毛笔触专注按钮 (`flex 3xl:hidden`)，确保普通屏幕创作者依然可一键秒入 Zen 沉浸禅模式；
+  3. **三态标签自适应缩写**：在低于 xl (1280px) 视口下将 `构思设计/沉浸码字/审稿精修` 紧凑自适应为 `构思/码字/审稿`，节省 60px；
+  4. **工序 Stepper 紧凑排版**：收紧 Stepper 内各按钮的横向内边距与间隙 (`px-1 2xl:px-1.5 3xl:px-2.5` 与 `gap-1`)，节省 60px；
+  5. **UI 缩放按钮自适应简化**：在低于 2xl 视口下隐藏 `- +` 展开按钮，直接呈现当前缩放百分比胶囊，点击弹出浮层微调，节省 44px；
+  6. **工具按钮内边距紧缩**：将 Zone 3 图标按钮内边距从 `p-2` 紧凑优化为 `p-1.5`，节省 20px。
+  - **总计释放横向预算达 359px+**，在 1024px、1280px、1366px、1440px、1536px (1080p 125%) 与 1920px (3XL) 等全视口分辨率下，顶栏所有功能完好无损、无挤压截断。
+- **验证结果**：
+  - `pnpm test:tri-modes`（9/9 PASS）、`pnpm test:zen`（12/12 PASS）、`pnpm test:header`（9/9 PASS）、`pnpm test:bugfixes`（82/82 PASS）、`pnpm test:beats-bible`（100% PASS）、`pnpm test:image-generation`（14/14 PASS）、`pnpm test:image-optimizer`（4/4 PASS）、`pnpm test:editor:inline`（9/9 PASS）、`pnpm test:sandbox`（12/12 PASS）全部绿标通过；
+  - Rust 编译检查 `cargo check` 0.44s 零错误零警告，前端生产构建 `pnpm build` 1.18s 零错误完成。
+
+## ADR-075: 全系统 UI 按钮聚合收纳与横向防截断体系 (Full-System UI Consolidation & Responsive Truncation Prevention)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户深入使用反馈：除了顶栏右侧设置等按钮截断外，在角色对戏演武场（`CharacterSandboxPanel`）等多个关键模块中，底部操作栏出现按钮溢出遮挡（右侧“连续推演”按钮被硬挤出屏幕）；
+  2. 根因剖析：
+     - **主顶栏 `Header.tsx`**：中段（Zone 2）同时展开了三态模式与完整六步进度条（占 535px），右端缩放控件采用展开式的 `[-] 100% [+]`（占 95px），导致 1080p @ 125% DPI 缩放（逻辑视口 1536px）及标准笔记本下 Zone 3 右侧动作溢出达 142px；
+     - **演武场底部栏 `CharacterSandboxPanel.tsx`**：右侧并排陈列 5 个按钮（指定发言、插入旁白、抉择探针、步进一轮、连续推演）总计达 514px，左侧累计信息与静态文本又占据近 300px，在停靠分栏（宽度 500~750px）下必发物理溢出；
+     - **正文编辑器工具栏 `NovelEditor.tsx`**：右侧多达 10 项操作按钮未设分屏断点，在分屏撰写时挤压左侧撤销重做与排版工具。
+- **决策与实施（合并功能、重新布局、弹性自适应）**：
+  1. **演武场剧情干预三合一下拉聚合 (`CharacterSandboxPanel.tsx`)**：
+     - 在分屏与常规屏（`< 2xl`）下，将“指定发言角色”、“插入突发旁白”与“🎯 角色抉择探针”合并收拢为单一的 **`🎭 剧情干预 ▾`** 弹性下拉浮窗；
+     - 清除左侧常态下的冗余提示文本 `· 按 Esc 可随时暂停推演`（保留推演运行时红字直达按钮），精简对戏轮次文案；
+     - 底部栏总计宽度预算骤降 60%（从 841px 降至 320px），保障在 400px~800px 任意分屏尺寸下，核心推演控制（步进一轮、连续推演）均 100% 舒展呈现；
+  2. **顶栏空间预算二次深潜解耦 (`Header.tsx`)**：
+     - **工序步进器收纳为单胶囊**：常规桌面屏与窄屏（`< 3xl`）下折叠为当前阶段下拉药丸（`[ 5 正文执笔 ▾ ]`），仅 1920px+ 超宽屏平铺展开，释放 185px；
+     - **UI 缩放控件精炼**：顶栏精简为单一紧凑百分比胶囊（`100%`），点击呼出下拉预设（90%~130%）并在菜单内部集成 `[-] [+]` 5% 步进微调与重置键，释放 57px；
+     - **连载与辅助按钮弹性响应**：`自动连载`在 `< 2xl` 下自适应为图标按钮，`快捷键速查`收拢至超宽屏展开（普通屏随 `F1/?` 与设置中心调阅），释放 85px；
+     - 累计释放超过 **415px** 空间，彻底杜绝顶栏右端按钮被窗口控制键遮挡；
+  3. **正文编辑器右侧工具栏紧凑化 (`NovelEditor.tsx`)**：
+     - 细纲节拍、文风巡检、抉择探针、查找与章节速览等按钮在分屏及常规屏下收缩为精致图标带角标态，聚焦与打字机收纳为 2 合 1 双模胶囊，释放超过 310px 宽度。
+- **验证结果**：
+  - 全套专项与回归测试套件 100% 满分通过：
+    - `pnpm test:tri-modes`（9/9 PASS）
+    - `pnpm test:zen`（12/12 PASS）
+    - `pnpm test:header`（9/9 PASS）
+    - `pnpm test:sandbox`（12/12 PASS）
+    - `pnpm test:sandbox:pause`（6/6 PASS）
+    - `pnpm test:sandbox:header`（6/6 PASS）
+    - `pnpm test:sandbox:polisher`（8/8 PASS）
+    - `pnpm test:editor:inline`（9/9 PASS）
+    - `pnpm test:beats-bible`（100% PASS）
+    - `pnpm test:bugfixes`（82/82 PASS）
+  - 前端生产打包 `pnpm build` 1.43s 零错误，Rust 后端 `cargo check` 0.55s 零错误零警告。
+
+## ADR-076: 演武场顶栏物理防重叠重构与多层级推演重置 (Reset) 系统
+- **状态**：已采纳
+- **上下文**：
+  1. 用户在角色对戏演武场顶栏发现明显的排版重叠 Bug（截图中会话切换下拉框 `[ 密室对峙与解药试探 ∨ ]` 与戏剧张力徽标 `张力: 剑拔弩张 (7/10)` 直接重叠遮盖，且亮点副标题被挤扁截断为 `零...`）；
+  2. 用户反馈推演台找不到直观明显的“重置”按钮，此前仅有微小灰色字体的“重开”且在对戏轮次为 0 时被彻底条件隐藏，左侧场景与动机配置亦缺少一键重置清空机制。
+- **决策**：
+  1. **顶栏弹性盒模型物理隔离与重叠阻断 (`CharacterSandboxPanel.tsx`)**：
+     - **会话切换器父容器加固**：将 `relative shrink min-w-0` 重构为 `relative shrink-0 max-w-[130px] sm:max-w-[170px]`，子级按钮设定 `w-full min-w-0 overflow-hidden`，彻底杜绝父容器坍塌导致子级向右外溢压盖同级元素的 CSS Bug；
+     - **戏剧张力指数下沉至剧情走向栏**：将戏剧张力徽标移至对戏气泡流上方的剧情走向栏（`What-If Branch Bar`）右端，与分支轮次统计及“开辟新分支”按钮有机结合常驻呈现；顶栏张力胶囊提升阈值至 `3xl:flex`，常规分屏与桌面屏下彻底为会话标题与副标留出呼吸空间；
+     - **副标呼吸自适应**：会话选择器与副标之间无任何同级浮动元素插队，副标在宽屏下舒展平铺。
+  2. **多层级推演重置 (Reset) 体验升级**：
+     - **底部主操作栏【重置推演】常驻**：将原隐藏在条件分支中的灰色小字“重开”升级为带边框实心胶囊按钮 `[ 🔄 重置推演 ]`，无论何时均常驻显示（0 轮或推演中时半透明禁用），醒目标注 `RotateCcw` 图标与危险朱砂红悬停预警；
+     - **情境与阵容配置区【重置设定】**：在场景与目标卡片顶端新增 `[ 🔄 重置设定 ]`，支持一键清空场景描述、交锋目标与出场角色的临时秘密动机；
+     - **工具箱与导出菜单双轨重置项**：在顶栏“导出/工具”下拉面板中集成 `[ 🔄 重置推演对戏记录 ]` 与 `[ 🧹 重置场景与出场设定 ]`，满足任意工作流位置的全局重置需求。
+- **验证结果**：
+  - `pnpm test:sandbox:header` 扩展至 11/11 项断言全部 100% 通过；
+  - `pnpm test:sandbox` (12/12), `pnpm test:sandbox:pause` (6/6), `pnpm test:sandbox:polisher` (8/8) 全部 100% 通过；
+## ADR-077: 演武场全抽屉化 (Slide-over Drawer) 与三态分界面 (Sub-interfaces) 架构改造
+- **状态**：已采纳
+- **上下文**：
+  - 用户反馈演武场界面“太乱太杂了”，原左侧为固定常驻的 380px 大表单，将“经典冲突情境”、“场景与目标”、“出场阵容”与各角色卡片全部垂直平铺，严重挤占推演舞台视觉空间，在对戏时造成极大的视觉干扰与认知负荷。用户明确提出：“尽量使用抽屉或者分界面去实现这个功能”。
+- **决策**：
+  1. **推演主舞台 100% 沉浸全宽化**：彻底移除左侧默认常驻的固定分栏，使推演交锋大厅与气泡流在打开演武场时独占整屏，给对话创作留出开阔、舒适的排版空间；
+  2. **剧本与阵容设定抽屉化 (`Slide-over Drawer`)**：
+     - 将原本繁琐的配置面板重构为独立滑出式抽屉，在顶栏会话切换器右侧常驻呈现精致药丸按钮 `[ ⚙️ 剧本设定 N人 ]`，点击一键从左侧平滑滑出；
+     - 抽屉自带半透明模糊遮罩与流畅过渡动画，点击遮罩或底栏 `[ 🎬 进入推演舞台 → ]` 可即刻关闭并恢复纯净舞台；
+     - 支持右上角图钉 `Pin` 自由切换：宽屏/多屏创作者可选择将其一键固定为常驻侧边栏；
+  3. **配置面板三态分界面 (Sub-interfaces Tab) 解耦**：
+     - 在抽屉顶部引入结构化三态 Tab 导航，彻底消灭单列 1500px 的垂直表单滚动深渊：
+       - **Tab 1: `👥 出场阵容 (${actors.length})`**：专精角色卡片、立绘下锚、攻守位置互换、私密动机/隐藏秘密与多模型分配；
+       - **Tab 2: `🎬 场景与目标`**：专精剧本标题、环境描写、交锋目标、大纲前情导入与设定重置；
+       - **Tab 3: `⚡ 经典情境`**：以 2 列卡片形式直观呈现 6 大高冲突经典模板，点击一键套用并自动切回阵容视图。
+  4. **舞台空态直达抽屉**：在对话轮次为 0 的舞台起幕卡片中，提供 `[ ⚙️ 配置剧本场景与角色秘密 (抽屉) ]` 直达入口，零障碍新手引导。
+- **验证结果**：
+  - `pnpm test:sandbox:header` 扩充 Part 5，15/15 项断言全部 100% 通过；
+  - `pnpm test:sandbox` (12/12), `pnpm test:sandbox:pause` (6/6), `pnpm test:sandbox:polisher` (8/8) 100% 通过；
+  - `cargo check` 0.40s 零警告，`pnpm build` 1.10s 生产打包零错误！
+
+## ADR-078: 演武场顶栏冗余消除、自适应防撞预算与工具箱深度聚合体系 (Character Sandbox Header Anti-Collision Budgeting & Tool Consolidation Architecture)
+- **状态**：已采纳
+- **上下文**：
+  - 用户反馈“还是有重叠情况”并提供真机界面截图：在分屏/紧凑分栏（~950px）视口下，左侧的 `[ 🎛️ 剧本设定 2人 ]` 胶囊按钮被推挤并直接覆盖压在右侧的 `[ 💡 灵感盒 ]` 上方。
+  - **根本诱因剖析**：
+    1. 顶栏右侧功能区按钮严重超载膨胀：堆砌了 7 个平铺按钮（`灵感盒` + `内心戏/潜台词` + `导入设定` + `联机` + `导出/工具` + `Settings2` + `优化精修文段`），其占用宽度高达 586px；
+    2. 左侧容器包含图标、演武场标题、会话选择器及 `剧本设定` 胶囊（占 ~410px）；
+    3. 两者相加需 996px 物理宽度。当窗口处于 ~950px 或侧边停靠时，左侧 `flex-1` 容器因子元素全带 `shrink-0` 无法收缩，导致右端元素强行向右外溢，与右侧工具栏首个按钮 `灵感盒` 产生物理视觉叠放重叠；
+    4. 存在严重的按钮功能冗余：右侧独立的 `Settings2` 齿轮按钮与左侧的 `[ 🎛️ 剧本设定 ]` 功能完全重复（均为切换抽屉）；`导入设定` 在抽屉的“场景与目标”Tab 中已重点呈现；`联机` 在未连接时常驻占位极度低效。
+- **决策**：
+  1. **消除顶栏重复触发器**：彻底移除顶栏右侧多余的 `Settings2` 齿轮按钮，保持 `[ 🎛️ 剧本设定 N人 ]` 作为演武场唯一的抽屉总控入口，直接省去 36px 物理像素；
+  2. **设定导入与 P2P 联机深度聚合至工具箱**：
+     - 将原本散落平铺的 `[ 📖 导入设定 ]` 与 `[ 🌐 联机 ]` 优雅收纳进 `[ 📥 导出/工具 ▾ ]` 下拉菜单（支持一键导入设定、一键进入 P2P 房间）；
+     - `导入设定` 同时在设定抽屉的【场景与目标】分界面中原生常驻，符合创作者在设定情境时顺理成章导入前情与世界观法则的心智模型；
+     - `P2P 联机` 采用状态机驱动：未建立房间时不占用顶栏黄金像素，一旦房间连接成功，在顶栏高亮呈现微型状态胶囊 `[ 🟢 P2P:888-999 ]`，兼顾状态透视与排版紧凑；
+  3. **右侧弹性宽度预算压缩至 ~370px（紧凑视口下 ~220px）**：
+     - 经过清理聚合后，右侧仅保留 `灵感盒`、`内心戏/潜台词` 视角胶囊、`导出/工具 ▾` 下拉与高光行动 `优化精修文段`；
+     - 在 800px~950px 分屏下，顶栏中央预留 150px~250px 的绝对充裕安全空白带，彻底根治物理挤压与图层覆盖。
+- **验证结果**：
+  - `pnpm test:sandbox:header` 升级为 17/17 项断言，全部 100% 通过；
+  - `pnpm test:sandbox`, `pnpm test:sandbox:pause`, `pnpm test:sandbox:polisher`, `pnpm test:tri-modes`, `pnpm test:zen`, `pnpm test:editor:inline`, `pnpm test:beats-bible`, `pnpm test:bugfixes` 全套满分通过；
+  - Rust 后端 `cargo check` 0.40s 零错误，前端 Vite `pnpm build` 1.11s 零错误！
+
+## ADR-079: 技能中心弹窗滚动透传失效修复与卡片交互下压治理 (Skills Manager Modal Scroll Propagation & Card Accordion Header Expansion)
+- **状态**：已采纳
+- **上下文**：
+  - 用户反馈技能中心“这里怎么下拉不了”，截图中第 4 项技能 `Scene Dramaturge` 在窗口底部被截断，且右侧无滚动条，无法查看第 5、6 项技能与沙盒底部；同时技能卡片原本仅有左侧 16px 的微型箭头能触发折叠展开，点击卡片标题无任何响应。
+  - **根因分析**：
+    1. **弹窗高度未确定导致 flex 滚动透传失效**：`SettingsModal` 容器使用 `max-h-[90vh]`，在 `activeTab === 'SKILLS'` 时子容器未声明确定像素高度，导致 `flex-1` 高度由 1800px 的技能全列表撑开，无法触发内层 `overflow-y-auto` 滚动判定，最终被外层 `overflow-hidden` 硬截断；
+    2. **卡片头部点击区域狭窄**：`SkillsManagerView` 技能卡片原本只有小图标绑定了 `onClick`，卡片标题及主体区域未绑定点击展开，导致用户期望点击卡片展开明细时无响应。
+- **决策**：
+  1. **明确弹窗高度与滚动容器架构**：
+     - 在 `SettingsModal.tsx` 中，`activeTab === 'SKILLS'` 时明确指定 `h-[88vh]`，并在内容容器显式声明 `flex-1 min-h-0 overflow-y-auto overscroll-contain`；
+     - `SkillsManagerView` 根容器声明 `min-h-full`，滚动条直接渲染在弹窗右侧边缘，支持鼠标滚轮与拖拽流畅滚动；
+     - `SkillsManagerPanel.tsx` 同步升级为 `w-full h-full overflow-y-auto overscroll-contain`，保持停靠面板与弹窗双端一致；
+  2. **卡片头部全域点击展开明细**：
+     - 将卡片整个头部区域升级为点击目标，配备 `cursor-pointer` 与 hover 轻微背景高亮；
+     - 右侧开关切换按钮使用 `e.stopPropagation()` 隔离事件，保障开启/关闭技能时绝不误触发折叠/展开；
+     - 鼠标悬停展示准确的 Title 气泡指引（“点击下拉展开详细规则与反向禁改区”）。
+- **验证结果**：
+  - `pnpm test:skills` 扩展至 Part 9（62/62 PASS 全部满分通过）；
+  - `cargo check` 0.40s 零错误，`pnpm build` 1.17s 零错误零警告！
+
+## ADR-080: 顶栏窗口无边框原生拖拽移动双轨驱动与空白区命中加固 (Frameless Window Native Dragging Dual-Track Propagation & Blank Hit Defense Architecture)
+- **状态**：已采纳
+- **上下文**：
+  - 用户反馈“怎么拖拽这个区域无法移动这个软件窗口了”并上传真机截图：用户尝试在顶栏空白处（如书名/案头与三态切换胶囊之间、或阶段切换胶囊与工具箱之间）点击并按住鼠标拖拽窗口，但窗口无任何位移响应。
+  - **根本诱因剖析**：
+    1. **Tauri 2 声明式属性未能向子级透传**：`<header>` 元素虽然声明了 `data-tauri-drag-region`，但其内部被 `flex items-center justify-between flex-1 min-w-0 h-full` 等子级容器 100% 铺满覆盖。在 Windows WebView2 运行时中，子级元素不继承祖先的 `data-tauri-drag-region` 特性。当用户点击顶栏中段的空白背景时，实际命中（`e.target`）的是子级 `div`，导致 Tauri 判定该处为非拖拽区域；
+    2. **缺乏编程式拖拽兜底 API**：Tauri 2 官方专门在权限清单中配置了 `"core:window:allow-start-dragging"`，并提供了 `appWindow.startDragging()` API，但此前代码中仅处理了双击最大化（`handleHeaderDoubleClick`），未在 `onMouseDown` 中主动调用 `startDragging()`。
+- **决策**：
+  1. **双轨驱动架构（Declarative + Programmatic Dual-Track）**：
+     - **编程式兜底**：在 `<header>` 上挂载 `onMouseDown={handleHeaderMouseDown}` 事件监听器；
+     - **防误触智能拦截**：`handleHeaderMouseDown` 优先核验 `e.button === 0`（仅响应左键），并通过 `(e.target as HTMLElement).closest('button, a, input, select, textarea, [data-tauri-drag-region="false"], [role="button"], .cursor-pointer')` 严格拦截所有按钮、输入框、下拉框及交互手型控件，确保任何业务点击毫无干扰；
+     - **原生调用**：只要点击处于顶栏背景或非交互区域，立即调用 `await getCurrentWindow().startDragging()`，由 Windows 系统原生接管窗口平滑位移拖动；
+  2. **声明式拖拽属性全层级透传**：
+     - 在顶栏内容区包裹层 `flex-1` 以及 Brand、Zone 1、Zone 2、Zone 3 各容器上显式补全 `data-tauri-drag-region`，双重确保 WebView2 底层区域命中。
+- **验证结果**：
+  - `pnpm test:header` 扩展 Part 3，11/11 项测试 100% PASS；
+  - `cargo check` 0.56s 零错误，`pnpm build` 1.19s 零错误零警告！
+
+## ADR-081: 推演台原生确认框全面应用内主题化与全局模态防截断治理 (Custom In-App Dialog Theme Unification & Modal Truncation Hardening)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户实测反馈“这个UI太丑了，有点割裂”，截图中弹出了 Chromium 原生的暗黑方块弹窗 `localhost:1420 显示: 确定重置当前推演记录吗？对白实录将清空，角色秘密与场景设定将予以保留。[确定] [取消]`。该原生对话框不仅带有 Web 端口域名标识，样式粗糙违和，与 NovelForge AI 精心打造的文人书卷风、水墨暗调及圆润毛玻璃质感产生严重割裂。
+  2. 根因剖析：`CharacterSandboxPanel.tsx` 内部误用了 6 处浏览器原生 `confirm(...)` 与 `window.confirm(...)`，而未接入此前已实装的全局应用内对话框系统 `confirmDialog` (`DialogHost.tsx`)。
+  3. 伴生隐患排查：在全局模态与弹窗中，部分弹窗内部 Flex 容器使用了 `flex-1 overflow-y-auto` 但未带 `min-h-0`，或者右侧打磨区设置了 `overflow-hidden`，在笔记本屏幕或高 DPI 缩放（125%~150%）下极易导致底部按钮被截断不可见。
+- **决策**：
+  1. **彻底清零原生 Confirm/Alert**：
+     - 在 `CharacterSandboxPanel.tsx` 中将所有删除会话、删除分支、重置推演、重置场景设定、替换正文与清空灵感盒操作全面升级为异步 `await confirmDialog({ title, message, tone: 'danger', confirmText, cancelText })`；
+     - 升级 `src/utils/dialog.ts` 的 `DANGER_KEYWORDS` 正则，将“重置”与“清空”纳入自动危险预警范围，提供一致且具有优雅朱砂红/茶金微光的操作确认体验。
+  2. **全局模态内层滚动与防截断加固**：
+     - 在 `NovelistToolboxModal`、`FullCheckModal`、`CreationWorkflowModal`、`WorkflowRunnerModal`、`SerializationModal`、`PublishingModal`、`DeconstructModal`、`AssetProposalModal`、`BookCoverModal`、`CharacterAvatarModal`、`WordImportModal` 与 `SettingsModal` 中，全面补齐 `flex-1 min-h-0 overflow-y-auto` 架构；
+     - 小说专项工具箱右侧落地卡片解除 `overflow-hidden` 限制，将内容输入框调整为弹性 `min-h-[160px]`，底部 4 大一键落地按钮赋予 `shrink-0`，确保任何分辨率与 DPI 下均能滚动到底部。
+- **验证结果**：
+  - `pnpm test:sandbox:header` 扩展 Part 4 专属断言，18/18 项测试 100% 满分通过；
+  - 全工程 `git grep` 核验：全量 0 处遗留 `window.confirm` / `confirm(`；
+  - `cargo check` 0.47s 零错误，`pnpm build` 1.19s 生产构建 0 错误零警告！
+
+## ADR-082: 剧本设定抽屉下拉滚动流畅度治理与 GPU 合成层解耦 (Drawer Scroll Performance & Compositor Layer Decoupling)
+- **状态**：已采纳
+- **上下文**：
+  1. 用户实测反馈“抽屉界面的下拉又出现了掉帧感”，并附带演武场“剧本与角色设定”抽屉界面的截图。
+  2. 根因剖析：
+     - **反模式 `content-visibility: auto` 在动态高度卡片上的误用**：在抽屉角色卡片上此前设置了 `style={{ contentVisibility: 'auto', containIntrinsicSize: '0 360px' }}`。但抽屉中角色卡片高度并非固定，而是依立绘图片、AI 模型选择器、私密动机展开度动态变化（卡片 1 高约 460px，卡片 2 高约 280px）。在 Chromium / WebView2 中，偏离实际高度的估算尺寸导致用户在滚动时浏览器持续反复触发布局重测算（Layout Recalculation）与滚动条抖动跳跃，引发主线程微卡顿与掉帧；且抽屉内角色仅 2~4 位，完全无需也不适宜启用虚拟渲染。
+     - **抽屉蒙层高开销 `backdrop-blur-[1px]`**：悬浮抽屉底层使用了 `backdrop-blur-[1px]` 遮罩，在 Windows WebView2 硬件加速环境下，抽屉在滚动时会迫使 GPU 合成器每一帧都重新对底层推演大厅画布执行昂贵的高斯模糊采样，帧率瞬间跌至 30~40 FPS。
+     - **抽屉容器缺乏独立 GPU 合成层隔离**：滑出容器与内容滚动区未声明 `transform-gpu`，导致抽屉内部的滚动重绘与外部推演舞台的 DOM 重排混合在一起。
+- **决策**：
+  1. **彻底移除动态卡片上的 `content-visibility: auto`**：
+     - 移除抽屉内出场角色卡片以及会话切换器下拉项的 `contentVisibility` 和 `containIntrinsicSize` 样式，保证 DOM 仅做一次标准静态布局，杜绝下拉时的反复重排。
+  2. **消除蒙层 `backdrop-blur` 降低合成器负载**：
+     - 抽屉背景蒙层调整为纯色透明度渐变 `bg-black/40 dark:bg-black/60`，彻底移除 `backdrop-blur-[1px]`，使 GPU 滚动开销清零。
+  3. **启用 `transform-gpu` 独立硬件合成层加速**：
+     - 为抽屉滑出容器与抽屉主体滚动容器分别追加 `transform-gpu`，将抽屉完全隔离提升为独立 GPU 合成层，杜绝跨图层重绘穿透。
+- **验证结果**：
+  - `pnpm test:sandbox:header` 专项测试 18/18 项 100% PASS；
+  - `pnpm test:sandbox` 12/12 深度断言 100% PASS；
+  - `pnpm test:skills`、`pnpm test:header`、`pnpm test:tri-modes`、`pnpm test:bugfixes` 全部 100% PASS；
+  - `cargo check` 0.55s 零错误，`pnpm build` 1.25s 生产构建 0 错误零警告！
+
+## ADR-083: 推演主对白流全域防抖、精修悬浮条减负与全局抽屉硬件合成优化 (Main Dialogue Stream Anti-Stutter & Global Drawer Compositing Optimization)
+- **状态**：已采纳
+- **上下文**：
+  1. 在完成抽屉内滚动治理（ADR-082）后，进一步全盘巡检推演舞台与全局抽屉组件发现：
+     - 主推演舞台的消息气泡流仍残存 `contentVisibility: 'auto'` 与固定 `containIntrinsicSize: '0 160px'`；而每轮对戏气泡随内心独白展开、潜台词开关与正文长短，其实际高度在 80px~450px 间剧烈波动，不仅导致长记录回滚时滚动条跳跃，还导致 `scrollToBottom` 触发时因估算尺寸偏差而产生位移抖动；
+     - 优化精修文段工作区中的划选文字浮动操作条使用了 `sticky top-0` 结合 `backdrop-blur-xs`，在正文阅读滚动时持续占用 GPU 模糊着色器资源；
+     - 经典冲突模板库在固定抽屉（352px）下存在双列挤压；环境描写与交锋目标缺少快捷灵感胶囊；
+     - 历史版本抽屉 `VersionDrawer` 仍存在 `backdrop-blur-xs`，与 `ZenChapterDrawer` 均未完全声明 `transform-gpu`。
+- **决策**：
+  1. **主对白气泡流彻底剥离 `content-visibility: auto`，升级 GPU 合成层**：
+     - 彻底清除主对话气泡、舞台起幕卡片与突发旁白卡片上的 `contentVisibility`，改由原生 DOM 标准计算，解决滚动跳跃与尺寸估算漂移；
+     - 主滚动区 `scrollRef` 全面注入 `transform-gpu` 与 `overscroll-contain`，实现真正的 60FPS 顺滑滚屏。
+  2. **精修工作室划选悬浮条纯色高对比度优化**：
+     - 移除粘性浮条上的 `backdrop-blur-xs`，升级为纯色稳固茶金水墨样式，并为主内容区配置 `transform-gpu`。
+  3. **剧本抽屉交互灵感增强与自适应布局**：
+     - 经典情境库升级为 `grid-cols-1 sm:grid-cols-2 gap-2.5` 响应式栅格，无论抽屉固定还是浮动均有充裕版面；
+     - 环境描写与交锋目标输入区增加动态字数统计，并提供“深夜书房、荒郊破庙、逼出真正底线、暗藏杀机试探”等高频环境与冲突一键植入胶囊。
+  4. **全局抽屉体系全量硬件合成加速与去 Blur 化**：
+     - `VersionDrawer` 移除 `backdrop-blur-xs`，滑出抽屉与版本列表、预览框追加 `transform-gpu`；
+     - `ZenChapterDrawer` 侧滑抽屉与章节树列表注入 `transform-gpu` 与 `overscroll-contain`。
+- **验证结果**：
+  - `pnpm test:sandbox:header` 18/18 PASS；
+  - `pnpm test:sandbox` 12/12 PASS；
+  - `pnpm test:skills` 62/62 PASS；
+  - `pnpm test:header` 11/11 PASS；
+  - `pnpm test:tri-modes` 9/9 PASS；
+  - `pnpm test:bugfixes` 82/82 PASS；
+  - `cargo check --manifest-path src-tauri/Cargo.toml` 0.55s 零错误零警告；
+  - `pnpm build` 1.27s 生产构建 0 错误零警告！
+
+
+
+
+
+
+
+
+
 
 
 

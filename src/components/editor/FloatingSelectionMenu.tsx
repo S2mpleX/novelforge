@@ -16,13 +16,14 @@ import {
   Loader2,
   Edit3,
   Clapperboard,
+  Target,
 } from 'lucide-react';
 
 interface FloatingSelectionMenuProps {
   editor: Editor | null;
 }
 
-type ActionKey = 'humanize' | 'dramaturgy' | 'actionize' | 'sensory' | 'dialogue' | 'save_rule';
+type ActionKey = 'humanize' | 'dramaturgy' | 'probe' | 'actionize' | 'sensory' | 'dialogue' | 'save_rule';
 
 export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ editor }) => {
   const { activeNovel, saveCurrentChapter } = useNovelStore();
@@ -176,6 +177,10 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
         prevContext: selectedText,
         sceneGoal: '消除平淡流水账与情绪贴标签，重构戏剧张力与真实行动后坐力',
       });
+    } else if (action === 'probe') {
+      systemPrompt =
+        '你是一名中文小说角色深度心理与行为决策分析大师。根据选中的当下小说剧情，推演出角色最精彩的下一步应对抉择（结合内心算盘、身体微动作与试探对白）。直接输出推演改写后的纯小说正文。';
+      userPrompt = `请以此情境为依据，为主要当事角色输出最具戏剧张力与心理纵深的【下一步微动作与试探对白】：\n\n【原文】：\n${selectedText}\n\n要求：\n1. 包含具体的身体微动作白描；\n2. 包含带有潜台词的试探话术；\n3. 直接输出纯小说正文：`;
     } else if (action === 'actionize') {
       systemPrompt =
         '你是一名小说动作白描大师。擅长将抽象情绪、心理独白与说明文宣告，彻底转化为具体可感的身体微反应、手头动作、物理受力与环境互动。';
@@ -296,6 +301,16 @@ export const FloatingSelectionMenu: React.FC<FloatingSelectionMenuProps> = ({ ed
           >
             <Clapperboard className="w-3.5 h-3.5 text-orange-400" />
             <span>戏剧重塑</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTriggerAction('probe')}
+            className="px-2.5 py-1.5 rounded-lg hover:bg-amber-600/30 text-amber-200 font-medium flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+            title="以此段情境为依据，探查角色下一步会作何反应与决策"
+          >
+            <Target className="w-3.5 h-3.5 text-amber-400" />
+            <span>探他抉择</span>
           </button>
 
           <button

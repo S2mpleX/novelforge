@@ -1,15 +1,25 @@
 # NovelForge AI — 项目持续开发状态 (PROJECT_STATE.md)
 
 ## 1. 当前阶段与基线
-- **当前阶段**：V3.7.1 **修复首屏打包循环依赖导致的白屏与渲染安全屏障机制 (Fix Initial Chunk Circular Dependency Blank Screen & Add Root Error Boundary)**
-  - ① **清除手动 manualChunks 消除 34 处循环依赖**：还原自然模块依赖树，彻底消灭 `vendor-icons` 与 `index.js` 间的环状依赖，恢复 ES 模块顶层拓扑求值安全；
-  - ② **首屏关键组件直出保障**：`App.tsx` 中的 `DockingWorkspace`（主写作工坊）与 `WritersDeskModal` 恢复为同步直出，避免启动挂起；
-  - ③ **接入全局异常与 RootErrorBoundary 容灾防线**：`src/main.tsx` 挂载全局异常与 React 错误边界，彻底杜绝静默白屏；
-  - ④ **全套自动化测试 100% 满分通过**：全部前端测试与 Rust 原生 `db_test` 66/66 全部通过，前端生产构建 1.46s 零错误完成！
-- **版本目标**：V3.7.1
-- **更新时间**：2026-10-21
-- **代码库状态**：真实可运行、真实编译通过 (Rust 后端与 SQLite 零错误零警告，前端 Vite 打包 1.46s 零错误，无循环依赖，全部前端专项测试 100% 通过，Rust db_test 66/66 全部通过)。
-- **最近实装**：修复首屏打包循环依赖导致的白屏与渲染安全屏障机制 (ADR-063)。
+- **当前阶段**：V4.0.2 (客户端 V2.7.0) **推演主对白流全域防抖、精修悬浮条减负与全局抽屉硬件合成优化 (Main Dialogue Stream Anti-Stutter & Global Drawer Compositing Optimization)**
+  - ① **推演主舞台对白流硬件合成与防抖消除 (ADR-083 & `CharacterSandboxPanel.tsx`)**：
+    - 针对推演舞台消息流，彻底剥离残存的 `contentVisibility: 'auto'` 与固定 `containIntrinsicSize: '0 160px'`；消除因内心独白、潜台词、正文对白长短差异（80px~450px 波动）导致的滚动条跳跃与自动滚底（`scrollToBottom`）位移偏差；
+    - 主滚动容器 `scrollRef` 全面注入 `transform-gpu` 与 `overscroll-contain`，实现真正的 60FPS 顺滑滚屏。
+  - ② **精修工作室划选悬浮条防掉帧 (ADR-083 & `CharacterSandboxPanel.tsx`)**：
+    - 移除粘性浮条 (`sticky top-0`) 上的 `backdrop-blur-xs`，替换为纯色稳固高对比茶金样式，精修主内容区补充 `transform-gpu overscroll-contain`，杜绝长文滚动时 GPU 逐帧模糊重采样。
+  - ③ **剧本抽屉交互灵感增强与自适应布局 (ADR-083 & `CharacterSandboxPanel.tsx`)**：
+    - 经典情境库升级为 `grid-cols-1 sm:grid-cols-2 gap-2.5` 响应式栅格，无论抽屉固定（Pinned 352px）还是浮动均有充裕版面；
+    - 场景与目标输入区增加动态字数统计，并提供“深夜书房、荒郊破庙、逼出真正底线、暗藏杀机试探”等高频环境与冲突一键植入胶囊。
+  - ④ **全局抽屉体系全量硬件合成加速与去 Blur 化 (ADR-083 & `VersionDrawer.tsx` / `ZenChapterDrawer.tsx`)**：
+    - 历史版本抽屉 `VersionDrawer` 移除 `backdrop-blur-xs`，滑出抽屉与版本列表、预览框追加 `transform-gpu` 与 `overscroll-contain`；
+    - 禅意码字章节抽屉 `ZenChapterDrawer` 侧滑抽屉与章节树列表注入 `transform-gpu` 与 `overscroll-contain`。
+  - ⑤ **全套自动化测试 100% 满分通过**：
+    - `test:sandbox:header`（18/18 PASS）、`test:skills`（62/62 PASS）、`test:header`（11/11 PASS）、`test:tri-modes`（9/9 PASS）、`test:sandbox`（12/12 PASS）、`test:bugfixes`（82/82 PASS）全部满分绿灯；
+    - Rust 后端 `cargo check` 0.55s 零错误零警告，前端 Vite 生产构建 1.27s 零错误！
+- **版本目标**：V2.7.0 (V4.0.2)
+- **更新时间**：2026-10-22
+- **代码库状态**：真实可运行、真实编译通过 (Rust 后端与 SQLite 零错误零警告，前端 Vite 打包 1.27s 零错误，无循环依赖，全部专项测试 100% 通过，Rust db_test 66/66 全部通过)。
+- **最近实装**：推演主对白流全域防抖、精修悬浮条减负与全局抽屉硬件合成优化 (ADR-083)、剧本设定抽屉下拉滚动流畅度治理与 GPU 合成层解耦 (ADR-082)、推演台原生确认框全面应用内主题化与全局模态防截断治理 (ADR-081)。
 
 ---
 

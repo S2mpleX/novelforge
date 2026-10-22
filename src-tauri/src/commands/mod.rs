@@ -8,7 +8,7 @@ use crate::models::{
     CharacterStateEvent, CollaborativeWorkflowInput, CollaborativeWorkflowResult,
     ContinuityAuditFinding, ContinuityAuditResponse, CreateCanonFactInput, CreateChapterInput,
     CreateCharacterInput, CreateCharacterRelationshipInput, CreateCharacterStateEventInput,
-    CreateNovelInput, CreatePlotThreadInput, CreateSceneInput, CreateStoryArcInput,
+    CreateNovelInput, CreatePlotThreadInput, CreateSceneInput, UpdateSceneInput, CreateStoryArcInput,
     CreateStoryEventInput, CreateStoryPhaseInput, CreateWorldRuleInput, ExtractChapterMemoryResult,
     GenerateStreamInput, MemoryContextPack, Novel, PlotThread, ReviewReport, SaveProviderInput,
     Scene, SerializationJob, StartSerializationJobInput, StoryArc, StoryEvent, StoryPhase,
@@ -34,6 +34,7 @@ use crate::models::{
     CharacterActionOption, ProbeCharacterActionsInput, ProbeCharacterActionsResult,
     DistillSandboxInspirationsInput, DistillSandboxInspirationsResult,
     AnalyzeCharacterAppearanceInput, AnalyzeCharacterAppearanceResult,
+    GenerateImageInput, GenerateImageResult,
 };
 use crate::providers::{
     ChatMessage, ChatCompletionRequest, ConnectionTestResult, OpenAIClient,
@@ -615,6 +616,22 @@ pub fn update_scene_status(
     status: String,
 ) -> Result<(), String> {
     db.update_scene_status(&id, &status).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_scene(
+    db: State<DbManager>,
+    id: String,
+) -> Result<Scene, String> {
+    db.get_scene(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_scene(
+    db: State<DbManager>,
+    input: UpdateSceneInput,
+) -> Result<Scene, String> {
+    db.update_scene(input).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -3154,6 +3171,35 @@ pub async fn synthesize_sandbox_dialogue_to_prose(
     let start_idx = input.start_round_index.unwrap_or(0);
     let end_idx = input.end_round_index.unwrap_or(history.len().saturating_sub(1));
 
+    // 解析出场角色的外貌衣饰与语气特征，为白描提供具象下锚点
+    let actors: Vec<CharacterActorConfig> = serde_json::from_str(&session.characters_config_json)
+        .unwrap_or_default();
+    let mut actors_appearance = String::new();
+    for actor in &actors {
+        let mut details = Vec::new();
+        if let Some(gender) = &actor.gender {
+            if !gender.trim().is_empty() {
+                details.push(format!("性别: {}", gender.trim()));
+            }
+        }
+        if let Some(vs) = &actor.visual_summary {
+            if !vs.trim().is_empty() {
+                details.push(format!("外貌体态衣饰: {}", vs.trim()));
+            }
+        }
+        if let Some(vq) = &actor.voice_quirks {
+            if !vq.trim().is_empty() {
+                details.push(format!("语气腔调特征: {}", vq.trim()));
+            }
+        }
+        if !actor.private_motivation.trim().is_empty() {
+            details.push(format!("底层动机: {}", actor.private_motivation.trim()));
+        }
+        if !details.is_empty() {
+            actors_appearance.push_str(&format!("- 【{}】{}\n", actor.character_name, details.join(" | ")));
+        }
+    }
+
     // 格式化对戏脚本供作家转译
     let mut dialogue_transcript = String::new();
     for (i, r) in history.iter().enumerate() {
@@ -3174,12 +3220,18 @@ pub async fn synthesize_sandbox_dialogue_to_prose(
         }
     }
 
-    let pov = input.pov_mode.unwrap_or_else(|| "THIRD_LIMITED".to_string());
+    let pov_desc = match input.pov_mode.as_deref().unwrap_or("THIRD_LIMITED") {
+        "THIRD_OMNISCIENT" => "第三人称全知上帝视角（双向博弈全收眼底，全景呈现双方微妙表情、动作反应与环境声色）",
+        "FIRST_PERSON" => "第一人称“我”的沉浸视角（极具代入感的心境暗流、呼吸停顿与第一视角感官体验）",
+        _ => "第三人称有限视角（紧随当场主要视点角色，见其所见，感其所感，绝不泄露对方私密未说之言）",
+    };
     let guidance = input.custom_guidance.unwrap_or_else(|| "保持文学留白，侧重眼神对峙与呼吸节奏".to_string());
 
     let style_requirement = match input.polishing_style.as_deref().unwrap_or("CINEMATIC") {
         "PSYCHOLOGICAL" => "【文风要求：心理暗流深描】将各角色的动机盘算与隐秘软肋融化为第三人称有限视角的眼神博弈与潜台词，不直接挑明，却暗潮汹涌令人脊背发凉！",
         "HARDCORE_TENSE" => "【文风要求：硬派高张力冷冽】语言极度凝练，以短句和动词为主，留白深远，刺刀见红，杜绝任何说明书式的连词堆砌！",
+        "CLASSICAL_ELEGANT" => "【文风要求：古风文雅留白】辞藻清雅沉凝，讲究对偶与句读呼吸感，多借草木风雨等外景寄托杀机与算计，风骨俨然！",
+        "DARK_HUMOR_IRONY" => "【文风要求：冷面讽刺藏刀】表面客套甚至带点黑色幽默与荒诞客套，实则每一句客套话后面都藏着致命匕首！",
         _ => "【文风要求：电影感镜头白描】强化光影声色、物理微小动作（如指节发白、茶雾散去、目光偏转两寸）、呼吸停顿，杜绝抽象情绪概括！",
     };
 
@@ -3191,19 +3243,26 @@ pub async fn synthesize_sandbox_dialogue_to_prose(
          【精修守则】\n\
          1. {}\n\
          2. 彻底融化内心戏：各角色的“心理暗流”是动机支撑，严禁机械写成“某某心想”，而必须转化为细腻的第三人称有限视角白描与神态沉吟！\n\
-         3. Show, Don't Tell：封杀一切 AI 机械套话（严禁“嘴角勾起弧度”、“眼中闪过冷芒”、“空气凝固”等）；台词与微动作自然穿插。\n\
-         4. 视点要求：采用{}视角；结合指导意见：{}。\n\
+         3. 具象入微 (Show, Don't Tell)：封杀一切 AI 机械套话（严禁“嘴角勾起弧度”、“眼中闪过冷芒”、“空气凝固”等）；台词与微动作自然穿插，并巧妙结合角色外貌、衣饰发簪与肢体小动作！\n\
+         4. 视点要求：采用{}；结合指导意见：{}。\n\
          5. 直接从第一行开始输出纯精修文段，段落间空一行，严禁任何客套解释！",
         novel.title, novel.genre_profile, novel.writing_style,
-        style_requirement, pov, guidance
+        style_requirement, pov_desc, guidance
     );
+
+    let actors_section = if !actors_appearance.is_empty() {
+        format!("【主要登场人物外貌衣饰与人设特征】\n{}\n", actors_appearance)
+    } else {
+        String::new()
+    };
 
     let user_prompt = format!(
         "【场景环境设定】\n{}\n\n\
          【场景冲突目标】\n{}\n\n\
+         {}\
          【角色演武场高光对戏实录】\n{}\n\n\
          请立刻开始打磨精修高光小说文段：",
-        session.scene_setting, session.scene_goal, dialogue_transcript
+        session.scene_setting, session.scene_goal, actors_section, dialogue_transcript
     );
 
     let client = OpenAIClient::new();
@@ -3462,6 +3521,68 @@ fn generate_fallback_visual_analysis(name: &str, gender: &str, genre: &str) -> A
         clothing_style: Some(clothing),
         body_type: Some(body),
     }
+}
+
+// ==========================================
+// AI IMAGE GENERATION (封面与角色立绘生图网关)
+// ==========================================
+
+#[tauri::command]
+pub async fn generate_image(
+    db: State<'_, DbManager>,
+    input: GenerateImageInput,
+) -> Result<GenerateImageResult, String> {
+    if input.prompt.trim().is_empty() {
+        return Err("提示词 (Prompt) 不能为空".to_string());
+    }
+
+    // 1. 确定 Base URL、API Key 与 Model
+    let (base_url, api_key, model) = if let (Some(cb), Some(ck)) = (&input.custom_base_url, &input.custom_api_key) {
+        let m = input.model_name.clone().unwrap_or_else(|| "dall-e-3".to_string());
+        (cb.clone(), ck.clone(), m)
+    } else if let Some(ref pid) = input.provider_id {
+        if let Ok(Some(p)) = db.get_provider_by_id(pid) {
+            let m = input.model_name.clone().unwrap_or_else(|| "dall-e-3".to_string());
+            (p.base_url, p.api_key, m)
+        } else {
+            return Err("指定的 AI 供应商不存在".to_string());
+        }
+    } else if let Ok(Some((p, m))) = db.get_active_provider_and_model() {
+        let chosen_model = if let Some(ref req_m) = input.model_name {
+            if !req_m.trim().is_empty() {
+                req_m.clone()
+            } else {
+                m.model_name
+            }
+        } else if m.model_name.contains("dall-e")
+            || m.model_name.contains("flux")
+            || m.model_name.contains("cogview")
+            || m.model_name.contains("wanx")
+            || m.model_name.contains("sd")
+        {
+            m.model_name
+        } else {
+            "dall-e-3".to_string()
+        };
+        (p.base_url, p.api_key, chosen_model)
+    } else {
+        return Err("当前未激活任何 AI 供应商，请前往【模型网关设置】配置 OpenAI / SiliconFlow / 智谱 等支持绘图的 API".to_string());
+    };
+
+    let client = OpenAIClient::new();
+    let res = client
+        .generate_image(
+            &base_url,
+            &api_key,
+            &model,
+            &input.prompt,
+            input.size.as_deref(),
+            input.style.as_deref(),
+            input.response_format.as_deref(),
+        )
+        .await?;
+
+    Ok(res)
 }
 
 

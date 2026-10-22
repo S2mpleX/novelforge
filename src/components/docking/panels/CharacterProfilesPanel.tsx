@@ -3,6 +3,8 @@ import { useNovelStore } from '@/stores/useNovelStore';
 import { api } from '@/utils/tauriBridge';
 import { confirmDialog } from '@/utils/dialog';
 import type { Character } from '@/types';
+import { CharacterAvatarModal } from '@/components/modals/CharacterAvatarModal';
+import { optimizeImageFileToDataUrl } from '@/utils/imageOptimizer';
 
 const showToast = (title: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
   window.dispatchEvent(
@@ -118,6 +120,18 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
   const [isAnalyzingVisual, setIsAnalyzingVisual] = useState(false);
   const [charInitialStatus, setCharInitialStatus] = useState<CharacterLifeStatus>('健康');
 
+  // AI 角色立绘创绘状态
+  const [showAvatarGenerator, setShowAvatarGenerator] = useState(false);
+  const [avatarGeneratorTarget, setAvatarGeneratorTarget] = useState<{
+    id?: string;
+    name: string;
+    gender?: string;
+    personality?: string;
+    motivation?: string;
+    visual_summary?: string;
+    avatar_url?: string;
+  } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadCharacters = async () => {
@@ -174,24 +188,21 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
     setShowAddModal(true);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      showToast('请选择有效的图片文件', 'warning');
-      return;
+    try {
+      const optimized = await optimizeImageFileToDataUrl(file, {
+        maxDimension: 1024,
+        quality: 0.88,
+        maxFileSizeBytes: 10 * 1024 * 1024,
+      });
+      setCharAvatarUrl(optimized);
+      showToast('角色立绘已载入并自动完成高清优化，点击【AI 识图】可提取外貌', 'info');
+    } catch (err: any) {
+      showToast(err?.message || '读取立绘图片失败', 'error');
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      if (base64) {
-        setCharAvatarUrl(base64);
-        showToast('角色贴图已就绪，点击【AI 识图】可自动提取人设外貌', 'info');
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleAiAnalyzeAvatar = async () => {
@@ -476,17 +487,40 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                     {/* 卡片头部：姓名与生存状态选择 */}
                     <div className="flex items-center justify-between pb-2 mb-2 border-b border-line">
                       <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                        {char.avatar_url ? (
-                          <img
-                            src={char.avatar_url}
-                            alt={char.name}
-                            className="w-12 h-14 rounded-xl object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2 transition-transform hover:scale-[1.03]"
-                          />
-                        ) : (
-                          <div className="w-12 h-14 rounded-xl bg-amber-800/10 text-primary flex items-center justify-center font-bold text-sm font-serif shrink-0 border border-dashed border-amber-800/20">
-                            {char.name.slice(0, 1)}
-                          </div>
-                        )}
+                        <div className="relative group shrink-0">
+                          {char.avatar_url ? (
+                            <img
+                              src={char.avatar_url}
+                              alt={char.name}
+                              className="w-12 h-14 rounded-xl object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2 transition-transform hover:scale-[1.03]"
+                            />
+                          ) : (
+                            <div className="w-12 h-14 rounded-xl bg-amber-800/10 text-primary flex items-center justify-center font-bold text-sm font-serif shrink-0 border border-dashed border-amber-800/20">
+                              {char.name.slice(0, 1)}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAvatarGeneratorTarget({
+                                id: char.id,
+                                name: char.name,
+                                gender: char.gender || '男',
+                                personality: char.personality || '',
+                                motivation: char.motivation || '',
+                                visual_summary: char.visual_summary || '',
+                                avatar_url: char.avatar_url || '',
+                              });
+                              setShowAvatarGenerator(true);
+                            }}
+                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex flex-col items-center justify-center text-amber-300 text-[9px] font-medium cursor-pointer"
+                            title="AI 生成立绘"
+                          >
+                            <Sparkles className="w-3 h-3 mb-0.5 text-amber-400" />
+                            <span>AI立绘</span>
+                          </button>
+                        </div>
                         <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-sm text-primary truncate">{char.name}</span>
@@ -597,17 +631,40 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                        {char.avatar_url ? (
-                          <img
-                            src={char.avatar_url}
-                            alt={char.name}
-                            className="w-12 h-14 rounded-xl object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2 transition-transform hover:scale-[1.03]"
-                          />
-                        ) : (
-                          <div className="w-12 h-14 rounded-xl bg-amber-800/10 text-primary flex items-center justify-center font-bold text-sm font-serif shrink-0 border border-dashed border-amber-800/20">
-                            {char.name.slice(0, 1)}
-                          </div>
-                        )}
+                        <div className="relative group shrink-0">
+                          {char.avatar_url ? (
+                            <img
+                              src={char.avatar_url}
+                              alt={char.name}
+                              className="w-12 h-14 rounded-xl object-cover border border-amber-800/30 shadow-2xs shrink-0 bg-surface-2 transition-transform hover:scale-[1.03]"
+                            />
+                          ) : (
+                            <div className="w-12 h-14 rounded-xl bg-amber-800/10 text-primary flex items-center justify-center font-bold text-sm font-serif shrink-0 border border-dashed border-amber-800/20">
+                              {char.name.slice(0, 1)}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAvatarGeneratorTarget({
+                                id: char.id,
+                                name: char.name,
+                                gender: char.gender || '男',
+                                personality: char.personality || '',
+                                motivation: char.motivation || '',
+                                visual_summary: char.visual_summary || '',
+                                avatar_url: char.avatar_url || '',
+                              });
+                              setShowAvatarGenerator(true);
+                            }}
+                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex flex-col items-center justify-center text-amber-300 text-[9px] font-medium cursor-pointer"
+                            title="AI 生成立绘"
+                          >
+                            <Sparkles className="w-3 h-3 mb-0.5 text-amber-400" />
+                            <span>AI立绘</span>
+                          </button>
+                        </div>
                         <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-sm text-primary">{char.name}</span>
@@ -741,7 +798,7 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                   )}
 
                   <div className="flex-1 space-y-1.5">
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 flex-wrap">
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
@@ -749,6 +806,26 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
                       >
                         <Upload className="w-3 h-3 text-amber-700" />
                         选择本地图片
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarGeneratorTarget({
+                            id: editingChar?.id,
+                            name: charName || '角色',
+                            gender: charGender,
+                            personality: charPersonality,
+                            motivation: charMotivation,
+                            visual_summary: charVisualSummary,
+                            avatar_url: charAvatarUrl,
+                          });
+                          setShowAvatarGenerator(true);
+                        }}
+                        className="px-2 py-1 rounded border border-amber-700/60 bg-amber-500/10 hover:bg-amber-500/20 text-primary dark:text-amber-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                        title="呼叫 AI 绘图模型生成立绘"
+                      >
+                        <Sparkles className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                        ✨ AI 生成立绘
                       </button>
                       {charAvatarUrl && (
                         <button
@@ -904,6 +981,34 @@ export const CharacterProfilesPanel: React.FC<Props> = ({ params }) => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* 角色立绘 AI 创绘模态框 */}
+      {showAvatarGenerator && avatarGeneratorTarget && (
+        <CharacterAvatarModal
+          isOpen={showAvatarGenerator}
+          onClose={() => {
+            setShowAvatarGenerator(false);
+            setAvatarGeneratorTarget(null);
+          }}
+          character={avatarGeneratorTarget}
+          genre={activeNovel?.genre_profile}
+          onApplyAvatar={async (newUrl) => {
+            if (showAddModal) {
+              setCharAvatarUrl(newUrl);
+              showToast('立绘已生成并载入编辑模态框，保存档案即可持久化！', 'success');
+            } else if (avatarGeneratorTarget.id) {
+              await api.updateCharacter({
+                id: avatarGeneratorTarget.id,
+                name: avatarGeneratorTarget.name,
+                avatar_url: newUrl,
+              });
+              await loadCharacters();
+              window.dispatchEvent(new CustomEvent('novelforge:reload-story-bible'));
+              showToast(`角色【${avatarGeneratorTarget.name}】的立绘已成功更新！`, 'success');
+            }
+          }}
+        />
       )}
     </div>
   );

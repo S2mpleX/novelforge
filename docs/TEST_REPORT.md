@@ -1862,6 +1862,309 @@ pnpm test:bugfixes
   - 循环依赖检测：**0 处循环引用 (PASS)**；
   - 前端生产构建：`pnpm build` **1.46s 零错误 0 警告通过**！
 
+### 2.58 角色对戏演武场推演全链路即时暂停与原子快照保全验证 (ADR-065)
+- **验证范围**：
+  1. 状态机全面覆盖 (`isStepping`, `isRunning`, `cancelRequestedRef`, `currentStepHistoryBeforeRef`)；
+  2. `handleStopDeduction` 原子回滚与 PAUSED 状态持久化机制；
+  3. 键盘 `Esc` 快捷键第一优先级截获与暂停响应；
+  4. 消息流思考卡片与直接暂停控制；
+  5. 底部主控制栏双模式（单步/连续）红色脉冲暂停态自适应切换与防脏写入保护。
+- **全套回归与构建验证矩阵**：
+  - 新增专属测试：`pnpm test:sandbox:pause` (**6/6 项全部满分通过**)；
+  - 顶栏排版测试：`pnpm test:sandbox:header` (**6/6 项全部满分通过**)；
+  - 演武场核心逻辑测试：`pnpm test:sandbox` (**12/12 项全部满分通过**)；
+  - 角色视觉与贴图测试：`pnpm test:character:visual` (**6/6 项全部满分通过**)；
+  - 工作区停靠布局测试：`pnpm test:docking` (**12/12 项全部满分通过**)；
+  - 前端生产构建：`pnpm build` **1.01s 零错误 0 警告通过**！
+
+### 2.59 角色对戏演武场高光文段打磨台与灵感工坊验证 (ADR-066)
+- **验证范围**：
+  1. 单轮节拍锚定修复与 `FOCUSED_ROUND` 范围切片算法（`idx - 1` 至 `idx + 1`）；
+  2. 5 大文学流派（电影感镜头白描、心理暗流深描、硬派高张力冷冽、古风文雅留白、冷面讽刺藏刀）与 3 大叙事视点（第三人称限制、第三人称全知、第一人称沉浸）；
+  3. 3 大打磨工作室视图：纯享阅读（READ）、骨架对照（COMPARE）、原地编辑（EDIT）；
+  4. 多版本打磨历史留存（`polishedVariations`）与 `换个写法` Re-roll 机制；
+  5. 灵感火花提取：逐段独立复制、逐段存入灵感盒、一键自动提炼高光金句与微动作 (`handleExtractHighlightsToInspiration`)；
+  6. 严格弱化“并入正文”为低调次要辅助操作，全链路保障灵感捕捉心流。
+- **全套回归与构建验证矩阵**：
+  - 新增专属测试：`pnpm test:sandbox:polisher` (**6/6 项全部满分通过**)；
+  - 演武场暂停测试：`pnpm test:sandbox:pause` (**6/6 项全部满分通过**)；
+  - 顶栏排版测试：`pnpm test:sandbox:header` (**6/6 项全部满分通过**)；
+  - 演武场核心逻辑测试：`pnpm test:sandbox` (**12/12 项全部满分通过**)；
+  - 角色视觉与贴图测试：`pnpm test:character:visual` (**6/6 项全部满分通过**)；
+  - 工作区停靠布局测试：`pnpm test:docking` (**12/12 项全部满分通过**)；
+  - 前端生产构建：`pnpm build` **1.08s 零错误 0 警告通过**！
+
+### 2.60 演武场高光打磨台四大视图、外貌下锚、划选灵感与抉择探针验证 (ADR-067)
+- **验证范围**：
+  1. Rust 后端反序列化 `characters_config_json`，将角色外貌体态衣饰、语气腔调与底层动机注入提示词；
+  2. 前端打磨台顶部【视觉下锚】快照横栏呈现；
+  3. 四大多维打磨视图（新增 `DIFF` 双版同屏比对，左右自选版本与文风，支持字数统计与正文插入）；
+  4. 纯享阅读模式划选文字即时悬浮吸附条（`Selection-to-Inspiration`：一键存为灵感、一键插正文、复制）；
+  5. 单轮对话卡片底部“🎯 探他抉择”直达入口；
+  6. 角色抉择探针与灵感盒、正文草稿无缝联动（支持存为灵感与一键插入正文）。
+- **全套回归与构建验证矩阵**：
+  - 打磨台全要素测试：`pnpm test:sandbox:polisher` (**8/8 项全部满分通过**)；
+  - 演武场暂停测试：`pnpm test:sandbox:pause` (**6/6 项全部满分通过**)；
+  - 顶栏排版测试：`pnpm test:sandbox:header` (**6/6 项全部满分通过**)；
+  - 演武场核心逻辑测试：`pnpm test:sandbox` (**12/12 项全部满分通过**)；
+  - 角色视觉与贴图测试：`pnpm test:character:visual` (**6/6 项全部满分通过**)；
+  - 工作区停靠布局测试：`pnpm test:docking` (**12/12 项全部满分通过**)；
+  - 前端生产构建：`pnpm build` **1.39s 零错误 0 警告通过**！
+
+### 2.61 演武场文案臃余剔除与极简文学沉浸UI优化验证 (ADR-068)
+- **验证范围**：
+  1. 剔除所有带有生硬括号与说明书口吻的冗余副标题与备注（对他人完全屏蔽、附加功能、3选1、Prose Polishing Studio等）；
+  2. 对戏时间线卡片操作按钮与空态纯化为极简文人质感；
+  3. 高光打磨台模态框去宣传口号，五大流派、视点与范围精简紧凑呈现，高光提炼横幅精简；
+  4. 抉择路线探针与灵感盒抽屉文案提纯；
+  5. 零破坏性与功能全保留验证。
+- **全套回归与构建验证矩阵**：
+  - 打磨台专项测试：`pnpm test:sandbox:polisher` (**8/8 PASS**)；
+  - 演武场暂停测试：`pnpm test:sandbox:pause` (**6/6 PASS**)；
+  - 顶栏自适应排版测试：`pnpm test:sandbox:header` (**6/6 PASS**)；
+  - 演武场核心逻辑测试：`pnpm test:sandbox` (**12/12 PASS**)；
+  - 角色视觉与贴图测试：`pnpm test:character:visual` (**6/6 PASS**)；
+  - 前端生产构建：`pnpm build` **1.41s 零错误 0 警告通过**！
+
+### 2.62 工作台“极简三态化”（降噪防迷航）专项测试验证 (ADR-069)
+- **验证范围**：
+  1. Header 顶栏 Zone 2 极简三态药丸胶囊（`🌿 构思设计 PLAN`、`✍️ 沉浸码字 WRITE`、`🔍 审稿精修 POLISH`）集成；
+  2. WorkspaceToolbar 工具栏常驻三态快速药丸与预设切换联动；
+  3. `workspacePresets.ts` 布局拓扑（`tri_plan`、`focus_writing`、`tri_polish`）无缝导出与深拷贝保护；
+  4. 严密保全既有 Zen/Studio 双模测试断言；
+  5. `useWorkspaceStore.applyPreset` 0ms 状态流转与拓扑纯净性。
+- **全套回归与构建验证矩阵**：
+  - 极简三态专属测试：`pnpm test:tri-modes` (**9/9 PASS**)；
+  - 可停靠工作台全要素测试：`pnpm test:docking` (**12/12 PASS**)；
+  - 沉浸与工坊双模测试：`pnpm test:zen` (**12/12 PASS**)；
+  - 前端生产打包构建：`pnpm build` **1.81s 零错误 0 警告通过**！
+
+### 2.63 正文行内 @ 提及、光标抉择探针与全书防吃书静默监护验证 (ADR-070)
+- **验证范围**：
+  1. 正文输入 `@` 触发 `EditorMentionPopover` 快速联想与键盘上下方向键、Enter 补全；
+  2. 联想项与正文 `@提及` 悬停联动 `EntityHoverCard`，呈现立绘头像、外貌体态衣饰、动机软肋与法则约束，支持一键插正文；
+  3. 光标未划选时按 `Ctrl+J` 或点击工具栏呼出 `InlineCursorBreakoutBar`，推演 3 套性格与利益决断路线（内心算盘 + 微动作 + 试探对白）；
+  4. 划选文字悬浮条增加【🎯 探他抉择】与文学级【✨ 去AI味】；
+  5. `ContinuityGuardian` 静默监护当前草稿违背权威世界法则 (Canon)、已故角色复活及已埋设伏笔呼应。
+- **全套回归与构建验证矩阵**：
+  - 行内交互专属测试：`pnpm test:editor:inline` (**9/9 项全要素 PASS**)；
+  - 极简三态专属测试：`pnpm test:tri-modes` (**9/9 PASS**)；
+  - 可停靠工作台测试：`pnpm test:docking` (**12/12 PASS**)；
+  - 沉浸与工坊双模测试：`pnpm test:zen` (**12/12 PASS**)；
+  - 前端生产打包构建：`pnpm build` **1.22s 零错误 0 警告通过**！
+
+### 2.64 AI 生图网关接入与作品封面/角色立绘全流程创绘系统验证 (ADR-071)
+- **验证范围**：
+  1. Rust 原生后端生图命令 `commands::generate_image` 与模型网关适配 `OpenAIClient::generate_image`；
+  2. 标准 `/v1/images/generations` 协议适配（OpenAI DALL-E 3、FLUX.1、智谱 CogView-3、通义万相 Wanx 等网关）；
+  3. 前端 Bridge `api.generateImage` 结构化请求封装与 WebMock 本地离线保底；
+  4. 角色立绘创绘工坊 `CharacterAvatarModal`（6 大艺术流派、3 种构图机位、Prompt 自动装配）；
+  5. 角色大表 `CharactersView`、工作台人物面板 `CharacterProfilesPanel` 与沙盘演练 `CharacterSandboxPanel` 的一键立绘创绘与持久化；
+  6. 封面工坊 `BookCoverModal` 的 AI 原画生图升级与左侧 3D 实体书卷联动。
+- **全套回归与构建验证矩阵**：
+  - 专属生图全要素测试：`pnpm test:image-generation` (**14/14 PASS**)；
+  - 行内交互专属测试：`pnpm test:editor:inline` (**9/9 PASS**)；
+  - 极简三态专属测试：`pnpm test:tri-modes` (**9/9 PASS**)；
+  - 角色视觉人设测试：`pnpm test:character:visual` (**6/6 PASS**)；
+  - 版本号一致性检查：`pnpm check:version` (**V2.7.0 一致**)；
+  - 前端生产打包构建：`pnpm build` **1.23s 零错误 0 警告通过**；
+  - Rust 后端编译检查：`cargo check` **零错误零警告完成**！
+
+### 2.65 全软件漏洞排查、性能边界加固与图像防膨胀专项测试 (ADR-072)
+- **验证范围**：
+  1. 图像优化器 `imageOptimizer.ts`（Canvas 内存等比压缩，杜绝超大 Base64 膨胀导致 SQLite/内存卡顿）；
+  2. 全书封面工坊与角色面板全部升级为本地安全压缩流输入；
+  3. 生图网关 `OpenAIClient` Base64 前缀叠加防爆防御与业务 `error.message` 精准拦截；
+  4. SQLite 核心数据库代码全量移除防御性不足的 `.unwrap()`；
+  5. `CharacterAvatarModal` 补全 `Escape` 键盘退出监听。
+- **全套回归与构建验证矩阵**：
+  - 性能边界专属测试：`pnpm test:image-optimizer` (**4/4 PASS**)；
+  - 生图全要素测试：`pnpm test:image-generation` (**14/14 PASS**)；
+  - 前端生产打包构建：`pnpm build` **1.36s 零错误 0 警告通过**；
+  - Rust 编译检查：`cargo check` **10.35s 零错误 0 警告通过**！
+
+### 2.66 细纲节拍编排看板、故事圣经画册一键导出与行文文风监护专项测试 (ADR-073)
+- **验证范围**：
+  1. 细纲节拍数据模型与 Rust/SQLite IPC：`get_scene`、`update_scene` 及其原子级状态与序列流转；
+  2. 场景节拍看板与抽屉 `SceneBeatsDrawer.tsx`（行动目标、节拍推演、POV 立绘、地点、冲突，一键装配提纲至正文，双向精准定位 `handleFocusSceneInEditor`）；
+  3. 典藏故事圣经画册导出服务 `StoryBibleExportService.ts`（全书设定宋韵宣纸 HTML5、`@media print` 版式、发布中心支持离线与一键弹出打印预览转存实体 PDF）；
+  4. 行文文风监护与防串味巡检引擎 `VoiceSentinelEngine.ts` & `VoiceSentinelDrawer.tsx`（18+ 现代黑话与翻译腔检测，ProseMirror 原地事务原子级单处与批量文学级替换）；
+  5. 码字心流增量激励与响应式冲刺条 `EditorWordStatsTracker`（实时呈现“本次 +X 字”，支持 2000~10000 目标快速切换与 `lg:flex` 响应式断点）；
+  6. 后台 MCP 服务 DLL 锁定彻底隔离解决 (`scripts/novelforge-mcp.cjs`)。
+- **全套回归与构建验证矩阵**：
+  - 专属节拍/画册/文风测试：`pnpm test:beats-bible` (**全部断言 100% 满分通过**)；
+  - 图像生图网关测试：`pnpm test:image-generation` (**14/14 PASS**)；
+  - 本地图像优化器测试：`pnpm test:image-optimizer` (**4/4 PASS**)；
+  - 编辑器行内交互测试：`pnpm test:editor:inline` (**9/9 PASS**)；
+  - 演武场角色对戏测试：`pnpm test:sandbox` (**12/12 PASS**)；
+  - 工作台三态切换测试：`pnpm test:tri-modes` (**9/9 PASS**)；
+  - 前端生产打包构建：`pnpm build` **1.20s 零错误 0 警告通过**；
+  - Rust 编译检查：`cargo check` **0.36s 零错误 0 警告通过**！
+
+### 2.69 演武场全抽屉化 (Slide-over Drawer) 与三态分界面重构专项验证
+- **问题根因定位**：
+  - 用户反馈“界面太乱太杂了，尽量使用抽屉或者分界面去实现这个功能”；
+  - 根因分析：原本在推演舞台左侧常驻了一个 380px 的巨大侧边栏，将角色空态引导、经典冲突情境 6 按钮网格、场景与目标表单、出场阵容卡片纵向串行堆叠（总高度超 1500px），不仅霸占大半个屏幕，更让作者在推演对戏时充斥着表单输入框的视觉噪声与认知负荷。
+- **重构架构设计**：
+  1. **推演主舞台极简全宽化**：移除默认常驻的左侧固定栏，推演交锋大厅直接占满视口，对话气泡流视野开阔；
+  2. **剧本设定抽屉化 (`Slide-over Drawer`)**：
+     - 在顶栏会话旁常驻 `[ ⚙️ 剧本设定 N人 ]` 药丸按钮，点击即从左侧平滑呼出悬浮抽屉（具备半透明遮罩与平滑动画）；
+     - 支持点击右上角图钉 `Pin` 自由在“悬浮抽屉”与“常驻侧边栏”之间切换；
+  3. **抽屉三态分界面 (Sub-interfaces) 解耦**：
+     - 将原本 1500px 的纵向大杂烩拆解为结构化 3 大选项卡：
+       - `出场阵容`: 角色卡片、立绘下锚、攻守互换、私密动机与模型分配；
+       - `场景与目标`: 剧本标题、环境白描、交锋目标与设定重置；
+       - `经典情境`: 6 大高冲突经典模板卡片，点击一键套用；
+  4. **底栏与舞台空态入口**：
+     - 抽屉底栏提供 `[ 🎬 进入推演舞台 → ]` 按钮，一键收起抽屉回归创作；
+     - 舞台 0 轮次卡片配备一键呼出设定抽屉入口。
+- **全套回归与构建验证矩阵**：
+  - 演武场顶栏、重置与抽屉分界面测试：`pnpm test:sandbox:header` (**15/15 PASS**)；
+  - 演武场全生命周期与推演测试：`pnpm test:sandbox` (**12/12 PASS**)；
+  - 演武场推演暂停与保全测试：`pnpm test:sandbox:pause` (**6/6 PASS**)；
+  - 演武场高光打磨台专项测试：`pnpm test:sandbox:polisher` (**8/8 PASS**)；
+  - 极简三态化自动化测试：`pnpm test:tri-modes` (**9/9 PASS**)；
+  - 双模与弹性视口自动化测试：`pnpm test:zen` (**12/12 PASS**)；
+  - 顶栏窗口控制防坍塌测试：`pnpm test:header` (**9/9 PASS**)；
+  - 细纲节拍与故事圣经测试：`pnpm test:beats-bible` (**100% PASS**)；
+  - 专项漏洞防溢出综合测试：`pnpm test:bugfixes` (**82/82 PASS**)；
+  - 前端生产打包构建：`pnpm build` **1.10s 零错误 0 警告通过**；
+  - Rust 编译检查：`cargo check` **0.40s 零错误 0 警告通过**！
+
+### 2.70 演武场顶栏冗余消除、自适应防撞预算与工具箱深度聚合专项验证 (ADR-078)
+- **问题根因定位**：
+  - 用户反馈“还是有重叠情况”并提供真机截图：在分屏/侧边停靠视口（~950px）下，左侧 `[ 🎛️ 剧本设定 2人 ]` 胶囊按钮直接压盖在右侧 `[ 💡 灵感盒 ]` 上方；
+  - 根因分析：原本右侧工具栏平铺了 7 个独立按钮（`灵感盒` + `内心戏/潜台词` + `导入设定` + `联机` + `导出/工具` + `Settings2` + `优化精修文段`），总宽度超 586px；左侧需要 ~410px，总和达 996px。当容器宽度为 800~950px 时，左侧 flex 容器因子项皆设 `shrink-0` 无法收缩，导致右端元素强行向右外溢并覆盖在右侧工具栏最左侧按钮 `灵感盒` 上；同时存在严重的按钮冗余（`Settings2` 齿轮按钮与 `剧本设定` 功能 100% 重复；`导入设定` 在抽屉“场景与目标”已存在；`联机` 在断开时常驻占位极度低效）。
+- **重构架构设计**：
+  1. **消除顶栏重复触发器**：彻底移除顶栏右侧多余的 `Settings2` 齿轮按钮，保持 `[ 🎛️ 剧本设定 N人 ]` 作为演武场唯一的抽屉总控入口；
+  2. **设定导入与 P2P 联机深度聚合至工具箱**：
+     - 将原本散落平铺的 `[ 📖 导入设定 ]` 与未连接时的 `[ 🌐 联机 ]` 优雅收纳进 `[ 📥 导出/工具 ▾ ]` 下拉菜单；
+     - `导入设定` 同时在设定抽屉的【场景与目标】分界面中原生常驻；
+     - `P2P 联机` 采用状态机驱动：未建立房间时不占用顶栏黄金像素，一旦房间连接成功，在顶栏高亮呈现微型状态胶囊 `[ 🟢 P2P:888-999 ]`；
+  3. **右侧弹性宽度预算压缩至 ~370px（紧凑视口下 ~220px）**：
+     - 经过清理聚合后，右侧仅保留 `灵感盒`、`内心戏/潜台词` 视角胶囊、`导出/工具 ▾` 下拉与高光行动 `优化精修文段`；
+     - 在 800px~950px 分屏下，顶栏中央预留 150px~250px 的绝对充裕安全空白带，彻底根治物理挤压与图层覆盖。
+- **全套回归与构建验证矩阵**：
+  - 演武场顶栏防折行、重置、抽屉分界面与防撞预算测试：`pnpm test:sandbox:header` (**17/17 PASS**)；
+  - 演武场全生命周期与推演测试：`pnpm test:sandbox` (**12/12 PASS**)；
+  - 演武场推演暂停与保全测试：`pnpm test:sandbox:pause` (**6/6 PASS**)；
+  - 演武场高光打磨台专项测试：`pnpm test:sandbox:polisher` (**8/8 PASS**)；
+  - 极简三态化自动化测试：`pnpm test:tri-modes` (**9/9 PASS**)；
+  - 双模与弹性视口自动化测试：`pnpm test:zen` (**12/12 PASS**)；
+  - 顶栏窗口控制防坍塌测试：`pnpm test:header` (**9/9 PASS**)；
+  - 编辑器行内交互测试：`pnpm test:editor:inline` (**9/9 PASS**)；
+  - 细纲节拍与故事圣经测试：`pnpm test:beats-bible` (**100% PASS**)；
+  - 专项漏洞防溢出综合测试：`pnpm test:bugfixes` (**82/82 PASS**)；
+  - 前端生产打包构建：`pnpm build` **1.11s 零错误 0 警告通过**；
+  - Rust 编译检查：`cargo check` **0.40s 零错误 0 警告通过**！
+
+### 2.72 顶部无边框原生拖拽双轨保障与交互穿透隔离专项验证 (ADR-080)
+- **问题根因定位**：
+  - 用户反馈在无边框窗口模式下，“怎么拖拽这个区域无法移动这个软件窗口了”，提供红框标注顶部 Header 区域按钮间的空白留白处；
+  - 根因分析：在 Tauri 2 Frameless（无边框沉浸式）模式下，Windows WebView2 内核对 CSS 声明的 `data-tauri-drag-region` 属性并不自动深度下沉穿透到所有子节点。Header 根元素内部承载了占满 100% 宽高的 `flex items-center justify-between flex-1` 容器，该容器捕获了鼠标指针事件。由于原本仅依靠外层 `<header>` 的声明式属性，在子层级元素未标记且未挂载原生 `startDragging()` API 时，鼠标拖拽被当成普通 DOM 拖选而无法触发 Tauri 窗口位移；
+- **重构架构设计**：
+  1. **声明式与编程式双轨拖拽保障机制 (Dual-Track Window Dragging)**：
+     - 在 `Header.tsx` 声明式层面：将 `data-tauri-drag-region` 全面下沉应用至 `<header>` 容器、内部弹性流容器、Zone 1 品牌标题区及按钮间距空白槽，确保系统级命中测试（Hit-Testing）直接生效；
+     - 在编程式事件层面：挂载统一的 `handleHeaderMouseDown` 监听器，并在其内调用 Tauri 2 官方原生 API `getCurrentWindow().startDragging()`；
+  2. **严格防误触与交互控件穿透隔离**：
+     - `e.button === 0` 保证仅响应鼠标左键点击拖拽；
+     - 通过 `(e.target as HTMLElement).closest('button, a, input, select, textarea, [data-tauri-drag-region="false"], [role="button"], .cursor-pointer')` 执行严密过滤，遇到任何按钮、下拉菜单、链接、输入框或可点击控件时立即退出，严禁拦截日常按钮点击与下拉菜单唤起；
+     - 完整保留 `handleHeaderDoubleClick` 双击空白处最大化/还原窗口的原生桌面操作手感。
+- **全套回归与构建验证矩阵**：
+  - 顶栏无边框窗口控制与原生拖拽测试：`pnpm test:header` (**11/11 PASS 100% 通过**)；
+  - 技能中心全要素与交互测试：`pnpm test:skills` (**62/62 PASS**)；
+  - 演武场顶栏防折行测试：`pnpm test:sandbox:header` (**17/17 PASS**)；
+  - 极简三态化自动化测试：`pnpm test:tri-modes` (**9/9 PASS**)；
+  - 专项漏洞防溢出综合测试：`pnpm test:bugfixes` (**82/82 PASS**)；
+  - 前端生产打包构建：`pnpm build` **1.19s 零错误 0 警告通过**；
+  - Rust 编译检查：`cargo check` **0.56s 零错误 0 警告通过**！
+
+### 2.73 推演台原生确认框全面应用内主题化与全局模态防截断专项验证 (ADR-081)
+- **问题根因定位**：
+  - 用户反馈推演台重置对戏记录时“这个UI太丑了，有点割裂”，截图中展示出 Chromium 底层自带的系统默认弹窗 `localhost:1420 显示: 确定重置当前推演记录吗？对白实录将清空，角色秘密与场景设定将予以保留。[确定] [取消]`；
+  - 根因分析：`CharacterSandboxPanel.tsx` 存在 6 处调用原生 `confirm(...)` 与 `window.confirm(...)` 的历史遗留代码，未统一接入项目预设的应用内优雅对话框体系 `confirmDialog` (`DialogHost.tsx`)，在暗黑与桌面模式下弹出系统级粗糙弹窗，严重破坏文人书卷沉浸感。同时全局排查发现部分模态（如小说专项工具箱右侧落地卡片）存在 `overflow-hidden` 与未声明 `min-h-0` 的问题，在笔记本小视口下可能导致操作按钮截断。
+- **重构架构设计**：
+  1. **推演台原生 Confirm 彻底清零与全生命周期接入**：
+     - 将 `CharacterSandboxPanel.tsx` 中的重置推演、重置场景设定、删除会话、删除分支、替换正文与清空灵感盒 6 处弹窗全部替换为异步 `await confirmDialog({ title, message, tone: 'danger', confirmText, cancelText })`；
+     - 升级 `src/utils/dialog.ts` 的 `DANGER_KEYWORDS` 正则，将“重置”与“清空”纳入自动危险语气样式匹配范围；
+     - 弹出窗口继承全局暗色与暖宣纸模式、毛玻璃遮罩、微光告警与回车/Esc 键盘快捷键。
+  2. **全局模态内层滚动与防截断加固**：
+     - 在 12 个核心弹窗全面补齐 `flex-1 min-h-0 overflow-y-auto`；小说工具箱右侧卡片解除 `overflow-hidden`，保证任何视口与系统 DPI 缩放下内容均可平滑滚动到底。
+- **全套回归与构建验证矩阵**：
+  - 演武场顶栏防折行与统一对话框测试：`pnpm test:sandbox:header` (**18/18 PASS 100% 通过**)；
+  - 演武场人机对戏与多会话测试：`pnpm test:sandbox` (**12/12 PASS**)；
+  - 技能中心全要素与交互测试：`pnpm test:skills` (**62/62 PASS**)；
+  - 顶栏无边框窗口控制与原生拖拽测试：`pnpm test:header` (**11/11 PASS**)；
+  - 极简三态化自动化测试：`pnpm test:tri-modes` (**9/9 PASS**)；
+  - 专项漏洞防溢出综合测试：`pnpm test:bugfixes` (**82/82 PASS**)；
+  - 全工程原生 Confirm/Alert/Prompt 扫描：**0 处遗留 (Exit Code 1)**；
+  - 前端生产打包构建：`pnpm build` **1.19s 零错误 0 警告通过**；
+  - Rust 编译检查：`cargo check` **0.47s 零错误 0 警告通过**！
+
+### 2.74 剧本设定抽屉下拉滚动流畅度治理与 GPU 合成层解耦专项验证 (ADR-082)
+- **问题根因定位**：
+  - 用户反馈“抽屉界面的下拉又出现了掉帧感”，并附带演武场“剧本与角色设定”抽屉界面的截图；
+  - 根因分析：
+    1. **动态高度卡片上的 `content-visibility: auto` 反模式**：此前在抽屉角色卡片上配置了 `style={{ contentVisibility: 'auto', containIntrinsicSize: '0 360px' }}`。但卡片内有立绘、外貌特征、模型选择器与多行文本框，实际高度各异（280px~460px）。Chromium 在滚动时因估算尺寸偏差反复触发布局重测算（Layout Recalculation）与滚动条抖动，引发持续掉帧微卡顿；且抽屉内角色仅 2~4 位，完全无需使用虚拟化跳过渲染；
+    2. **遮罩层 `backdrop-blur-[1px]` 导致 GPU 高斯模糊重采样**：在 Windows WebView2 硬件加速环境下，抽屉滚动时迫使 GPU 每一帧对底层推演大厅画布执行昂贵的高斯模糊采样；
+    3. **抽屉容器缺乏独立硬件合成层隔离**：滑动抽屉未声明 `transform-gpu`，导致抽屉内部的滚动与底层舞台 DOM 重绘相互穿透干扰。
+- **重构架构设计**：
+  1. **彻底移除 `content-visibility: auto`**：
+     - 从 `CharacterSandboxPanel.tsx` 抽屉角色卡片及会话切换器下拉项中彻底移除 `contentVisibility` 和 `containIntrinsicSize` 样式，让 DOM 一次性静态渲染，滚动时零重排；
+  2. **消除蒙层 `backdrop-blur` 降低合成器负载**：
+     - 将抽屉背景蒙层调整为纯色透明度渐变 `bg-black/40 dark:bg-black/60`，彻底移除高开销的 `backdrop-blur-[1px]`；
+  3. **启用 `transform-gpu` 独立硬件合成层加速**：
+     - 在抽屉滑出容器与内容滚动容器上增加 `transform-gpu`，将抽屉完全隔离提升为独立 GPU 合成层，解除主线程滚动卡顿，实现平滑 60 FPS 滚动体验。
+- **全套回归与构建验证矩阵**：
+  - 演武场顶栏防折行与抽屉 60FPS 测试：`pnpm test:sandbox:header` (**18/18 PASS 100% 通过**)；
+  - 演武场人机对戏与多会话测试：`pnpm test:sandbox` (**12/12 PASS**)；
+  - 技能中心全要素与交互测试：`pnpm test:skills` (**62/62 PASS**)；
+  - 顶栏无边框窗口控制与原生拖拽测试：`pnpm test:header` (**11/11 PASS**)；
+  - 极简三态化自动化测试：`pnpm test:tri-modes` (**9/9 PASS**)；
+  - 专项漏洞防溢出综合测试：`pnpm test:bugfixes` (**82/82 PASS**)；
+  - 前端生产打包构建：`pnpm build` **1.25s 零错误 0 警告通过**；
+  - Rust 编译检查：`cargo check --manifest-path src-tauri/Cargo.toml` **0.55s 零错误 0 警告通过**！
+
+### 2.75 推演主对白流全域防抖、精修悬浮条减负与全局抽屉硬件合成优化专项验证 (ADR-083)
+- **问题根因定位**：
+  - 在完成抽屉内滚动治理后，全面巡检发现主推演舞台的消息气泡流仍存在 `contentVisibility: 'auto'` 与固定 `containIntrinsicSize: '0 160px'`；随内心戏、潜台词展开或文本长短变化（80px~450px 波动），估算尺寸导致 Chromium 重新计算布局，产生滚动条跳跃与自动滚底（`scrollToBottom`）位移偏差；
+  - 优化精修文段工作区中的划选文字悬浮条存在 `backdrop-blur-xs`，在文字长卷滚动时占用 GPU 合成着色器资源；
+  - 经典情境库在固定抽屉（352px）下存在双列挤压；环境描写与交锋目标缺少快捷灵感胶囊；
+  - 历史版本抽屉 `VersionDrawer` 仍存在 `backdrop-blur-xs`，与 `ZenChapterDrawer` 均未完全声明 `transform-gpu`。
+- **重构架构设计**：
+  1. **主对白气泡流彻底剥离 `content-visibility: auto`，升级 GPU 合成层**：
+     - 彻底清除主对话气泡、舞台起幕卡片与突发旁白卡片上的 `contentVisibility`，改由原生 DOM 标准计算，解决滚动跳跃与尺寸估算漂移；
+     - 主滚动区 `scrollRef` 全面注入 `transform-gpu` 与 `overscroll-contain`，实现真正的 60FPS 顺滑滚屏。
+  2. **精修工作室划选悬浮条纯色高对比度优化**：
+     - 移除粘性浮条上的 `backdrop-blur-xs`，升级为纯色稳固茶金水墨样式，并为主内容区配置 `transform-gpu`。
+  3. **剧本抽屉交互灵感增强与自适应布局**：
+     - 经典情境库升级为 `grid-cols-1 sm:grid-cols-2 gap-2.5` 响应式栅格，无论抽屉固定还是浮动均有充裕版面；
+     - 环境描写与交锋目标输入区增加动态字数统计，并提供“深夜书房、荒郊破庙、逼出真正底线、暗藏杀机试探”等高频环境与冲突一键植入胶囊。
+  4. **全局抽屉体系全量硬件合成加速与去 Blur 化**：
+     - `VersionDrawer` 移除 `backdrop-blur-xs`，滑出抽屉与版本列表、预览框追加 `transform-gpu`；
+     - `ZenChapterDrawer` 侧滑抽屉与章节树列表注入 `transform-gpu` 与 `overscroll-contain`。
+- **全套回归与构建验证矩阵**：
+  - 演武场顶栏防折行与抽屉 60FPS 测试：`pnpm test:sandbox:header` (**18/18 PASS 100% 通过**)；
+  - 演武场人机对戏与多会话测试：`pnpm test:sandbox` (**12/12 PASS**)；
+  - 技能中心全要素与交互测试：`pnpm test:skills` (**62/62 PASS**)；
+  - 顶栏无边框窗口控制与原生拖拽测试：`pnpm test:header` (**11/11 PASS**)；
+  - 极简三态化自动化测试：`pnpm test:tri-modes` (**9/9 PASS**)；
+  - 专项漏洞防溢出综合测试：`pnpm test:bugfixes` (**82/82 PASS**)；
+  - 前端生产打包构建：`pnpm build` **1.27s 零错误 0 警告通过**；
+  - Rust 编译检查：`cargo check --manifest-path src-tauri/Cargo.toml` **0.55s 零错误 0 警告通过**！
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

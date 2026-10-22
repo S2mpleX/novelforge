@@ -147,9 +147,9 @@ export const ZenChapterDrawer: React.FC<Props> = ({ isOpen, onClose, onToggle })
         />
       )}
 
-      {/* 侧滑抽屉面板 */}
+      {/* 侧滑抽屉面板 (transform-gpu 硬件加速合成) */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-surface dark:bg-[#1a1714] border-r border-line dark:border-[#38332d] z-50 shadow-2xl flex flex-col transition-transform duration-300 ease-out font-sans ${
+        className={`fixed top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-surface dark:bg-[#1a1714] border-r border-line dark:border-[#38332d] z-50 shadow-2xl flex flex-col transition-transform duration-300 ease-out font-sans transform-gpu ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -241,8 +241,8 @@ export const ZenChapterDrawer: React.FC<Props> = ({ isOpen, onClose, onToggle })
           )}
         </div>
 
-        {/* 章节树滚动列表 */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-3 scrollbar-thin">
+        {/* 章节树滚动列表 (transform-gpu 硬件加速平滑滚动) */}
+        <div className="flex-1 overflow-y-auto overscroll-contain transform-gpu p-2 space-y-3 scrollbar-thin">
           {groupedChapters.length === 0 || (groupedChapters.length === 1 && groupedChapters[0].chapters.length === 0) ? (
             <div className="text-center py-12 text-ink-2 dark:text-[#7d7162] text-xs font-serif">
               <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />

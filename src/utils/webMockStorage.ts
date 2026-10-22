@@ -862,16 +862,47 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
         id: 'scene_' + Date.now(),
         chapter_id: args.input.chapter_id,
         sequence: args.input.sequence || scenes.length + 1,
+        title: args.input.title || `场景 ${args.input.sequence || scenes.length + 1}`,
         objective: args.input.objective,
         outline: args.input.outline,
         pov_character_id: args.input.pov_character_id,
         location_id: args.input.location_id || '',
+        conflict_target: args.input.conflict_target || '',
         status: 'PLANNED',
         created_at: Date.now(),
       };
       scenes.push(s);
       setStorage('scenes', scenes);
       return s;
+    }
+    case 'get_scene': {
+      const scenes = getStorage<Scene[]>('scenes', []);
+      const s = scenes.find((item) => item.id === args.id);
+      if (!s) throw new Error('Scene not found');
+      return s;
+    }
+    case 'update_scene': {
+      const scenes = getStorage<Scene[]>('scenes', []);
+      const idx = scenes.findIndex((item) => item.id === args.input.id);
+      if (idx === -1) throw new Error('Scene not found');
+      scenes[idx] = { ...scenes[idx], ...args.input };
+      setStorage('scenes', scenes);
+      return scenes[idx];
+    }
+    case 'delete_scene': {
+      const scenes = getStorage<Scene[]>('scenes', []);
+      const filtered = scenes.filter((item) => item.id !== args.id);
+      setStorage('scenes', filtered);
+      return;
+    }
+    case 'update_scene_status': {
+      const scenes = getStorage<Scene[]>('scenes', []);
+      const idx = scenes.findIndex((item) => item.id === args.id);
+      if (idx !== -1) {
+        scenes[idx].status = args.status;
+        setStorage('scenes', scenes);
+      }
+      return;
     }
 
     case 'list_story_events':
@@ -2132,18 +2163,54 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
     }
 
     case 'run_scene_planning': {
-      return {
-        scenes: [
-          {
-            scene_number: 1,
-            title: '剑试青云峰',
-            setting: '太玄主峰绝壁',
-            conflict_target: '通过宗门试炼',
-            emotional_beat: '由忐忑变为决然',
-            key_dialogue_subtext: '隐藏的杀机',
-          },
-        ],
-      };
+      const scenes = getStorage<Scene[]>('scenes', []);
+      const chId = args?.chapterId || 'default_chapter';
+      const goal = args?.goal || '推进本章核心冲突';
+      const newScenes: Scene[] = [
+        {
+          id: 'scene_' + Date.now() + '_1',
+          chapter_id: chId,
+          sequence: 1,
+          scene_number: 1,
+          title: '初临险境·暗流涌动',
+          objective: '主角察觉异常，试探各方动机并确立防备底线',
+          outline: '1. 抵达成事之地，环境氛围诡异压抑\n2. 遭遇对手阻挠，言语间暗藏锋芒\n3. 抓住关键破绽，为下一步行动埋下伏笔',
+          location_id: '山门前殿 / 核心重地',
+          conflict_target: '打破阻碍，获取关键线索',
+          status: 'PLANNED',
+          created_at: Date.now(),
+        },
+        {
+          id: 'scene_' + Date.now() + '_2',
+          chapter_id: chId,
+          sequence: 2,
+          scene_number: 2,
+          title: '正面交锋·危机升级',
+          objective: goal,
+          outline: '1. 双方面对面言语对质或动作试探\n2. 突发意外事件打破既定平衡\n3. 付出微小代价后成功逆转被动态势',
+          location_id: '试炼绝壁 / 密室中心',
+          conflict_target: '正面博弈，争夺主动权',
+          status: 'PLANNED',
+          created_at: Date.now() + 10,
+        },
+        {
+          id: 'scene_' + Date.now() + '_3',
+          chapter_id: chId,
+          sequence: 3,
+          scene_number: 3,
+          title: '惊变余波·断章尾钩',
+          objective: '揭示更深层阴谋，在最高悬念处收官',
+          outline: '1. 战斗/博弈收尾，清点收获与损耗\n2. 发现出人意料的遗留信物或隐秘线索\n3. 危机并未解除，章末抛出致命悬念尾钩',
+          location_id: '静室 / 暮色荒原',
+          conflict_target: '收束本章线索，埋下全书伏笔',
+          status: 'PLANNED',
+          created_at: Date.now() + 20,
+        },
+      ];
+      // 保存至 mock 存储中
+      const merged = [...scenes.filter(s => s.chapter_id !== chId), ...newScenes];
+      setStorage('scenes', merged);
+      return newScenes;
     }
 
     case 'run_collaborative_workflow': {
@@ -2463,6 +2530,42 @@ export async function handleWebMockCall(cmd: string, args: any): Promise<any> {
           ? '一袭霜白配素蓝的流云暗纹广袖仙裙，腰系织银罗带，配有温润压裙古玉。'
           : '玄底滚暗金纹利落劲装，护腕裹革，腰悬冷铁佩剑，行动便捷干练。',
         body_type: isFemale ? '身形纤细匀称，步履轻盈飘逸。' : '身姿修长挺拔，体魄矫健有力。',
+      };
+    }
+
+    case 'generate_image': {
+      const input = args?.input;
+      const prompt = input?.prompt || 'NovelForge AI 艺术原画';
+      const model = input?.model_name || 'dall-e-3';
+      const promptTitle = prompt.length > 24 ? prompt.slice(0, 24) + '...' : prompt;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
+        <defs>
+          <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1c1917"/>
+            <stop offset="50%" stop-color="#292524"/>
+            <stop offset="100%" stop-color="#0c0a09"/>
+          </linearGradient>
+          <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#d97706"/>
+            <stop offset="50%" stop-color="#fbbf24"/>
+            <stop offset="100%" stop-color="#b45309"/>
+          </linearGradient>
+        </defs>
+        <rect width="600" height="800" fill="url(#bg)"/>
+        <rect x="24" y="24" width="552" height="752" fill="none" stroke="url(#gold)" stroke-width="2" stroke-opacity="0.4" rx="12"/>
+        <circle cx="300" cy="300" r="130" fill="none" stroke="url(#gold)" stroke-width="1.5" stroke-dasharray="6 4" stroke-opacity="0.6"/>
+        <text x="300" y="300" fill="#fde68a" font-size="26" font-family="serif" text-anchor="middle" font-weight="bold">NovelForge AI</text>
+        <text x="300" y="340" fill="#d6d3d1" font-size="13" font-family="sans-serif" text-anchor="middle" opacity="0.8">【${model}】</text>
+        <rect x="40" y="500" width="520" height="130" rx="8" fill="#000000" fill-opacity="0.4" stroke="#44403c" stroke-width="1"/>
+        <text x="300" y="545" fill="#f5f5f4" font-size="15" font-family="sans-serif" text-anchor="middle" font-weight="500">${promptTitle}</text>
+        <text x="300" y="585" fill="#a8a29e" font-size="12" font-family="sans-serif" text-anchor="middle">AI 原画艺术生成 · 本地离线持久化</text>
+      </svg>`;
+      const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+      return {
+        image_url: dataUrl,
+        b64_json: undefined,
+        revised_prompt: prompt,
+        model,
       };
     }
 

@@ -78,8 +78,8 @@ export const VersionDrawer: React.FC<Props> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex justify-end animate-in fade-in">
-      <div className="w-full max-w-xl bg-surface border-l border-line h-full flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 flex justify-end animate-in fade-in">
+      <div className="w-full max-w-xl bg-surface border-l border-line h-full flex flex-col shadow-2xl transform-gpu">
         {/* Header */}
         <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2">
@@ -104,7 +104,7 @@ export const VersionDrawer: React.FC<Props> = ({ onClose }) => {
         {/* Content Body: Split list & preview */}
         <div className="flex-1 flex overflow-hidden">
           {/* Version List */}
-          <div className="w-52 border-r border-line bg-surface overflow-y-auto p-2 space-y-1 shrink-0">
+          <div className="w-52 border-r border-line bg-surface overflow-y-auto overscroll-contain transform-gpu p-2 space-y-1 shrink-0">
             {versions.map((v) => {
               const isSelected = selectedVersion?.id === v.id;
               const dateStr = new Date(v.created_at).toLocaleTimeString();
@@ -172,7 +172,7 @@ export const VersionDrawer: React.FC<Props> = ({ onClose }) => {
                   </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto bg-surface border border-line rounded-xl p-5 text-xs text-ink whitespace-pre-wrap leading-relaxed font-serif select-text shadow-2xs">
+                <div className="flex-1 overflow-y-auto overscroll-contain transform-gpu bg-surface border border-line rounded-xl p-5 text-xs text-ink whitespace-pre-wrap leading-relaxed font-serif select-text shadow-2xs">
                   {selectedVersion.content || '(本版本内容为空)'}
                 </div>
               </>

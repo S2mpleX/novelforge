@@ -269,6 +269,35 @@ pub struct AnalyzeCharacterAppearanceResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenerateImageInput {
+    pub prompt: String,
+    #[serde(default)]
+    pub model_name: Option<String>,
+    #[serde(default)]
+    pub size: Option<String>,
+    #[serde(default)]
+    pub style: Option<String>,
+    #[serde(default)]
+    pub provider_id: Option<String>,
+    #[serde(default)]
+    pub custom_base_url: Option<String>,
+    #[serde(default)]
+    pub custom_api_key: Option<String>,
+    #[serde(default)]
+    pub response_format: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenerateImageResult {
+    pub image_url: String,
+    #[serde(default)]
+    pub b64_json: Option<String>,
+    #[serde(default)]
+    pub revised_prompt: Option<String>,
+    pub model: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldRule {
     pub id: String,
     pub novel_id: String,
@@ -504,6 +533,20 @@ pub struct CreateSceneInput {
     pub content: Option<String>,
     pub time_anchor: Option<String>,
     pub conflict_target: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateSceneInput {
+    pub id: String,
+    pub title: Option<String>,
+    pub sequence: Option<i64>,
+    pub scene_number: Option<i64>,
+    pub objective: Option<String>,
+    pub outline: Option<String>,
+    pub pov_character_id: Option<String>,
+    pub location_id: Option<String>,
+    pub conflict_target: Option<String>,
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

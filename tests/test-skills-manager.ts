@@ -191,6 +191,41 @@ function runTests() {
   assert('面板标题定义为 Agent Skills 技能中心', panelRegistryContent.includes("title: 'Agent Skills 技能中心'"));
   assert('面板分类归属于 AI 智能创作分类', panelRegistryContent.includes("category: 'ai'"));
 
+  // -------------------------------------------------------------
+  // 测试 9: 技能中心弹窗滚动下拉与卡片头部展开交互断言
+  // -------------------------------------------------------------
+  console.log('\n▶ [测试 9] 技能中心弹窗滚动下拉与卡片头部交互断言');
+  const settingsModalContent = fs.readFileSync('src/components/modals/SettingsModal.tsx', 'utf8');
+  assert(
+    'SettingsModal 在 SKILLS 标签下具备确定高度 h-[88vh]',
+    settingsModalContent.includes("activeTab === 'SKILLS' ? 'max-w-5xl h-[88vh]'")
+  );
+  assert(
+    'SettingsModal 容器具备 overflow-y-auto overscroll-contain 杜绝滚动穿透或失效',
+    settingsModalContent.includes('flex-1 min-h-0 overflow-y-auto overscroll-contain')
+  );
+
+  const skillsViewContent = fs.readFileSync('src/features/skills/components/SkillsManagerView.tsx', 'utf8');
+  assert(
+    'SkillsManagerView 根容器声明 min-h-full 保证父容器平滑自然滚动',
+    skillsViewContent.includes('className="flex flex-col w-full min-h-full bg-surface')
+  );
+  assert(
+    '技能卡片头部整体支持点击展开/收起下拉明细，并声明 cursor-pointer 与 title 提示',
+    skillsViewContent.includes("onClick={() => setExpandedSkillId(isExpanded ? null : skill.id)}") &&
+    skillsViewContent.includes('cursor-pointer hover:bg-black/[0.02]')
+  );
+  assert(
+    '开关 Toggle 容器显式调用 e.stopPropagation() 避免误触发卡片折叠展开',
+    skillsViewContent.includes('onClick={(e) => e.stopPropagation()}')
+  );
+
+  const skillsPanelContent = fs.readFileSync('src/components/docking/panels/SkillsManagerPanel.tsx', 'utf8');
+  assert(
+    'SkillsManagerPanel 停靠面板配备 overflow-y-auto overscroll-contain 滚动支持',
+    skillsPanelContent.includes('overflow-y-auto overscroll-contain')
+  );
+
   console.log('\n===============================================================');
   console.log(` 测试完成：总计 ${total} 项，通过 ${passed} 项，失败 ${total - passed} 项`);
   console.log('===============================================================\n');

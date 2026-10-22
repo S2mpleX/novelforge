@@ -137,7 +137,7 @@ export const SkillsManagerView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-surface dark:bg-[#1c1917] text-ink dark:text-[#e7e5e4] overflow-y-auto">
+    <div className="flex flex-col w-full min-h-full bg-surface dark:bg-[#1c1917] text-ink dark:text-[#e7e5e4]">
       {/* 顶部统计与定位卡片 */}
       <div className="p-4 lg:p-6 border-b border-[#e7e5e4] dark:border-[#292524] bg-[#f5f0e6]/50 dark:bg-[#171412]">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -299,12 +299,19 @@ export const SkillsManagerView: React.FC = () => {
                     : 'bg-[#faf8f5] dark:bg-[#1a1715] border-[#e7e5e4] dark:border-[#2a2623] opacity-75'
                 }`}
               >
-                {/* 技能卡片头部 */}
-                <div className="p-4 flex items-start justify-between gap-3">
+                {/* 技能卡片头部 (支持全卡片头部点击展开/收起下拉明细，并阻止子开关事件冒泡) */}
+                <div
+                  onClick={() => setExpandedSkillId(isExpanded ? null : skill.id)}
+                  className="p-4 flex items-start justify-between gap-3 cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors select-none"
+                  title={isExpanded ? '点击折叠规则明细' : '点击下拉展开详细规则与反向禁改区'}
+                >
                   <div className="flex items-start gap-3 flex-1 min-w-0">
                     <button
                       type="button"
-                      onClick={() => setExpandedSkillId(isExpanded ? null : skill.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedSkillId(isExpanded ? null : skill.id);
+                      }}
                       className="mt-0.5 p-1 text-ink-2 hover:text-ink transition cursor-pointer"
                       title={isExpanded ? '收起规则' : '展开规则'}
                     >
@@ -339,8 +346,11 @@ export const SkillsManagerView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* 开关 Toggle */}
-                  <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
+                  {/* 开关 Toggle (阻止冒泡，避免误触发下拉折叠) */}
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex flex-col items-end gap-1 shrink-0 ml-2"
+                  >
                     <button
                       type="button"
                       onClick={() => toggleSkill(skill.id)}

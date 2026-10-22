@@ -10,7 +10,7 @@ use crate::models::{
     AiModel, AiProvider, CanonFact, Chapter, ChapterVersion, Character, CharacterRelationship,
     CharacterStateEvent, ContinuityAuditFinding, CreateCanonFactInput, CreateChapterInput,
     CreateCharacterInput, CreateCharacterRelationshipInput, CreateCharacterStateEventInput,
-    CreateNovelInput, CreatePlotThreadInput, CreateSceneInput, CreateStoryArcInput,
+    CreateNovelInput, CreatePlotThreadInput, CreateSceneInput, UpdateSceneInput, CreateStoryArcInput,
     CreateStoryEventInput, CreateStoryPhaseInput, CreateWorldRuleInput, MemoryContextPack, Novel,
     PlotThread, ReviewFinding, ReviewReport, SaveProviderInput, Scene, SerializationJob, StoryArc,
     StoryEvent, StoryPhase, Volume, WorldRule, DatabaseHealthReport, NovelArchive,
@@ -844,7 +844,7 @@ impl DbManager {
 
             new_v_id
         } else {
-            let cur_v = current_version_id.unwrap();
+            let cur_v = current_version_id.unwrap_or_else(|| Uuid::new_v4().to_string());
             conn.execute(
                 "UPDATE chapter_versions SET content = ?1, updated_at = ?2 WHERE id = ?3",
                 params![content, now, &cur_v],
@@ -2103,6 +2103,93 @@ impl DbManager {
         let conn = self.conn.lock();
         conn.execute("UPDATE scenes SET status = ?1 WHERE id = ?2", params![status, id])?;
         Ok(())
+    }
+
+    pub fn get_scene(&self, id: &str) -> Result<Scene> {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT id, chapter_id, sequence, order_index, title, scene_number,
+                    objective, outline, pov_character_id, location_id, content,
+                    word_count, time_anchor, conflict_target, status, created_at
+             FROM scenes WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(Scene {
+                    id: row.get(0)?,
+                    chapter_id: row.get(1)?,
+                    sequence: row.get(2)?,
+                    order_index: row.get(3)?,
+                    title: row.get(4)?,
+                    scene_number: row.get(5)?,
+                    objective: row.get(6)?,
+                    outline: row.get(7)?,
+                    pov_character_id: row.get(8)?,
+                    location_id: row.get(9)?,
+                    content: row.get(10)?,
+                    word_count: row.get(11)?,
+                    time_anchor: row.get(12)?,
+                    conflict_target: row.get(13)?,
+                    status: row.get(14)?,
+                    created_at: row.get(15)?,
+                })
+            },
+        ).map_err(Into::into)
+    }
+
+    pub fn update_scene(&self, input: UpdateSceneInput) -> Result<Scene> {
+        let mut scene = self.get_scene(&input.id)?;
+        let conn = self.conn.lock();
+
+        if let Some(t) = input.title {
+            scene.title = Some(t);
+        }
+        if let Some(s) = input.sequence {
+            scene.sequence = s;
+            scene.order_index = Some(s);
+        }
+        if let Some(sn) = input.scene_number {
+            scene.scene_number = Some(sn);
+        }
+        if let Some(obj) = input.objective {
+            scene.objective = obj;
+        }
+        if let Some(otl) = input.outline {
+            scene.outline = otl;
+        }
+        if input.pov_character_id.is_some() {
+            scene.pov_character_id = input.pov_character_id;
+        }
+        if let Some(loc) = input.location_id {
+            scene.location_id = loc;
+        }
+        if let Some(ct) = input.conflict_target {
+            scene.conflict_target = Some(ct);
+        }
+        if let Some(st) = input.status {
+            scene.status = st;
+        }
+
+        conn.execute(
+            "UPDATE scenes SET sequence = ?1, order_index = ?2, title = ?3, scene_number = ?4,
+                               objective = ?5, outline = ?6, pov_character_id = ?7, location_id = ?8,
+                               conflict_target = ?9, status = ?10
+             WHERE id = ?11",
+            params![
+                scene.sequence,
+                scene.order_index,
+                &scene.title,
+                scene.scene_number,
+                &scene.objective,
+                &scene.outline,
+                &scene.pov_character_id,
+                &scene.location_id,
+                &scene.conflict_target,
+                &scene.status,
+                &scene.id,
+            ],
+        )?;
+
+        Ok(scene)
     }
 
     // --- STORY EVENTS ---
@@ -5527,8 +5614,7 @@ impl DbManager {
             Err(_) => None,
         };
 
-        if target_novel_id.is_some() {
-            let nid = target_novel_id.as_ref().unwrap();
+        if let Some(ref nid) = target_novel_id {
             let _ = conn.execute(
                 "UPDATE voice_profiles SET is_active = 0 WHERE novel_id = ?1",
                 params![nid],

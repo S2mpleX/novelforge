@@ -16,7 +16,7 @@ import type {
  * 也可通过 options.tone 显式指定。
  */
 
-const DANGER_KEYWORDS = /删除|回退|恢复|清除|不可撤销|彻底/;
+const DANGER_KEYWORDS = /删除|回退|恢复|清除|不可撤销|彻底|重置|清空/;
 
 function normalizeConfirm(options: ConfirmDialogOptions | string): ConfirmDialogOptions {
   const opts = typeof options === 'string' ? { message: options } : options;

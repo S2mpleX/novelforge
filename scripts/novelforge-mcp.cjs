@@ -15,8 +15,38 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const projectRoot = path.resolve(__dirname, '..');
+
+// 隔离运行时目录：防止直接运行 target 目录导致 WebView2Loader.dll 与可执行文件被 Windows 锁死，进而阻断 cargo check / cargo build
+function prepareRuntimeBinary(sourceBinPath) {
+  if (!sourceBinPath) return sourceBinPath;
+  try {
+    const runtimeDir = path.join(os.tmpdir(), 'novelforge_mcp_runtime');
+    if (!fs.existsSync(runtimeDir)) {
+      fs.mkdirSync(runtimeDir, { recursive: true });
+    }
+    const destBin = path.join(runtimeDir, path.basename(sourceBinPath));
+    const sourceDir = path.dirname(sourceBinPath);
+    const loaderSrc = path.join(sourceDir, 'WebView2Loader.dll');
+    const loaderDest = path.join(runtimeDir, 'WebView2Loader.dll');
+
+    if (fs.existsSync(loaderSrc)) {
+      try {
+        fs.copyFileSync(loaderSrc, loaderDest);
+      } catch (_) {}
+    }
+    try {
+      fs.copyFileSync(sourceBinPath, destBin);
+    } catch (_) {}
+
+    if (fs.existsSync(destBin)) {
+      return destBin;
+    }
+  } catch (_) {}
+  return sourceBinPath;
+}
 
 // 探测 MCP 服务端可执行文件路径
 function findBinary() {
@@ -47,7 +77,8 @@ function findBinary() {
   return null;
 }
 
-const binaryPath = findBinary();
+const rawBinaryPath = findBinary();
+const binaryPath = prepareRuntimeBinary(rawBinaryPath);
 
 if (!binaryPath) {
   console.error('[NovelForge MCP Launcher] ❌ 未找到 novelforge_mcp 可执行文件。');

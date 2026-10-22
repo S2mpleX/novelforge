@@ -33,6 +33,94 @@ export const FOCUS_WRITING_LAYOUT: WorkspaceLayout = {
   },
 };
 
+export const TRI_PLAN_LAYOUT: WorkspaceLayout = {
+  version: 1,
+  activePresetKey: 'tri_plan',
+  maximizedInstanceId: null,
+  floatingPanels: [],
+  root: {
+    type: 'split',
+    id: 'split_tri_plan_root',
+    orientation: 'horizontal',
+    sizes: [22, 52, 26],
+    children: [
+      {
+        type: 'tabs',
+        id: 'tab_tri_plan_left',
+        panels: [
+          { instanceId: 'plot_outline_main', panelType: 'plot_outline', title: '剧情大纲' },
+          { instanceId: 'chapters_main', panelType: 'chapters', title: '章节目录' },
+          { instanceId: 'story_arcs_main', panelType: 'story_arcs', title: '故事弧' },
+        ],
+        activeInstanceId: 'plot_outline_main',
+      },
+      {
+        type: 'tabs',
+        id: 'tab_tri_plan_center',
+        panels: [
+          { instanceId: 'character_sandbox_main', panelType: 'character_sandbox', title: '角色思维演武沙盒' },
+          { instanceId: 'character_flow_main', panelType: 'character_flow', title: '人物关系图谱' },
+          { instanceId: 'timeline_main', panelType: 'timeline', title: '小说时间线' },
+        ],
+        activeInstanceId: 'character_sandbox_main',
+      },
+      {
+        type: 'tabs',
+        id: 'tab_tri_plan_right',
+        panels: [
+          { instanceId: 'character_profiles_main', panelType: 'character_profiles', title: '角色档案' },
+          { instanceId: 'world_settings_main', panelType: 'world_settings', title: '世界法则设定' },
+          { instanceId: 'memory_engine_main', panelType: 'memory_engine', title: '设定记忆检索' },
+        ],
+        activeInstanceId: 'character_profiles_main',
+      },
+    ],
+  },
+};
+
+export const TRI_POLISH_LAYOUT: WorkspaceLayout = {
+  version: 1,
+  activePresetKey: 'tri_polish',
+  maximizedInstanceId: null,
+  floatingPanels: [],
+  root: {
+    type: 'split',
+    id: 'split_tri_polish_root',
+    orientation: 'horizontal',
+    sizes: [20, 52, 28],
+    children: [
+      {
+        type: 'tabs',
+        id: 'tab_tri_polish_left',
+        panels: [
+          { instanceId: 'chapters_main', panelType: 'chapters', title: '章节目录' },
+          { instanceId: 'version_history_main', panelType: 'version_history', title: '章节版本对比' },
+        ],
+        activeInstanceId: 'chapters_main',
+      },
+      {
+        type: 'tabs',
+        id: 'tab_tri_polish_center',
+        panels: [
+          { instanceId: 'editor_main', panelType: 'editor', title: '正文编辑器' },
+        ],
+        activeInstanceId: 'editor_main',
+      },
+      {
+        type: 'tabs',
+        id: 'tab_tri_polish_right',
+        panels: [
+          { instanceId: 'review_report_main', panelType: 'review_report', title: '审稿质检与修复' },
+          { instanceId: 'typesetter_cleaner_main', panelType: 'typesetter_cleaner', title: '网文排版与敏感词' },
+          { instanceId: 'full_check_main', panelType: 'full_check', title: '全书一致性体检' },
+          { instanceId: 'editor_in_chief_main', panelType: 'editor_in_chief', title: 'AI 主编控制台' },
+        ],
+        activeInstanceId: 'review_report_main',
+      },
+    ],
+  },
+};
+
 export const AGENT_COLLABORATION_LAYOUT: WorkspaceLayout = {
   version: 1,
   activePresetKey: 'agent_collaboration',
@@ -307,12 +395,33 @@ export const WORKFLOW_PIPELINE_LAYOUT: WorkspaceLayout = {
 };
 
 export const BUILTIN_WORKSPACE_PRESETS: Record<string, WorkspacePreset> = {
+  tri_plan: {
+    id: 'tri_plan',
+    name: '🌿 构思设计布局',
+    description: '作者极简三态之【构思】：左侧大纲，中央沙盒与人物拓扑，右侧档案法则与记忆，专注剧情与设定推敲。',
+    isBuiltIn: true,
+    layout: TRI_PLAN_LAYOUT,
+  },
   focus_writing: {
     id: 'focus_writing',
-    name: '专注写作布局',
-    description: '正文编辑器占据大部分空间，左侧章节目录，右侧 AI 助手，适合高效码字与心流沉浸。',
+    name: '✍️ 沉浸码字布局',
+    description: '作者极简三态之【码字】：正文编辑器占据核心视觉，左侧轻量目录，右侧灵感陪伴，极致降噪。',
     isBuiltIn: true,
     layout: FOCUS_WRITING_LAYOUT,
+  },
+  tri_write: {
+    id: 'tri_write',
+    name: '✍️ 沉浸码字布局',
+    description: '作者极简三态之【码字】：正文编辑器占据核心视觉，左侧轻量目录，右侧灵感陪伴，极致降噪。',
+    isBuiltIn: true,
+    layout: FOCUS_WRITING_LAYOUT,
+  },
+  tri_polish: {
+    id: 'tri_polish',
+    name: '🔍 审稿精修布局',
+    description: '作者极简三态之【精修】：正文与审稿质检、智能排版清洗、版本对比一体化呈现，保障成书质量。',
+    isBuiltIn: true,
+    layout: TRI_POLISH_LAYOUT,
   },
   concept_workshop: {
     id: 'concept_workshop',

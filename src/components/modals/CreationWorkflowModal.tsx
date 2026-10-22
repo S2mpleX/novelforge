@@ -176,7 +176,7 @@ export const CreationWorkflowModal: React.FC<CreationWorkflowModalProps> = ({
         )}
 
         {/* Modal Body: Pipeline Step Cards */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
           <div className="text-xs text-ink-2 dark:text-[#9e9383] flex items-center gap-1.5 font-medium mb-1">
             <Layers className="w-4 h-4 text-primary dark:text-amber-400" />
             <span>推荐按以下流水线依序推进创作。点击任意阶段可直接跳转：</span>
